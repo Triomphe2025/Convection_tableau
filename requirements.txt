@@ -1,0 +1,16 @@
+# Requirements pour le projet d'extraction d'images
+
+# Manipulation de fichiers Word
+python-docx==1.1.2
+
+# Manipulation d'images (optionnel mais recommandé)
+Pillow>=11.0.0
+
+# Optionnel: pour les rapports Excel avancés
+openpyxl==3.1.5
+
+# OCR et traitement d'images avancées
+opencv-python>=4.8.0
+pytesseract>=0.3.10
+numpy>=1.24.0
+pandas>=2.0.0

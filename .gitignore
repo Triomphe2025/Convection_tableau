@@ -1,0 +1,39 @@
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+env/
+venv/
+.venv/
+
+# VS Code
+.vscode/
+
+# macOS files
+.DS_Store
+
+# Python packaging
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Logs
+*.log
+
+# Generated Excel / test outputs
+*.xlsx
+*.xls
+
+# Word and document files
+*.docx
+*.doc
+
+# Other temporary files
+*.tmp
+*.swp
+*~
+
+# output folders
+VD23111 PE 162/
