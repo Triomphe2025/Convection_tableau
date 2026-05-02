@@ -1,28 +1,36 @@
 #!/usr/bin/env python3
 """
-Point d'entrée simple pour extraire les images.
+Point d'entrée principal.
 
-Exécution:
-    python run.py
+Étapes exécutées :
+  1. Extraction des images depuis le fichier Word source
+  2. OCR sur chaque image avec BornierTableExtractor
+  3. Génération de tous_les_borniers.xlsx  (tous les tableaux, feuille unique)
+  4. Génération de tous_les_borniers.docx  (tous les tableaux, document unique)
+
+Exécution :
+    py run.py
 """
 
 import sys
 import logging
 from pathlib import Path
 
-# Importer la configuration et le pipeline
-from config import Config, ConfigDev, ConfigProd
+from config import Config
 from recuperer_image import ImageExtractionPipeline
+from generer_classeur import extraire_tous, generer_excel, generer_word
 
 
 def setup_logging(log_level: str) -> None:
-    """Configure le système de logging."""
     numeric_level = getattr(logging, log_level.upper(), logging.INFO)
-    logging.basicConfig(level=numeric_level)
+    logging.basicConfig(
+        level=numeric_level,
+        format='%(levelname)s: %(message)s'
+    )
 
 
 def get_word_file_path() -> Path:
-    """Demande à l'utilisateur le chemin du fichier Word à traiter, ou utilise la config."""
+    """Résout le chemin du fichier Word source."""
     if len(sys.argv) > 1 and sys.argv[1].strip():
         user_input = sys.argv[1].strip().strip('"').strip("'")
     else:
@@ -35,126 +43,129 @@ def get_word_file_path() -> Path:
     if word_file.exists():
         return word_file
 
-    if word_file.suffix.lower() != ".docx":
-        alternate = word_file.with_suffix(".docx")
-        if alternate.exists():
-            return alternate
+    if word_file.suffix.lower() != '.docx':
+        alt = word_file.with_suffix('.docx')
+        if alt.exists():
+            return alt
 
-    # Si pas trouvé, demander à l'utilisateur
-    while not user_input:
-        user_input = input("Entrez le chemin du document Word (.docx) : ").strip().strip('"').strip("'")
+    # Demander à l'utilisateur si le fichier n'est pas trouvé
+    while True:
+        user_input = input(
+            "Chemin du document Word (.docx) : "
+        ).strip().strip('"').strip("'")
         if not user_input:
-            print("Veuillez indiquer un chemin de fichier valide.")
-        else:
-            word_file = Path(user_input)
-            if not word_file.is_absolute():
-                word_file = Path.cwd() / word_file
-            if word_file.exists():
-                return word_file
-
-    return word_file
+            print("  Veuillez indiquer un chemin valide.")
+            continue
+        word_file = Path(user_input)
+        if not word_file.is_absolute():
+            word_file = Path.cwd() / word_file
+        if word_file.exists():
+            return word_file
+        print(f"  Fichier introuvable : {word_file}")
 
 
 def main() -> int:
-    """
-    Point d'entrée principal.
-    
-    Returns:
-        int: Code de sortie (0 = succès, 1 = erreur)
-    """
+    sep = '=' * 62
+
+    # ── Étape 1 : extraction des images depuis le Word ────────────────
+    print(f'\n{sep}')
+    print('  ÉTAPE 1 — EXTRACTION DES IMAGES DEPUIS LE WORD')
+    print(sep)
+
     try:
-        # Afficher la bannière
-        print("\n" + "=" * 60)
-        print("🖼️  EXTRACTEUR D'IMAGES DEPUIS WORD")
-        print("=" * 60 + "\n")
-        
-        # Demander le fichier Word à traiter
         word_file = get_word_file_path()
-        
-        # Valider la configuration globale
         Config.validate()
-        
-        # Afficher les paramètres
-        Config.display_config(word_file=word_file)
-        print()
-        
-        # Vérifications avant traitement
-        if not word_file.exists():
-            print(f"❌ Erreur: Le fichier Word n'existe pas")
-            print(f"   Attendu: {word_file}")
-            return 1
-        
-        print(f"✅ Fichier Word trouvé: {word_file.name}")
-        print()
-        
-        # Créer et exécuter le pipeline
-        print("🚀 Démarrage du traitement...\n")
-        
+    except Exception as e:
+        print(f'  Erreur de configuration : {e}')
+        return 1
+
+    if not word_file.exists():
+        print(f'  Fichier Word introuvable : {word_file}')
+        return 1
+
+    print(f'  Fichier : {word_file.name}')
+    print(f'  Dossier de sortie : {Config.IMAGES_FOLDER_NAME}\n')
+
+    try:
+        # Le pipeline extrait uniquement les images (pas d'OCR ici,
+        # l'OCR est géré par generer_classeur avec BornierTableExtractor)
         pipeline = ImageExtractionPipeline(
             word_path=str(word_file),
             output_folder=Config.IMAGES_FOLDER_NAME,
-            enable_ocr=Config.ENABLE_OCR,
+            enable_ocr=False,
             tesseract_path=Config.TESSERACT_PATH,
-            export_excel=Config.EXPORT_EXCEL
+            export_excel=False
         )
-        
         results = pipeline.run()
-        
-        # Afficher les résultats
-        print()
-        print("=" * 60)
-        print("✅ TRAITEMENT RÉUSSI")
-        print("=" * 60)
-        print(f"📊 Résultats:")
-        print(f"   • Images trouvées: {results['total']}")
-        print(f"   • Images enregistrées: {results['saved']}")
-        print(f"   • Erreurs: {results['errors']}")
-        print(f"   • Localisation: {results['output_path']}")
-        
-        # Résultats OCR
-        if results.get('ocr_enabled', False):
-            ocr_results = results.get('ocr_results', [])
-            successful_ocr = sum(1 for r in ocr_results if r.get('success', False))
-            print(f"   • Documents OCR créés: {successful_ocr}/{len(ocr_results)}")
-            if successful_ocr > 0:
-                print(f"   • Tables OCR dans: {results['output_path']}/ocr_tables")
-            if results.get('export_excel', False):
-                print(f"   • Fichiers Excel créés dans: {results['output_path']}/ocr_tables")
-        
-        print("=" * 60 + "\n")
-        
-        # Vérifier s'il y a eu des erreurs
-        if results['errors'] > 0:
-            print(f"⚠️  Attention: {results['errors']} image(s) n'a pas pu être traitée(s)")
-            print("   Consultez les messages ci-dessus pour plus de détails.\n")
-            return 1
-        
-        if results['saved'] > 0:
-            print(f"💾 Vos images sont prêtes dans: {results['output_path']}\n")
-            if results.get('ocr_enabled', False) and successful_ocr > 0:
-                print(f"📝 Vos tableaux OCR sont dans: {results['output_path']}/ocr_tables\n")
-            return 0
-        else:
-            print("⚠️  Aucune image n'a été trouvée dans le document.\n")
-            return 1
-    
-    except FileNotFoundError as e:
-        print(f"❌ Fichier non trouvé: {e}\n")
-        return 1
-    
-    except ValueError as e:
-        print(f"❌ Erreur de configuration: {e}\n")
-        return 1
-    
     except Exception as e:
-        print(f"❌ Erreur inattendue: {e}\n")
+        print(f'  Erreur lors de l\'extraction : {e}')
         return 1
 
+    print(f'\n  Images extraites : {results["saved"]} / {results["total"]}')
+    if results['errors']:
+        print(f'  Erreurs          : {results["errors"]}')
 
-if __name__ == "__main__":
-    # Configurer le logging
+    if results['saved'] == 0:
+        print('  Aucune image extraite — arrêt.')
+        return 1
+
+    # ── Étapes 2-4 : OCR + génération des classeurs ──────────────────
+    images_dir = Config.get_output_folder()
+    out_dir = Path.cwd()
+
+    print(f'\n{sep}')
+    print('  ÉTAPE 2 — OCR SUR CHAQUE IMAGE')
+    print(sep)
+
+    try:
+        ocr_results, extractor = extraire_tous(images_dir)
+    except Exception as e:
+        print(f'  Erreur OCR : {e}')
+        return 1
+
+    if not ocr_results:
+        print('  Aucun résultat OCR — arrêt.')
+        return 1
+
+    print(f'\n{sep}')
+    print('  ÉTAPE 3 — GÉNÉRATION DU CLASSEUR EXCEL')
+    print(sep)
+
+    try:
+        generer_excel(
+            ocr_results, extractor,
+            out_dir / 'tous_les_borniers.xlsx'
+        )
+    except Exception as e:
+        print(f'  Erreur Excel : {e}')
+
+    print(f'\n{sep}')
+    print('  ÉTAPE 4 — GÉNÉRATION DU DOCUMENT WORD')
+    print(sep)
+
+    try:
+        generer_word(
+            ocr_results, extractor,
+            out_dir / 'tous_les_borniers.docx'
+        )
+    except Exception as e:
+        print(f'  Erreur Word : {e}')
+
+    # ── Résumé final ──────────────────────────────────────────────────
+    ok = sum(1 for r in ocr_results if r.get('success'))
+    print(f'\n{sep}')
+    print('  TERMINÉ')
+    print(sep)
+    print(f'  Images extraites   : {results["saved"]}')
+    print(f'  Tableaux lus       : {ok} / {len(ocr_results)}')
+    print()
+    print('  Fichiers créés :')
+    print('    → tous_les_borniers.xlsx')
+    print('    → tous_les_borniers.docx')
+    print(sep)
+    return 0
+
+
+if __name__ == '__main__':
     setup_logging(Config.LOG_LEVEL)
-    
-    # Exécuter
-    exit_code = main()
-    sys.exit(exit_code)
+    sys.exit(main())

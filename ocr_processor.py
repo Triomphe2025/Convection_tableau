@@ -5,15 +5,16 @@ Ce module utilise OpenCV et Tesseract pour extraire le texte des images
 et créer des tableaux structurés dans des documents Word.
 """
 
+import re
 import cv2
 import pytesseract
 import numpy as np
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from docx import Document
 from docx.shared import Inches
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font
+from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 import logging
 
@@ -37,6 +38,7 @@ class OCRTableProcessor:
             tesseract_path: Chemin vers Tesseract (optionnel)
             language: Langue pour l'OCR
         """
+        self.tesseract_path = tesseract_path
         if tesseract_path:
             pytesseract.pytesseract.tesseract_cmd = tesseract_path
 
@@ -655,86 +657,570 @@ class OCRTableProcessor:
                               save_excel: bool = False,
                               excel_output_path: Optional[Path] = None) -> Dict:
         """
-        Pipeline complet: image → OCR → tableau → Word.
-
-        Args:
-            image_path: Chemin de l'image à traiter
-            output_path: Chemin du document Word de sortie
-            save_excel: Crée également un fichier Excel si True
-            excel_output_path: Chemin du fichier Excel de sortie
-
-        Returns:
-            Statistiques du traitement
+        Pipeline complet: image → OCR → tableau → Word/Excel.
+        Utilise BornierTableExtractor pour une extraction précise.
         """
-        logger.info(f"🚀 Début du traitement OCR pour: {image_path.name}")
-
+        logger.info(f"🚀 Traitement OCR: {image_path.name}")
         try:
-            # Prétraitement
-            processed_image = self.preprocess_image(image_path)
+            extractor = BornierTableExtractor(
+                tesseract_path=self.tesseract_path,
+                language=self.language
+            )
+            result = extractor.extract(image_path)
 
-            # OCR
-            text_data = self.extract_text_data(processed_image)
+            if not result['success']:
+                logger.warning(f"⚠ {result.get('error', 'Échec')}")
+                return {'success': False, 'error': result.get('error')}
 
-            if not text_data:
-                logger.warning("⚠ Aucune donnée texte trouvée")
-                return {'success': False, 'error': 'No text found'}
-
-            # Détection de la grille du tableau
-            grid = self.detect_table_grid(processed_image)
-            if grid.get('valid'):
-                table_data = self.build_table_data_from_grid(text_data, grid)
-                table_structure = {
-                    'columns': max(len(row) for row in table_data) if table_data else 0,
-                    'column_widths': [grid['col_edges'][i + 1] - grid['col_edges'][i]
-                                      for i in range(len(grid['col_edges']) - 1)]
-                }
-            else:
-                # Regroupement par lignes
-                lines = self.group_by_lines(text_data)
-                table_data = self.build_table_data_from_lines(lines)
-                table_structure = {
-                    'columns': max(len(row) for row in table_data) if table_data else 0,
-                    'column_widths': []
-                }
-
-            # Filtrage commun : ajouter en-tête si absent, filtrer borne <=3, remplacer vides par 'none'
-            if table_data:
-                if table_data[0] != ['BORNE', 'COULEUR', 'SIGNAL', 'JARRETIERES']:
-                    table_data.insert(0, ['BORNE', 'COULEUR', 'SIGNAL', 'JARRETIERES'])
-                filtered_data = [table_data[0]]
-                for row in table_data[1:]:
-                    row_text = ' '.join(str(cell) for cell in row).upper()
-                    if (len(row) > 0 and len(str(row[0])) <= 3 and
-                        not any(keyword in row_text for keyword in ['PLAN', 'PAGE', 'INDICE', 'PE ', 'MTI'])):
-                        filtered_row = [cell if cell else 'none' for cell in row[:4]]
-                        filtered_data.append(filtered_row)
-                table_data = filtered_data
-
-            # Création du document Word
-            self.create_word_document(table_data, table_structure,
-                                     output_path, image_path)
+            extractor.to_word(result, output_path)
 
             if save_excel:
                 if excel_output_path is None:
                     excel_output_path = output_path.with_suffix('.xlsx')
-                self.create_excel_document(table_data, excel_output_path, image_path)
+                extractor.to_excel(result, excel_output_path)
 
-            stats = {
+            data_rows = [r for r in result['rows'] if r['type'] == 'data']
+            logger.info(f"✅ Terminé: {len(data_rows)} lignes de données")
+            return {
                 'success': True,
                 'image_path': str(image_path),
                 'output_path': str(output_path),
-                'text_elements': len(text_data),
-                'table_rows': len(table_data),
-                'columns': table_structure.get('columns', 0),
+                'text_elements': sum(
+                    len([c for c in r.get('cells', []) if c])
+                    for r in data_rows
+                ),
+                'table_rows': len(result['rows']),
+                'columns': len(result['headers']),
                 'excel_path': str(excel_output_path) if save_excel else None
             }
-
-            logger.info(f"✅ Traitement terminé avec succès")
-            return stats
-
         except Exception as e:
-            logger.error(f"✗ Erreur lors du traitement: {e}")
+            logger.error(f"✗ Erreur: {e}")
             return {'success': False, 'error': str(e)}
+
+
+class BornierTableExtractor:
+    """
+    Extracteur générique pour tableaux tabulaires dans des images.
+
+    Paramétrable via TableTemplate : colonnes, séparateur de section,
+    pied de page. Compatible avec n'importe quelle structure de tableau.
+    """
+
+    # Modèle par défaut (rétrocompatibilité)
+    EXPECTED_HEADERS = ['BORNE', 'COULEUR', 'SIGNAL', 'JARRETIERES']
+
+    def __init__(self, tesseract_path: Optional[str] = None,
+                 language: str = 'fra',
+                 template=None):
+        """
+        Args:
+            tesseract_path: Chemin vers tesseract.exe (None = PATH système)
+            language:       Code langue Tesseract (ex: 'fra', 'eng')
+            template:       TableTemplate — structure du tableau à extraire.
+                            Si None, utilise le modèle bornier standard.
+        """
+        if tesseract_path:
+            pytesseract.pytesseract.tesseract_cmd = tesseract_path
+        self.language = language
+
+        # Résoudre le modèle
+        if template is None:
+            from template import DEFAULT_TEMPLATE
+            self._tpl = DEFAULT_TEMPLATE
+        else:
+            self._tpl = template
+
+        self._col_keywords = [c.upper() for c in self._tpl.columns]
+
+    # ------------------------------------------------------------------
+    # Étape 1 : Prétraitement
+    # ------------------------------------------------------------------
+
+    def _preprocess(self, image_path: Path) -> Tuple[np.ndarray, int]:
+        """Charge, met à l'échelle et binarise l'image."""
+        img = cv2.imread(str(image_path))
+        if img is None:
+            raise ValueError(f"Image non trouvée: {image_path}")
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        h, w = gray.shape
+        # Agrandir si trop petite pour l'OCR
+        if w < 1400:
+            scale = 1400 / w
+            gray = cv2.resize(
+                gray, None, fx=scale, fy=scale,
+                interpolation=cv2.INTER_CUBIC
+            )
+        # Binarisation Otsu : excellente pour les scans propres
+        _, binary = cv2.threshold(
+            gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+        )
+        return binary, binary.shape[1]
+
+    # ------------------------------------------------------------------
+    # Étape 2 : OCR
+    # ------------------------------------------------------------------
+
+    def _ocr_elements(self, image: np.ndarray) -> List[Dict]:
+        """Retourne tous les mots détectés avec leur position."""
+        config = f'--oem 3 --psm 6 -l {self.language}'
+        data = pytesseract.image_to_data(
+            image, config=config,
+            output_type=pytesseract.Output.DICT
+        )
+        elements = []
+        for i in range(len(data['text'])):
+            text = data['text'][i].strip()
+            try:
+                conf = int(data['conf'][i])
+            except (TypeError, ValueError):
+                conf = 0
+            if text and conf > 15:
+                x, y = data['left'][i], data['top'][i]
+                w, h = data['width'][i], data['height'][i]
+                elements.append({
+                    'text': text,
+                    'x': x, 'y': y, 'w': w, 'h': h,
+                    'cx': x + w // 2,
+                    'cy': y + h // 2,
+                    'conf': conf,
+                })
+        return elements
+
+    # ------------------------------------------------------------------
+    # Étape 3 : Regroupement en lignes
+    # ------------------------------------------------------------------
+
+    def _group_lines(self, elements: List[Dict]) -> List[List[Dict]]:
+        """Regroupe les mots OCR en lignes horizontales."""
+        if not elements:
+            return []
+        heights = [e['h'] for e in elements if e['h'] > 0]
+        tol = max(8, int(np.median(heights) * 0.6)) if heights else 12
+
+        sorted_elems = sorted(elements, key=lambda e: e['cy'])
+        lines, cur_line = [], [sorted_elems[0]]
+        cur_y = sorted_elems[0]['cy']
+
+        for elem in sorted_elems[1:]:
+            if abs(elem['cy'] - cur_y) <= tol:
+                cur_line.append(elem)
+                cur_y = int(np.mean([e['cy'] for e in cur_line]))
+            else:
+                lines.append(sorted(cur_line, key=lambda e: e['x']))
+                cur_line = [elem]
+                cur_y = elem['cy']
+        lines.append(sorted(cur_line, key=lambda e: e['x']))
+        return lines
+
+    # ------------------------------------------------------------------
+    # Étape 4 : Détection de l'en-tête et des frontières de colonnes
+    # ------------------------------------------------------------------
+
+    def _find_header_idx(self, lines: List[List[Dict]]) -> Optional[int]:
+        """Trouve la ligne contenant les mots-clés de colonnes du modèle."""
+        keywords = self._col_keywords
+        for i, line in enumerate(lines):
+            full = ' '.join(e['text'].upper() for e in line)
+            hits = sum(
+                1 for h in keywords
+                if h in full or any(h in e['text'].upper() for e in line)
+            )
+            if hits >= max(2, len(keywords) // 2):
+                return i
+        return None
+
+    def _col_boundaries(
+        self, header_line: List[Dict], img_w: int
+    ) -> Tuple[List[int], List[str]]:
+        """
+        Calcule les frontières de colonnes à partir des mots de l'en-tête.
+        Retourne (boundaries, col_names) où boundaries a len = n_cols + 1.
+        """
+        keywords = self._col_keywords
+        positions: Dict[str, int] = {}
+        for elem in header_line:
+            up = elem['text'].upper()
+            for hdr in keywords:
+                if hdr in up and hdr not in positions:
+                    positions[hdr] = elem['cx']
+
+        if len(positions) >= max(2, len(keywords) // 2):
+            ordered = sorted(positions.items(), key=lambda x: x[1])
+            ctrs = [v for _, v in ordered]
+            names = [k for k, _ in ordered]
+            bounds = [0]
+            for i in range(len(ctrs) - 1):
+                bounds.append((ctrs[i] + ctrs[i + 1]) // 2)
+            bounds.append(img_w)
+            return bounds, names
+
+        # Repli : colonnes égales
+        n = len(keywords) or 4
+        step = img_w // n
+        return [i * step for i in range(n + 1)], list(keywords)
+
+    # ------------------------------------------------------------------
+    # Étape 5 : Classification des lignes
+    # ------------------------------------------------------------------
+
+    def _classify_line(self, line: List[Dict]) -> str:
+        """Retourne 'section', 'footer' ou 'data' selon le modèle actif."""
+        text = ' '.join(e['text'].upper() for e in line)
+        kw = self._tpl.section_keyword.upper()
+        if kw in text or kw[:min(10, len(kw))] in text:
+            return 'section'
+        if not self._tpl.has_footer:
+            return 'data'
+        for m in self._tpl.footer_detect_keywords:
+            if m.upper() in text:
+                return 'footer'
+        tokens = {e['text'].upper() for e in line}
+        mti = set(t.upper() for t in self._tpl.footer_mti_tokens)
+        if tokens <= (mti | {'|', '-', '.', ':'}):
+            return 'footer'
+        return 'data'
+
+    # ------------------------------------------------------------------
+    # Étape 6 : Affectation des mots aux colonnes
+    # ------------------------------------------------------------------
+
+    def _line_to_cells(
+        self, line: List[Dict], bounds: List[int], n_cols: int
+    ) -> List[str]:
+        """Affecte chaque mot à une colonne selon sa position X."""
+        cells = [''] * n_cols
+        for elem in line:
+            cx = elem['cx']
+            col = n_cols - 1
+            for i in range(len(bounds) - 1):
+                if bounds[i] <= cx < bounds[i + 1]:
+                    col = i
+                    break
+            cells[col] = (cells[col] + ' ' + elem['text']).strip()
+        return cells
+
+    # ------------------------------------------------------------------
+    # Étape 7 : Extraction des métadonnées du pied de page
+    # ------------------------------------------------------------------
+
+    def _extract_meta(
+        self, footer_lines: List[List[Dict]]
+    ) -> Dict[str, str]:
+        """Extrait BORNIER, PAGE, P.E.T., INDICE, NO PLAN depuis le pied."""
+        text = ' '.join(
+            e['text'] for line in footer_lines for e in line
+        ).upper()
+        meta = {}
+        patterns = [
+            ('PET',     r'P\.?E\.?T\.?\s*[:\s]\s*([A-Z0-9]+(?:\s[A-Z0-9]+)?)'),
+            ('BORNIER', r'BORNIER\s*[:\s]\s*([A-Z0-9]+)'),
+            ('NO_PLAN', r'(?:NO|N°)\s*PLAN\s*[:\s]\s*([\w\s]+?)(?=\s*[|]|\s*INDICE|$)'),
+            ('INDICE',  r'INDICE\s*[:\s]\s*(\d+)'),
+            ('PAGE',    r'PAGE\s*[:\s]\s*(\d+)'),
+        ]
+        for key, pat in patterns:
+            m = re.search(pat, text)
+            if m:
+                meta[key] = m.group(1).strip()
+        return meta
+
+    # ------------------------------------------------------------------
+    # Pipeline principal
+    # ------------------------------------------------------------------
+
+    def extract(self, image_path: Path) -> Dict:
+        """
+        Extraction complète : image → dict structuré.
+
+        Retourne:
+            success  : bool
+            headers  : liste des noms de colonnes
+            rows     : liste de dicts {'type': 'data'|'section', 'cells'|'text'}
+            metadata : dict avec BORNIER, PAGE, PET, INDICE, NO_PLAN
+        """
+        try:
+            binary, img_w = self._preprocess(image_path)
+            elements = self._ocr_elements(binary)
+            if not elements:
+                return {'success': False, 'error': 'Aucun texte détecté'}
+
+            lines = self._group_lines(elements)
+            h_idx = self._find_header_idx(lines)
+
+            if h_idx is not None:
+                bounds, col_names = self._col_boundaries(
+                    lines[h_idx], img_w
+                )
+                data_lines = lines[h_idx + 1:]
+            else:
+                n = len(self._col_keywords) or 4
+                step = img_w // n
+                bounds = [i * step for i in range(n + 1)]
+                col_names = list(self._col_keywords)
+                data_lines = lines
+
+            n_cols = len(col_names)
+            rows: List[Dict] = []
+            footer_lines: List[List[Dict]] = []
+
+            for line in data_lines:
+                ltype = self._classify_line(line)
+                if ltype == 'footer':
+                    footer_lines.append(line)
+                elif ltype == 'section':
+                    rows.append({
+                        'type': 'section',
+                        'text': ' '.join(e['text'] for e in line)
+                    })
+                else:
+                    cells = self._line_to_cells(line, bounds, n_cols)
+                    if any(c for c in cells):
+                        rows.append({'type': 'data', 'cells': cells})
+
+            return {
+                'success': True,
+                'headers': col_names,
+                'rows': rows,
+                'metadata': self._extract_meta(footer_lines),
+                'image_path': str(image_path),
+            }
+        except Exception as e:
+            logger.error(f"Erreur extraction {image_path.name}: {e}")
+            return {'success': False, 'error': str(e)}
+
+    # ------------------------------------------------------------------
+    # Génération Excel
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Helpers partagés (Excel + classeur combiné)
+    # ------------------------------------------------------------------
+
+    def _fill_worksheet(self, ws, result: Dict,
+                        start_row: int = 1) -> int:
+        """
+        Remplit un onglet Excel à partir de start_row.
+
+        Mise en forme fidèle à l'original :
+          - En-tête  : fond gris, bordure complète
+          - Données  : séparateurs verticaux seulement
+          - Sections : pointillé au-dessus
+          - Pied     : M T I dans col 1 (fusionné 2 lignes),
+                       P.E.T./BORNIER et NO PLAN dans cols 2-n
+
+        Retourne la prochaine ligne disponible après le tableau
+        (utile pour empiler plusieurs tableaux sur une même feuille).
+        """
+        headers = result.get('headers', self.EXPECTED_HEADERS)
+        rows = result.get('rows', [])
+        meta = result.get('metadata', {})
+        n_cols = len(headers)
+
+        # ── Styles ────────────────────────────────────────────────────
+        thin = Side(style='thin')
+        dashed = Side(style='dashed')
+        ns = Side(style=None)           # no_side
+        full_b = Border(left=thin, right=thin, top=thin, bottom=thin)
+        data_b = Border(left=thin, right=thin, top=ns, bottom=ns)
+        sect_b = Border(left=thin, right=thin, top=dashed, bottom=ns)
+
+        bold = Font(bold=True)
+        bold_ital = Font(bold=True, italic=True)
+        center = Alignment(horizontal='center', vertical='center',
+                           wrap_text=True)
+        left_top = Alignment(horizontal='left', vertical='top',
+                             wrap_text=True)
+        vcenter = Alignment(horizontal='left', vertical='center')
+        hfill = PatternFill('solid', fgColor='D9D9D9')
+
+        # ── Largeurs de colonnes (seulement à la 1re ligne de la feuille)
+        if start_row == 1:
+            for ci, hdr in enumerate(headers, 1):
+                ws.column_dimensions[get_column_letter(ci)].width = (
+                    self._tpl.col_width(hdr)
+                )
+
+        # ── En-tête ───────────────────────────────────────────────────
+        for ci, hdr in enumerate(headers, 1):
+            c = ws.cell(row=start_row, column=ci, value=hdr)
+            c.font = bold
+            c.alignment = center
+            c.fill = hfill
+            c.border = full_b
+
+        # ── Données et sections ───────────────────────────────────────
+        cur = start_row + 1
+        for row_data in rows:
+            if row_data['type'] == 'section':
+                ws.merge_cells(start_row=cur, start_column=1,
+                               end_row=cur, end_column=n_cols)
+                c = ws.cell(row=cur, column=1, value=row_data['text'])
+                c.font = bold_ital
+                c.alignment = left_top
+                c.border = sect_b
+            else:
+                for ci, val in enumerate(
+                    row_data.get('cells', []), 1
+                ):
+                    c = ws.cell(row=cur, column=ci, value=val)
+                    c.alignment = left_top
+                    c.border = data_b
+            cur += 1
+
+        # ── Pied de page ──────────────────────────────────────────────
+        if not self._tpl.has_footer:
+            return cur   # pas de pied : première ligne libre = cur
+
+        r = cur
+        row1_txt = self._tpl.render_footer_row1(meta)
+        row2_txt = self._tpl.render_footer_row2(meta)
+
+        # — Cellule gauche : fusionnée sur 2 lignes —
+        ws.merge_cells(start_row=r, start_column=1,
+                       end_row=r + 1, end_column=1)
+        mti = ws.cell(row=r, column=1,
+                      value=self._tpl.footer_left_label)
+        mti.font = bold
+        mti.alignment = Alignment(horizontal='center', vertical='center')
+        ws.cell(row=r,     column=1).border = Border(
+            left=thin, right=thin, top=thin, bottom=ns)
+        ws.cell(row=r + 1, column=1).border = Border(
+            left=thin, right=thin, top=ns, bottom=thin)
+
+        # — Ligne 1 du pied (cols 2 à n_cols) —
+        if n_cols > 1:
+            ws.merge_cells(start_row=r, start_column=2,
+                           end_row=r, end_column=n_cols)
+        ws.cell(row=r, column=2, value=row1_txt).alignment = vcenter
+        for ci in range(2, n_cols + 1):
+            ws.cell(row=r, column=ci).border = Border(
+                left=thin if ci == 2       else ns,
+                right=thin if ci == n_cols else ns,
+                top=thin, bottom=thin,
+            )
+
+        # — Ligne 2 du pied (cols 2 à n_cols) —
+        if n_cols > 1:
+            ws.merge_cells(start_row=r + 1, start_column=2,
+                           end_row=r + 1, end_column=n_cols)
+        ws.cell(row=r + 1, column=2, value=row2_txt).alignment = vcenter
+        for ci in range(2, n_cols + 1):
+            ws.cell(row=r + 1, column=ci).border = Border(
+                left=thin if ci == 2       else ns,
+                right=thin if ci == n_cols else ns,
+                top=ns, bottom=thin,
+            )
+
+        return r + 2   # première ligne libre après le pied de page
+
+    def to_excel(self, result: Dict, output_path: Path) -> None:
+        """Génère un fichier Excel pour un seul bornier."""
+        wb = Workbook()
+        ws = wb.active
+        meta = result.get('metadata', {})
+        ws.title = (meta.get('BORNIER') or 'Bornier')[:31]
+        self._fill_worksheet(ws, result, start_row=1)
+        wb.save(str(output_path))
+        logger.info(f"✓ Excel créé: {output_path.name}")
+
+    # ------------------------------------------------------------------
+    # Helpers partagés (Word + document combiné)
+    # ------------------------------------------------------------------
+
+    def _add_table_to_doc(self, doc, result: Dict) -> None:
+        """
+        Ajoute un tableau de bornier à un document Word existant.
+        Pied de page : M T I col 1, P.E.T./NO PLAN cols 2-n.
+        """
+        headers = result.get('headers', self.EXPECTED_HEADERS)
+        rows = result.get('rows', [])
+        meta = result.get('metadata', {})
+        n_cols = len(headers)
+
+        footer_rows = 2 if self._tpl.has_footer else 0
+        n_table_rows = 1 + len(rows) + footer_rows
+        table = doc.add_table(rows=n_table_rows, cols=n_cols)
+        table.style = 'Table Grid'
+
+        # En-têtes
+        for ci, hdr in enumerate(headers):
+            cell = table.rows[0].cells[ci]
+            cell.text = hdr
+            if cell.paragraphs[0].runs:
+                cell.paragraphs[0].runs[0].bold = True
+
+        # Données / sections
+        for ri, row_data in enumerate(rows, start=1):
+            if row_data['type'] == 'section':
+                rc = table.rows[ri].cells
+                merged = rc[0].merge(rc[n_cols - 1])
+                merged.text = row_data['text']
+                if merged.paragraphs[0].runs:
+                    merged.paragraphs[0].runs[0].bold = True
+            else:
+                for ci, val in enumerate(row_data.get('cells', [])):
+                    if ci < n_cols:
+                        table.rows[ri].cells[ci].text = val
+
+        if not self._tpl.has_footer:
+            return   # pas de pied de page
+
+        fi = 1 + len(rows)
+        row1_txt = self._tpl.render_footer_row1(meta)
+        row2_txt = self._tpl.render_footer_row2(meta)
+
+        f1_col0 = table.rows[fi].cells[0]
+        f2_col0 = table.rows[fi + 1].cells[0]
+        f1_col1 = table.rows[fi].cells[1] if n_cols > 1 else f1_col0
+        f1_coln = table.rows[fi].cells[n_cols - 1]
+        f2_col1 = table.rows[fi + 1].cells[1] if n_cols > 1 else f2_col0
+        f2_coln = table.rows[fi + 1].cells[n_cols - 1]
+
+        # Cellule gauche fusionnée verticalement
+        mti = f1_col0.merge(f2_col0)
+        mti.text = self._tpl.footer_left_label
+        if mti.paragraphs[0].runs:
+            mti.paragraphs[0].runs[0].bold = True
+
+        # Ligne 1 du pied
+        if n_cols > 2:
+            pet_cell = f1_col1.merge(f1_coln)
+        else:
+            pet_cell = f1_col1
+        pet_cell.text = row1_txt
+
+        # Ligne 2 du pied
+        if n_cols > 2:
+            plan_cell = f2_col1.merge(f2_coln)
+        else:
+            plan_cell = f2_col1
+        plan_cell.text = row2_txt
+
+    def to_word(self, result: Dict, output_path: Path) -> None:
+        """Génère un document Word pour un seul bornier."""
+        doc = Document()
+        self._add_table_to_doc(doc, result)
+        doc.save(str(output_path))
+        logger.info(f"✓ Word créé: {output_path.name}")
+
+    def process(self, image_path: Path, output_dir: Path,
+                save_excel: bool = True,
+                save_word: bool = True) -> Dict:
+        """Traite une image et génère les fichiers de sortie."""
+        result = self.extract(image_path)
+        if not result['success']:
+            return result
+        output_dir.mkdir(parents=True, exist_ok=True)
+        stem = image_path.stem
+        if save_excel:
+            ep = output_dir / f"{stem}_table.xlsx"
+            self.to_excel(result, ep)
+            result['excel_path'] = str(ep)
+        if save_word:
+            wp = output_dir / f"{stem}_table.docx"
+            self.to_word(result, wp)
+            result['word_path'] = str(wp)
+        return result
 
 
 class BatchOCRProcessor:
