@@ -1,1 +1,66 @@
-{}
+{
+  "Bornier standard": {
+    "name": "Bornier standard",
+    "columns": [
+      "BORNE",
+      "COULEUR",
+      "SIGNAL",
+      "JARRETIERES"
+    ],
+    "section_keyword": "NOM DU CABLE",
+    "has_footer": true,
+    "footer_left_label": "M  T  I",
+    "footer_row1_format": "P.E.T. : {PET}   BORNIER : {BORNIER}",
+    "footer_row2_format": "NO PLAN : {NO_PLAN}  |  INDICE : {INDICE}  |  PAGE : {PAGE}",
+    "footer_detect_keywords": [
+      "NO PLAN",
+      "P.E.T",
+      "INDICE",
+      "BORNIER :"
+    ],
+    "footer_mti_tokens": [
+      "M",
+      "T",
+      "I"
+    ],
+    "col_widths": {
+      "BORNE": 8.0,
+      "COULEUR": 12.0,
+      "SIGNAL": 50.0,
+      "JARRETIERES": 15.0
+    },
+    "description": "Tableau de bornier : BORNE, COULEUR, SIGNAL, JARRETIERES"
+  },
+  "REPARTITEUR": {
+    "name": "REPARTITEUR",
+    "columns": [
+      "TENANT",
+      "JAR",
+      "ABOUTISSANT",
+      "SIGNAL"
+    ],
+    "section_keyword": "NOM DU CABLE",
+    "has_footer": true,
+    "footer_left_label": "M  T  I",
+    "footer_row1_format": "P.E.T. : {PET}   BORNIER : {BORNIER}",
+    "footer_row2_format": "NO PLAN : {NO_PLAN}  |  INDICE : {INDICE}  |  PAGE : {PAGE}",
+    "footer_detect_keywords": [
+      "NO PLAN",
+      "P.E.T",
+      "INDICE",
+      "BORNIER :"
+    ],
+    "footer_mti_tokens": [
+      "M",
+      "T",
+      "I"
+    ],
+    "col_widths": {
+      "TENANT": 22.0,
+      "JAR": 10.0,
+      "ABOUTISSANT": 22.0,
+      "SIGNAL": 36.0
+    },
+    "description": "Tableau répartiteur : TENANT, JAR., ABOUTISSANT, SIGNAL (documents VD23111 PE 163)"
+  }
+}
