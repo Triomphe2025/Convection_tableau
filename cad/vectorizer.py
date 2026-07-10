@@ -74,13 +74,16 @@ ETAPES = [
 ]
 
 
-def snap_lineweight(width_mm: float) -> int:
-    """Discrétise l'épaisseur en paliers DXF standards (hundredths de mm)."""
+def snap_lineweight(width_mm: float) -> float:
+    """
+    Retourne l'épaisseur en mm (CadEntity.lineweight est en mm).
+    Le DXF writer multiplie par 100 pour obtenir les centièmes de mm ezdxf.
+    """
     if width_mm < 0.40:
-        return 18   # 0.18 mm — fin (cotations, hachures)
+        return 0.09   # fin — dessin technique électrique
     if width_mm < 0.95:
-        return 35   # 0.35 mm — normal (géométrie principale)
-    return 60       # 0.60 mm — gras (cadre, contours)
+        return 0.18   # normal
+    return 0.25       # gras (cadres)
 
 
 def detect_corners(

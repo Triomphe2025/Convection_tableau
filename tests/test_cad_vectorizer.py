@@ -5,24 +5,25 @@ import numpy as np
 
 
 def test_snap_lineweight_fin():
+    """Lignes fines → 0.09 mm (dessin technique électrique)."""
     from cad.vectorizer import snap_lineweight
-    assert snap_lineweight(0.20) == 18
+    assert abs(snap_lineweight(0.20) - 0.09) < 1e-9
 
 
 def test_snap_lineweight_normal():
     from cad.vectorizer import snap_lineweight
-    assert snap_lineweight(0.50) == 35
+    assert abs(snap_lineweight(0.50) - 0.18) < 1e-9
 
 
 def test_snap_lineweight_gras():
     from cad.vectorizer import snap_lineweight
-    assert snap_lineweight(1.20) == 60
+    assert abs(snap_lineweight(1.20) - 0.25) < 1e-9
 
 
 def test_snap_lineweight_frontiere_bas():
-    """La valeur exacte 0.40 doit basculer vers normal (35)."""
+    """La valeur exacte 0.40 doit basculer vers normal (0.18 mm)."""
     from cad.vectorizer import snap_lineweight
-    assert snap_lineweight(0.40) == 35
+    assert abs(snap_lineweight(0.40) - 0.18) < 1e-9
 
 
 def test_detect_corners_angle_droit():
