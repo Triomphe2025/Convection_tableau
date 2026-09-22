@@ -94,9 +94,9 @@ class TestOCRTableProcessor:
 
         # Données de test
         text_data = [
-            {'text': 'A', 'x': 10, 'y': 10},
-            {'text': 'B', 'x': 50, 'y': 12},  # Même ligne
-            {'text': 'C', 'x': 10, 'y': 40},  # Nouvelle ligne
+            {'text': 'A', 'x': 10, 'y': 10, 'height': 10, 'y_center': 15},
+            {'text': 'B', 'x': 50, 'y': 12, 'height': 10, 'y_center': 17},  # Même ligne
+            {'text': 'C', 'x': 10, 'y': 40, 'height': 10, 'y_center': 45},  # Nouvelle ligne
         ]
 
         lines = processor.group_by_lines(text_data, y_threshold=10)
@@ -112,7 +112,7 @@ class TestOCRTableProcessor:
 
         row = [
             {'text': '01A', 'x': 10, 'y': 10, 'width': 20, 'height': 10},
-            {'text': '11', 'x': 50, 'y': 12, 'width': 15, 'height': 10},
+            {'text': '11', 'x': 38, 'y': 12, 'width': 15, 'height': 10},
             {'text': 'FSI-31', 'x': 180, 'y': 11, 'width': 40, 'height': 10},
         ]
 
@@ -279,7 +279,7 @@ class TestOCRTableProcessor:
         assert table_boxes[2]['coordinate'] == 'A2'
         assert table_boxes[3]['coordinate'] == 'B2'
 
-    @patch('docx.Document.save')
+    @patch('docx.document.Document.save')
     def test_create_word_document(self, mock_save, temp_dir):
         """Test la création de document Word."""
         with patch('pytesseract.get_tesseract_version'):
@@ -298,7 +298,7 @@ class TestOCRTableProcessor:
         mock_save.assert_called_once()
 
     @patch('pytesseract.image_to_data')
-    @patch('docx.Document.save')
+    @patch('docx.document.Document.save')
     def test_process_image_to_table_success(self, mock_save, mock_ocr, sample_image, temp_dir):
         """Test le pipeline complet avec succès."""
         with patch('pytesseract.get_tesseract_version'):
@@ -341,7 +341,7 @@ class TestOCRTableProcessor:
         result = processor.process_image_to_table(sample_image, output_path)
 
         assert result['success'] is False
-        assert result['error'] == 'No text found'
+        assert result['error'] == 'Aucun texte détecté'
 
 
 class TestBatchOCRProcessor:

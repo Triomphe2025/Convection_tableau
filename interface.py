@@ -760,6 +760,8 @@ class TriosSeconverterApp(tk.Tk):
         self._output_dir = tk.StringVar()
         self._queue: queue.Queue = queue.Queue()
         self._result = None
+        self._converter = None       # dernier Converter — relu par la vérification
+        self._verif_en_cours = False
         self._tpl_manager = TemplateManager()
         self._tpl_var = tk.StringVar(value=self._tpl_manager.names()[0])
 
@@ -1287,9 +1289,12 @@ class TriosSeconverterApp(tk.Tk):
             inner, "📋 Ouvrir log", self._ouvrir_observateur)
         self._ctx_btn_folder = self._ctx_btn(
             inner, "📂 Dossier sortie", self._open_folder)
+        self._ctx_btn_verif = self._ctx_btn(
+            inner, "🔎 Vérifier", self._ctx_verifier)
 
         for btn in (self._ctx_btn_format, self._ctx_btn_dico,
-                    self._ctx_btn_log, self._ctx_btn_folder):
+                    self._ctx_btn_log, self._ctx_btn_folder,
+                    self._ctx_btn_verif):
             btn.pack(side='left', padx=(0, 8))
 
     def _ctx_btn(self, parent, text: str, command) -> tk.Button:
@@ -1305,6 +1310,63 @@ class TriosSeconverterApp(tk.Tk):
     def _ctx_reformater(self):
         """Barre contextuelle → aller à la page Formater Excel."""
         self._show_page('format')
+
+    def _ctx_verifier(self):
+        """Barre contextuelle → vérifier la conversion (ou annuler la vérification)."""
+        if self._verif_en_cours:
+            self._cancel_event.set()
+            self._ctx_btn_verif.configure(state='disabled', text="⏹ Annulation…")
+            return
+        if self._converter is None:
+            messagebox.showinfo(
+                "Vérification",
+                "Lancez d'abord une conversion : la vérification compare son "
+                "résultat au document scanné.",
+            )
+        else:
+            self._lancer_verification(self._converter)
+
+    def _lancer_verification(self, converter):
+        self._verif_en_cours = True
+        # Un arrêt demandé pendant la conversion ne doit pas bloquer la relecture.
+        self._cancel_event.clear()
+        self._ctx_btn_verif.configure(text="⏹ Annuler la vérification")
+        self.configure(cursor="watch")
+        self._log("═" * 54, 'muted')
+        self._log("  🔎 Vérification de la conversion (relecture Tesseract)…", 'info')
+
+        def _worker_verification():
+            try:
+                self._queue.put(('verif_done', converter.verifier_conversion()))
+            except Exception as exc:
+                self._queue.put(('verif_error', str(exc)))
+
+        threading.Thread(target=_worker_verification, daemon=True).start()
+
+    def _fin_verification(self):
+        self._verif_en_cours = False
+        self.configure(cursor="")
+        self._ctx_btn_verif.configure(text="🔎 Vérifier")
+        self._update_ctx_btn_states()
+
+    def _on_verif_done(self, rapport):
+        annulee = self._cancel_event.is_set()
+        self._fin_verification()
+        if annulee:
+            self._log("  ⏹ Vérification annulée — aucun résultat affiché.", 'warn')
+            return
+        n = len(rapport.a_verifier)
+        self._log(
+            f"  🔎 {n} divergence(s) à vérifier — "
+            f"concordance {rapport.concordance * 100:.1f} %",
+            'ok' if n == 0 else 'warn',
+        )
+        VerificationDialog(self, rapport)
+
+    def _on_verif_error(self, message: str):
+        self._fin_verification()
+        self._log(f"  ✗ Vérification impossible : {message}", 'err')
+        messagebox.showerror("Vérification impossible", message)
 
     def _update_context_toolbar(self):
         """Affiche ou masque la barre contextuelle selon le workflow actif."""
@@ -1339,6 +1401,9 @@ class TriosSeconverterApp(tk.Tk):
 
         s, c = _state(has_outdir)
         self._ctx_btn_folder.configure(state=s, fg=c)
+
+        s, c = _state(self._converter is not None or self._verif_en_cours)
+        self._ctx_btn_verif.configure(state=s, fg=c)
 
     # ── Workflow UX — stepper 3 étapes ───────────────────────────────
 
@@ -1809,20 +1874,30 @@ class TriosSeconverterApp(tk.Tk):
     # ── Workflow UX — pages dessins et mixte (squelettes) ────────────
 
     def _build_page_dessins(self, parent) -> tk.Frame:
-        """Page squelette — Transformation dessins (en développement)."""
+        """Page Transformation dessins — pipeline PDF vectoriel → DXF (Phase 1 MVP)."""
         page = tk.Frame(parent, bg=BG_MAIN)
+        page.rowconfigure(3, weight=1)    # journal extensible — la row 2 est le panneau étapes
+        page.columnconfigure(0, weight=1)
+
+        # Variables d'état de cette page
+        self._cad_source = tk.StringVar()
+        self._cad_outdir = tk.StringVar()
+        self._cad_result_path = None
+        self._cad_step_widgets: dict = {}    # nom → (icon_label, text_label)
+        self._cad_max_samples_var = tk.IntVar(value=500)
+        self._cad_text_thresh_var = tk.IntVar(value=60)
 
         # ── En-tête ───────────────────────────────────────────────
         hdr = tk.Frame(page, bg=BG_CARD, height=50)
-        hdr.pack(fill='x')
-        hdr.pack_propagate(False)
+        hdr.grid(row=0, column=0, sticky='ew')
+        hdr.grid_propagate(False)
 
-        tk.Label(hdr, text="📐  Transformation dessins",
+        tk.Label(hdr, text="📐  Transformation dessins → DXF",
                  font=FONT_H2, fg=FG_TEXT, bg=BG_CARD,
         ).pack(side='left', padx=20, pady=12)
 
-        tk.Label(hdr, text=" En développement ",
-                 font=("Segoe UI", 8), fg="white", bg=FG_WARN,
+        tk.Label(hdr, text=" PDF / TIF → AutoCAD ",
+                 font=("Segoe UI", 8), fg="white", bg=COL_ACC2,
                  padx=6, pady=2,
         ).pack(side='left', pady=18)
 
@@ -1833,79 +1908,325 @@ class TriosSeconverterApp(tk.Tk):
                   command=lambda: self._show_page('accueil'),
         ).pack(side='right', padx=20, pady=12)
 
-        # ── Contenu ───────────────────────────────────────────────
-        body = tk.Frame(page, bg=BG_MAIN)
-        body.pack(fill='both', expand=True, padx=40, pady=24)
+        # ── Formulaire ────────────────────────────────────────────
+        form = tk.Frame(page, bg=BG_MAIN)
+        form.grid(row=1, column=0, sticky='ew', padx=24, pady=12)
+        form.columnconfigure(0, weight=1)
 
-        # Description
-        tk.Label(body,
-                 text="Ce module permettra d'extraire et de vectoriser des plans "
-                      "techniques scannés ou PDF vers AutoCAD (DXF).",
-                 font=FONT_MAIN, fg=FG_MUTED, bg=BG_MAIN,
-                 wraplength=600, justify='left',
-        ).pack(anchor='w', pady=(0, 24))
+        # Source PDF
+        tk.Label(form, text="Source — PDF ou image :",
+                 font=FONT_BOLD, fg=FG_TEXT, bg=BG_MAIN, anchor='w',
+        ).grid(row=0, column=0, columnspan=2, sticky='w')
 
-        # Étapes prévues
-        steps_lf = tk.LabelFrame(body, text="Étapes prévues",
-                                 font=FONT_BOLD, fg=FG_TEXT, bg=BG_PANEL,
-                                 labelanchor='nw', bd=1, relief='groove')
-        steps_lf.pack(fill='x', pady=(0, 20))
+        tk.Entry(form, textvariable=self._cad_source,
+                 font=FONT_MAIN, bg=BG_LOG, fg=FG_TEXT,
+                 insertbackground=FG_TEXT, relief='flat', bd=5,
+        ).grid(row=1, column=0, sticky='ew', padx=(0, 6), pady=(2, 8))
 
-        steps = [
-            ("1", "Détection automatique",
-             "Identifie si le PDF est vectoriel ou scanné (image). "
-             "Adapte le pipeline en conséquence."),
-            ("2", "Profil dessin",
-             "Paramètres de l'export : conserver textes, détecter cartouche, "
-             "calque de contrôle pour éléments incertains."),
-            ("3", "Analyse et aperçu",
-             "Extrait les lignes, courbes, textes. "
-             "Affiche un aperçu vectoriel côte à côte avec le plan original."),
-            ("4", "Export DXF",
-             "Produit un fichier .dxf autonome sans XREF, sans image attachée. "
-             "Compatible AutoCAD direct."),
+        tk.Button(form, text="Choisir…", font=FONT_MAIN,
+                  bg=COL_ACC2, fg=FG_TEXT,
+                  activebackground=COL_ACC, activeforeground="white",
+                  relief='flat', padx=10, pady=5, cursor='hand2',
+                  command=self._cad_browse_source,
+        ).grid(row=1, column=1, pady=(2, 8))
+
+        # Destination
+        tk.Label(form, text="Dossier de destination :",
+                 font=FONT_BOLD, fg=FG_TEXT, bg=BG_MAIN, anchor='w',
+        ).grid(row=2, column=0, columnspan=2, sticky='w')
+
+        tk.Entry(form, textvariable=self._cad_outdir,
+                 font=FONT_MAIN, bg=BG_LOG, fg=FG_TEXT,
+                 insertbackground=FG_TEXT, relief='flat', bd=5,
+        ).grid(row=3, column=0, sticky='ew', padx=(0, 6), pady=(2, 8))
+
+        tk.Button(form, text="Dossier…", font=FONT_MAIN,
+                  bg=BG_CARD, fg=FG_TEXT,
+                  activebackground=COL_ACC2, activeforeground="white",
+                  relief='flat', padx=10, pady=5, cursor='hand2',
+                  command=self._cad_browse_outdir,
+        ).grid(row=3, column=1, pady=(2, 8))
+
+        # Panneau paramètres avancés
+        params_frame = tk.LabelFrame(
+            form,
+            text=" Paramètres avancés ",
+            bg="#0f3460", fg="#7878a0", font=("Segoe UI", 8),
+            relief='flat', bd=1, padx=8, pady=6,
+        )
+        params_frame.grid(row=4, column=0, columnspan=2, sticky='ew', pady=(4, 0))
+
+        # Ligne 1 — Nombre de points (max_samples)
+        r1 = tk.Frame(params_frame, bg="#0f3460")
+        r1.pack(fill='x', pady=2)
+        tk.Label(r1, text="Nombre de points :", bg="#0f3460", fg="#e0e0f0",
+                 font=("Segoe UI", 9), width=22, anchor='w').pack(side='left')
+        tk.Spinbox(
+            r1, textvariable=self._cad_max_samples_var,
+            from_=20, to=2000, increment=100, width=6,
+            bg="#0a0a14", fg="#e0e0f0", insertbackground="#e0e0f0",
+            relief='flat', font=("Segoe UI", 9),
+        ).pack(side='left', padx=4)
+        tk.Label(r1, text="20=rapide · 500=standard · 2000=précis",
+                 bg="#0f3460", fg="#7878a0", font=("Segoe UI", 8)).pack(side='left')
+
+        # Ligne 2 — Seuil texte/géométrie
+        r2 = tk.Frame(params_frame, bg="#0f3460")
+        r2.pack(fill='x', pady=2)
+        tk.Label(r2, text="Seuil texte (px) :", bg="#0f3460", fg="#e0e0f0",
+                 font=("Segoe UI", 9), width=22, anchor='w').pack(side='left')
+        tk.Spinbox(
+            r2, textvariable=self._cad_text_thresh_var,
+            from_=10, to=300, increment=10, width=6,
+            bg="#0a0a14", fg="#e0e0f0", insertbackground="#e0e0f0",
+            relief='flat', font=("Segoe UI", 9),
+        ).pack(side='left', padx=4)
+        tk.Label(r2, text="60 px pour ~200 DPI — augmenter si texte confondu avec géométrie",
+                 bg="#0f3460", fg="#7878a0", font=("Segoe UI", 8)).pack(side='left')
+
+        # Bouton + barre de progression + statut
+        action_row = tk.Frame(form, bg=BG_MAIN)
+        action_row.grid(row=5, column=0, columnspan=2, sticky='w', pady=(4, 0))
+
+        self._btn_cad = tk.Button(
+            action_row, text="▶  Analyser & Exporter DXF",
+            font=FONT_BOLD, bg=COL_ACC, fg="white",
+            activebackground=BTN_HVR, activeforeground="white",
+            relief='flat', padx=16, pady=8, cursor='hand2',
+            command=self._cad_start,
+        )
+        self._btn_cad.pack(side='left')
+
+        self._btn_cad_open = tk.Button(
+            action_row, text="Ouvrir DXF",
+            font=FONT_MAIN, bg=BG_CARD, fg=FG_MUTED,
+            activebackground=COL_ACC2, activeforeground="white",
+            relief='flat', padx=10, pady=8, cursor='hand2',
+            state='disabled',
+            command=self._cad_open_result,
+        )
+        self._btn_cad_open.pack(side='left', padx=(10, 0))
+
+        self._cad_pbar = ttk.Progressbar(
+            action_row, style="Trios.Horizontal.TProgressbar",
+            orient='horizontal', mode='determinate', maximum=100, length=200,
+        )
+        self._cad_pbar.pack(side='left', padx=(12, 0))
+
+        self._cad_status = tk.Label(
+            action_row, text="", font=FONT_MAIN, fg=FG_MUTED, bg=BG_MAIN,
+        )
+        self._cad_status.pack(side='left', padx=(10, 0))
+
+        # ── Progression 7 étapes ──────────────────────────────────
+        ETAPES_DEF = [
+            ("chargement",      "1. Chargement + détection DPI"),
+            ("pretraitement",   "2. Prétraitement (binarisation)"),
+            ("separation",      "3. Séparation texte / géométrie"),
+            ("squelettisation", "4. Squelettisation (Zhang-Suen)"),
+            ("graphe",          "5. Graphe topologique + élagage"),
+            ("vectorisation",   "6. Vectorisation → SPLINE / POLYLINE"),
+            ("export",          "7. Export DXF + contrôle qualité"),
         ]
-        for num, titre, desc in steps:
-            row = tk.Frame(steps_lf, bg=BG_PANEL)
-            row.pack(fill='x', padx=16, pady=8)
+        steps_outer = tk.LabelFrame(
+            page,
+            text=" Progression du traitement ",
+            bg="#0f3460", fg="#e0e0f0", font=("Segoe UI", 9, "bold"),
+            relief='flat', bd=1,
+        )
+        steps_outer.grid(row=2, column=0, sticky='ew', padx=24, pady=(4, 0))
 
-            tk.Label(row, text=num, font=("Segoe UI", 11, "bold"),
-                     fg="white", bg=COL_ACC2,
-                     width=2, padx=6, pady=2,
-            ).pack(side='left', anchor='n')
+        for name, label in ETAPES_DEF:
+            step_row = tk.Frame(steps_outer, bg="#0f3460")
+            step_row.pack(fill='x', padx=12, pady=1)
+            icon_lbl = tk.Label(step_row, text="○", bg="#0f3460", fg="#7878a0",
+                                font=("Segoe UI", 9, "bold"), width=2)
+            icon_lbl.pack(side='left')
+            text_lbl = tk.Label(step_row, text=label, bg="#0f3460", fg="#7878a0",
+                                font=("Segoe UI", 9), anchor='w')
+            text_lbl.pack(side='left', fill='x', expand=True)
+            self._cad_step_widgets[name] = (icon_lbl, text_lbl)
 
-            col = tk.Frame(row, bg=BG_PANEL)
-            col.pack(side='left', fill='x', expand=True, padx=(12, 0))
+        # ── Journal ───────────────────────────────────────────────
+        log_frame = tk.Frame(page, bg=BG_MAIN)
+        log_frame.grid(row=3, column=0, sticky='nsew', padx=24, pady=(8, 16))
+        log_frame.rowconfigure(1, weight=1)
+        log_frame.columnconfigure(0, weight=1)
 
-            tk.Label(col, text=titre, font=FONT_BOLD,
-                     fg=FG_TEXT, bg=BG_PANEL, anchor='w',
-            ).pack(fill='x')
-            tk.Label(col, text=desc, font=FONT_MAIN,
-                     fg=FG_MUTED, bg=BG_PANEL, anchor='w', wraplength=520,
-            ).pack(fill='x')
+        tk.Label(log_frame, text="Journal de conversion DXF",
+                 font=FONT_BOLD, fg=FG_MUTED, bg=BG_MAIN, anchor='w',
+        ).grid(row=0, column=0, sticky='w', pady=(0, 4))
 
-        # Technologies prévues
-        tech_lf = tk.LabelFrame(body, text="Technologies envisagées",
-                                font=FONT_BOLD, fg=FG_TEXT, bg=BG_PANEL,
-                                labelanchor='nw', bd=1, relief='groove')
-        tech_lf.pack(fill='x')
-
-        tech_row = tk.Frame(tech_lf, bg=BG_PANEL)
-        tech_row.pack(fill='x', padx=16, pady=10)
-
-        techs = [
-            ("PyMuPDF", "Extraction vectorielle depuis PDF", COL_ACC2),
-            ("OpenCV", "Traitement des plans scannés", "#27AE60"),
-            ("ezdxf", "Écriture du fichier DXF", COL_ACC),
-        ]
-        for nom, role, col_t in techs:
-            f = tk.Frame(tech_row, bg=BG_LOG, padx=10, pady=8)
-            f.pack(side='left', padx=(0, 8))
-            tk.Label(f, text=nom, font=FONT_BOLD, fg=col_t, bg=BG_LOG).pack()
-            tk.Label(f, text=role, font=("Segoe UI", 8),
-                     fg=FG_MUTED, bg=BG_LOG).pack()
+        self._cad_log_box = scrolledtext.ScrolledText(
+            log_frame, font=FONT_MONO, bg=BG_LOG, fg=FG_TEXT,
+            insertbackground=FG_TEXT, relief='flat',
+            wrap='word', state='disabled', height=12,
+            padx=10, pady=8,
+        )
+        self._cad_log_box.grid(row=1, column=0, sticky='nsew')
+        for tag, color in (('ok', FG_OK), ('err', FG_ERR),
+                           ('warn', FG_WARN), ('muted', FG_MUTED),
+                           ('info', FG_TEXT)):
+            self._cad_log_box.tag_config(tag, foreground=color)
 
         return page
+
+    # ── Actions page Dessins ───────────────────────────────────────────
+
+    def _cad_browse_source(self):
+        path = filedialog.askopenfilename(
+            title="Choisir le fichier source",
+            filetypes=[
+                ("PDF et images", "*.pdf *.png *.jpg *.jpeg *.bmp *.tif *.tiff"),
+                ("Tous les fichiers", "*.*"),
+            ],
+        )
+        if path:
+            self._cad_source.set(path)
+            if not self._cad_outdir.get():
+                self._cad_outdir.set(str(Path(path).parent))
+
+    def _cad_browse_outdir(self):
+        path = filedialog.askdirectory(title="Choisir le dossier de destination")
+        if path:
+            self._cad_outdir.set(path)
+
+    def _cad_reset_steps(self):
+        """Remet toutes les pastilles d'étape en état initial (○ gris)."""
+        for name, (icon_lbl, text_lbl) in getattr(self, '_cad_step_widgets', {}).items():
+            self.after(0, lambda il=icon_lbl, tl=text_lbl: (
+                il.config(text="○", fg="#7878a0"),
+                tl.config(fg="#7878a0"),
+            ))
+
+    def _cad_step_start(self, name: str):
+        """Marque l'étape name comme en cours (● jaune)."""
+        widgets = getattr(self, '_cad_step_widgets', {})
+        if name not in widgets:
+            return
+        icon_lbl, text_lbl = widgets[name]
+        self.after(0, lambda: (
+            icon_lbl.config(text="●", fg="#e0a050"),
+            text_lbl.config(fg="#e0e0f0"),
+        ))
+
+    def _cad_step_done(self, name: str, info: dict = None):
+        """Marque l'étape name comme terminée (✓ vert)."""
+        widgets = getattr(self, '_cad_step_widgets', {})
+        if name not in widgets:
+            return
+        icon_lbl, text_lbl = widgets[name]
+        self.after(0, lambda: (
+            icon_lbl.config(text="✓", fg="#56c596"),
+            text_lbl.config(fg="#56c596"),
+        ))
+
+    def _cad_step_error(self, name: str):
+        """Marque l'étape name comme en erreur (✗ rouge)."""
+        widgets = getattr(self, '_cad_step_widgets', {})
+        if name not in widgets:
+            return
+        icon_lbl, text_lbl = widgets[name]
+        self.after(0, lambda: (
+            icon_lbl.config(text="✗", fg="#e05c5c"),
+            text_lbl.config(fg="#e05c5c"),
+        ))
+
+    def _cad_log(self, msg: str):
+        """Écrit dans le journal de la page Dessins (thread-safe)."""
+        tag = _tag_from_msg(msg)
+
+        def _write():
+            self._cad_log_box.configure(state='normal')
+            self._cad_log_box.insert('end', msg + '\n', tag)
+            self._cad_log_box.configure(state='disabled')
+            self._cad_log_box.see('end')
+
+        if threading.current_thread() is threading.main_thread():
+            _write()
+        else:
+            self.after(0, _write)
+
+    def _cad_open_result(self):
+        """Ouvre le DXF résultat dans l'application associée."""
+        if self._cad_result_path and Path(self._cad_result_path).exists():
+            import os
+            os.startfile(str(self._cad_result_path))
+
+    def _cad_start(self):
+        """Lance la conversion PDF → DXF dans un thread secondaire."""
+        src = self._cad_source.get().strip()
+        outdir = self._cad_outdir.get().strip()
+
+        if not src:
+            messagebox.showwarning("Source manquante",
+                                   "Choisissez un fichier PDF ou image source.")
+            return
+        if not Path(src).exists():
+            messagebox.showerror("Introuvable", f"Fichier introuvable :\n{src}")
+            return
+        if not outdir:
+            messagebox.showwarning("Destination manquante",
+                                   "Choisissez un dossier de destination.")
+            return
+
+        # Réinitialiser
+        self._cad_result_path = None
+        self._cad_log_box.configure(state='normal')
+        self._cad_log_box.delete('1.0', 'end')
+        self._cad_log_box.configure(state='disabled')
+        self._btn_cad.configure(state='disabled', text="⏳  Conversion…")
+        self._btn_cad_open.configure(state='disabled')
+        self._cad_pbar['value'] = 0
+        self._cad_status.configure(text="Démarrage…", fg=FG_WARN)
+        self._cad_reset_steps()
+
+        params = {
+            'max_samples': self._cad_max_samples_var.get(),
+            'text_thresh_px': self._cad_text_thresh_var.get(),
+        }
+
+        def _on_progress(pct, msg=""):
+            def _u():
+                self._cad_pbar['value'] = int(pct * 100)
+                if msg:
+                    self._cad_status.configure(text=msg)
+            self.after(0, _u)
+
+        def _worker():
+            try:
+                from cad import convert_to_dxf
+                result = convert_to_dxf(
+                    source_path=Path(src),
+                    output_dir=Path(outdir),
+                    on_log=self._cad_log,
+                    on_progress=_on_progress,
+                    on_step_start=self._cad_step_start,
+                    on_step_done=self._cad_step_done,
+                    params=params,
+                )
+                self.after(0, lambda r=result: self._cad_done(r))
+            except NotImplementedError as e:
+                self.after(0, lambda m=str(e): self._cad_error(m))
+            except Exception as e:
+                self.after(0, lambda m=str(e): self._cad_error(m))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _cad_done(self, result_path: Path):
+        self._cad_result_path = result_path
+        self._btn_cad.configure(state='normal', text="▶  Analyser & Exporter DXF")
+        self._btn_cad_open.configure(state='normal')
+        self._cad_pbar['value'] = 100
+        size_ko = result_path.stat().st_size // 1024
+        self._cad_status.configure(
+            text=f"✓ {result_path.name} ({size_ko} Ko)", fg=FG_OK)
+
+    def _cad_error(self, msg: str):
+        self._btn_cad.configure(state='normal', text="▶  Analyser & Exporter DXF")
+        self._cad_pbar['value'] = 0
+        self._cad_status.configure(text="Échec — voir le journal", fg=FG_ERR)
+        self._cad_log(f"✗ ERREUR : {msg}")
 
     def _build_page_mixte(self, parent) -> tk.Frame:
         """Page squelette — Transformation tableaux + dessins (en développement)."""
@@ -1981,14 +2302,28 @@ class TriosSeconverterApp(tk.Tk):
         return page
 
     def _build_page_dashboard(self, parent) -> tk.Frame:
-        """Dashboard visuel pendant la conversion (source | progression | modèle)."""
+        """Dashboard visuel pendant la conversion (source | progression | modèle).
+
+        Layout avec grid() : déterministe, pas d'ambiguïté pack/expand.
+          Row 0 : header (fixe)
+          Row 1 : 3 colonnes (fixe, minsize=210)
+          Row 2 : barre de statut (fixe)
+          Row 3 : journal miroir (expand=True)
+        """
         page = tk.Frame(parent, bg=BG_MAIN)
         self._dash_anim_idx = 0
 
-        # ── En-tête ───────────────────────────────────────────────
+        # Configuration grid de la page
+        page.columnconfigure(0, weight=1)
+        page.rowconfigure(0, weight=0)   # header
+        page.rowconfigure(1, weight=0)   # 3 colonnes
+        page.rowconfigure(2, weight=0)   # statut
+        page.rowconfigure(3, weight=1)   # journal (expand)
+
+        # ── Row 0 : En-tête ───────────────────────────────────────
         hdr = tk.Frame(page, bg=BG_CARD, height=50)
-        hdr.pack(fill='x', side='top')
-        hdr.pack_propagate(False)
+        hdr.grid(row=0, column=0, sticky='ew')
+        hdr.grid_propagate(False)
 
         self._dash_title_lbl = tk.Label(
             hdr, text="⏳  Conversion en cours…",
@@ -2003,63 +2338,18 @@ class TriosSeconverterApp(tk.Tk):
         )
         self._dash_mode_badge.pack(side='left', pady=17)
 
-        # ── Journal miroir (side='bottom' — réservé en dernier) ───
-        log_zone = tk.Frame(page, bg=BG_MAIN)
-        log_zone.pack(fill='both', expand=True, side='bottom',
-                      padx=16, pady=(0, 8))
-
-        log_hdr = tk.Frame(log_zone, bg=BG_MAIN)
-        log_hdr.pack(fill='x', pady=(4, 4))
-
-        tk.Label(log_hdr, text="Journal de conversion",
-                 font=FONT_BOLD, fg=FG_MUTED, bg=BG_MAIN,
-                 anchor='w').pack(side='left')
-
-        tk.Button(
-            log_hdr, text="Voir onglet Mode OCR →",
-            font=("Segoe UI", 8), bg=BG_CARD, fg=FG_MUTED,
-            activebackground=COL_ACC2, activeforeground="white",
-            relief='flat', padx=8, pady=2, cursor='hand2',
-            command=lambda: self._show_page('ocr'),
-        ).pack(side='right')
-
-        self._dash_log_box = scrolledtext.ScrolledText(
-            log_zone, font=FONT_MONO, bg=BG_LOG, fg=FG_TEXT,
-            insertbackground=FG_TEXT, relief='flat',
-            wrap='word', state='disabled', height=8,
-            padx=10, pady=6,
+        self._btn_arreter = tk.Button(
+            hdr, text="⏹ Arrêter", font=FONT_BOLD,
+            bg=COL_ACC, fg='white', relief='flat', bd=0,
+            activebackground=BTN_HVR, activeforeground='white',
+            cursor='hand2', command=self._demander_arret,
         )
-        self._dash_log_box.pack(fill='both', expand=True)
-        for tag, color in (('ok', FG_OK), ('err', FG_ERR),
-                           ('warn', FG_WARN), ('muted', FG_MUTED),
-                           ('info', FG_TEXT)):
-            self._dash_log_box.tag_config(tag, foreground=color)
+        self._btn_arreter.pack(side='right', padx=16)
 
-        # ── Barre de statut ───────────────────────────────────────
-        sbar = tk.Frame(page, bg=BG_CARD, height=28)
-        sbar.pack(fill='x', side='bottom')
-        sbar.pack_propagate(False)
-
-        tk.Frame(sbar, bg=BG_PANEL, height=1).pack(fill='x', side='top')
-        inner_sbar = tk.Frame(sbar, bg=BG_CARD)
-        inner_sbar.pack(fill='x', padx=14, pady=4)
-
-        self._dash_timer_lbl = tk.Label(
-            inner_sbar, text="⏱  00:00",
-            font=("Segoe UI", 8, "bold"), fg=COL_ACC, bg=BG_CARD,
-        )
-        self._dash_timer_lbl.pack(side='left')
-
-        self._dash_status_lbl = tk.Label(
-            inner_sbar, text="",
-            font=("Segoe UI", 8), fg=FG_MUTED, bg=BG_CARD,
-        )
-        self._dash_status_lbl.pack(side='left', padx=(20, 0))
-
-        # ── Zone 3 colonnes (entre header et status bar) ──────────
+        # ── Row 1 : Zone 3 colonnes ───────────────────────────────
         cols_outer = tk.Frame(page, bg=BG_MAIN, height=210)
-        cols_outer.pack(fill='x', side='top', padx=16, pady=(10, 6))
-        cols_outer.pack_propagate(False)
+        cols_outer.grid(row=1, column=0, sticky='ew', padx=16, pady=(10, 6))
+        cols_outer.grid_propagate(False)
 
         # Colonne gauche — SOURCE
         left_col = tk.Frame(cols_outer, bg=BG_PANEL, width=220)
@@ -2123,6 +2413,60 @@ class TriosSeconverterApp(tk.Tk):
         self._dash_tpl_frame.pack(fill='both', expand=True,
                                   padx=10, pady=(0, 10))
 
+        # ── Row 2 : Barre de statut ───────────────────────────────
+        sbar = tk.Frame(page, bg=BG_CARD, height=28)
+        sbar.grid(row=2, column=0, sticky='ew')
+        sbar.grid_propagate(False)
+
+        tk.Frame(sbar, bg=BG_PANEL, height=1).pack(fill='x', side='top')
+        inner_sbar = tk.Frame(sbar, bg=BG_CARD)
+        inner_sbar.pack(fill='x', padx=14, pady=4)
+
+        self._dash_timer_lbl = tk.Label(
+            inner_sbar, text="⏱  00:00",
+            font=("Segoe UI", 8, "bold"), fg=COL_ACC, bg=BG_CARD,
+        )
+        self._dash_timer_lbl.pack(side='left')
+
+        self._dash_status_lbl = tk.Label(
+            inner_sbar, text="",
+            font=("Segoe UI", 8), fg=FG_MUTED, bg=BG_CARD,
+        )
+        self._dash_status_lbl.pack(side='left', padx=(20, 0))
+
+        # ── Row 3 : Journal miroir (s'étend pour remplir) ─────────
+        log_zone = tk.Frame(page, bg=BG_MAIN)
+        log_zone.grid(row=3, column=0, sticky='nsew', padx=16, pady=(4, 8))
+        log_zone.rowconfigure(1, weight=1)
+        log_zone.columnconfigure(0, weight=1)
+
+        log_hdr = tk.Frame(log_zone, bg=BG_MAIN)
+        log_hdr.grid(row=0, column=0, sticky='ew', pady=(0, 4))
+
+        tk.Label(log_hdr, text="Journal de conversion",
+                 font=FONT_BOLD, fg=FG_MUTED, bg=BG_MAIN,
+                 anchor='w').pack(side='left')
+
+        tk.Button(
+            log_hdr, text="Voir onglet Mode OCR →",
+            font=("Segoe UI", 8), bg=BG_CARD, fg=FG_MUTED,
+            activebackground=COL_ACC2, activeforeground="white",
+            relief='flat', padx=8, pady=2, cursor='hand2',
+            command=lambda: self._show_page('ocr'),
+        ).pack(side='right')
+
+        self._dash_log_box = scrolledtext.ScrolledText(
+            log_zone, font=FONT_MONO, bg=BG_LOG, fg=FG_TEXT,
+            insertbackground=FG_TEXT, relief='flat',
+            wrap='word', state='disabled', height=8,
+            padx=10, pady=6,
+        )
+        self._dash_log_box.grid(row=1, column=0, sticky='nsew')
+        for tag, color in (('ok', FG_OK), ('err', FG_ERR),
+                           ('warn', FG_WARN), ('muted', FG_MUTED),
+                           ('info', FG_TEXT)):
+            self._dash_log_box.tag_config(tag, foreground=color)
+
         return page
 
     def _dashboard_reset(self):
@@ -2165,6 +2509,18 @@ class TriosSeconverterApp(tk.Tk):
         self._dash_log_box.configure(state='normal')
         self._dash_log_box.delete('1.0', 'end')
         self._dash_log_box.configure(state='disabled')
+
+        if hasattr(self, '_btn_arreter'):
+            self._btn_arreter.configure(state='normal', text="⏹ Arrêter")
+
+    def _demander_arret(self):
+        """Déclenche l'arrêt coopératif — .set() est thread-safe nativement,
+        aucun passage par self.after() nécessaire ici (écriture, pas lecture
+        d'un widget depuis le thread worker)."""
+        if hasattr(self, '_cancel_event'):
+            self._cancel_event.set()
+        self._btn_arreter.configure(state='disabled', text="⏹ Arrêt en cours…")
+        self._log("⏹ Arrêt demandé — finalisation en cours…", 'warn')
 
     def _dashboard_update_template(self):
         """Affiche les colonnes du modèle sélectionné dans le dashboard."""
@@ -3482,6 +3838,7 @@ class TriosSeconverterApp(tk.Tk):
 
         # Réinitialiser l'état
         self._result = None
+        self._converter = None
         self.configure(cursor="watch")
         self._btn_start.configure_state('disabled')
         self._btn_start.set_text("⏳  Conversion en cours…")
@@ -3624,6 +3981,45 @@ class TriosSeconverterApp(tk.Tk):
                 return local_result_box[0]
             validation_cb = _on_validation
 
+        # Callback de mapping manuel colonnes/blocs (>4 colonnes détectées)
+        # Même pattern thread-safe que _on_validation : Event LOCAL par appel.
+        def _on_column_mapping(candidate_blocks, template_columns, image_path):
+            local_event = threading.Event()
+            local_result_box = [None]
+
+            def _callback(mapping_result):
+                local_result_box[0] = mapping_result
+                local_event.set()
+
+            self.after(0, lambda: self._montrer_mapping_dialog(
+                candidate_blocks, template_columns, image_path, _callback
+            ))
+            # timeout=300s : si la fenêtre est fermée brutalement, le thread
+            # de travail ne reste pas bloqué indéfiniment.
+            local_event.wait(timeout=300)
+            return local_result_box[0]
+
+        # Callback de confirmation "template large" pour les moteurs vision
+        # (Claude/Ollama/Docling/Agent/Hybrid) — pas de blocs pixel à classer,
+        # juste un avertissement + confirmation oui/non. Même pattern
+        # thread-safe que les callbacks précédents.
+        def _on_wide_template_confirm(template_columns, ocr_mode):
+            local_event = threading.Event()
+            local_result_box = [True]   # défaut optimiste si jamais aucune réponse
+
+            def _callback(response: bool):
+                local_result_box[0] = response
+                local_event.set()
+
+            self.after(0, lambda: self._demander_confirmation_template_large(
+                template_columns, ocr_mode, _callback
+            ))
+            local_event.wait(timeout=300)
+            return local_result_box[0]
+
+        # Nouvel Event à CHAQUE lancement — jamais réutilisé d'un run à l'autre.
+        self._cancel_event = threading.Event()
+
         def _worker():
             try:
                 conv = Converter(
@@ -3634,7 +4030,11 @@ class TriosSeconverterApp(tk.Tk):
                     on_progress=lambda p, m: self._queue.put(('progress', p, m)),
                     on_log=lambda m:         self._queue.put(('log', m, _tag_from_msg(m))),
                     on_validation=validation_cb,
+                    on_column_mapping=_on_column_mapping,
+                    on_wide_template_confirm=_on_wide_template_confirm,
+                    cancel_event=self._cancel_event,
                 )
+                self._converter = conv
                 result = conv.run()
                 self._queue.put(('done', result))
             except Exception as exc:
@@ -3705,6 +4105,10 @@ class TriosSeconverterApp(tk.Tk):
                     self._on_error(item[1])
                 elif kind == 'audit_done':
                     self._on_audit_done(item[1])
+                elif kind == 'verif_done':
+                    self._on_verif_done(item[1])
+                elif kind == 'verif_error':
+                    self._on_verif_error(item[1])
         except Exception:
             pass
         self.after(80, self._poll_queue)
@@ -3742,6 +4146,8 @@ class TriosSeconverterApp(tk.Tk):
         self._result = result
         self._stop_timer()
         self.configure(cursor="")
+        if hasattr(self, '_btn_arreter'):
+            self._btn_arreter.configure(state='disabled')
         self._log("═" * 54, 'ok')
         self._log(f"  ✓ {result['tableaux']}/{result['total']} bornier(s) converti(s)", 'ok')
         p = result.get('excel')
@@ -3821,6 +4227,8 @@ class TriosSeconverterApp(tk.Tk):
     def _on_error(self, msg: str):
         self._stop_timer()
         self.configure(cursor="")
+        if hasattr(self, '_btn_arreter'):
+            self._btn_arreter.configure(state='disabled')
         self._log(f"\n  ✗ ERREUR : {msg}", 'err')
         self._set_progress(0.0, "Échec — consultez le journal.")
         self._btn_start.configure_state('normal')
@@ -3996,6 +4404,27 @@ class TriosSeconverterApp(tk.Tk):
             self, page_done, page_total, result, image_path,
             on_validated_callback, can_retry=can_retry,
         )
+
+    def _montrer_mapping_dialog(
+        self, candidate_blocks, template_columns, image_path, on_result_callback,
+    ):
+        """Crée le dialog de mapping colonnes dans le thread UI (via after(0,...))."""
+        ColumnMappingDialog(
+            self, candidate_blocks, template_columns, image_path, on_result_callback,
+        )
+
+    def _demander_confirmation_template_large(self, template_columns, ocr_mode, callback):
+        """Affiche la confirmation template large dans le thread UI (via after(0,...))."""
+        n = len(template_columns)
+        reponse = messagebox.askyesno(
+            "Modèle à colonnes multiples",
+            f"Le modèle sélectionné a {n} colonnes (recommandé : 4 max) et vous"
+            f" utilisez le moteur « {ocr_mode} », qui ne permet pas de classement"
+            f" manuel bloc par bloc comme le mode Tesseract.\n\n"
+            f"Continuer la conversion quand même ?",
+            parent=self,
+        )
+        callback(reponse)
 
     def _lancer_audit(self):
         """Lance l'audit du dernier classeur Excel généré."""
@@ -4321,6 +4750,320 @@ class ValidationPageDialog(tk.Toplevel):
             return
         self._on_validated(comment, True, retry=True)
         self.destroy()
+
+
+# ── Dialog de mapping manuel colonnes/blocs ────────────────────────────
+
+class ColumnMappingDialog(tk.Toplevel):
+    """
+    Dialog modal de mapping manuel bloc→colonne quand le template dépasse
+    Config.MAX_AUTO_COLUMNS colonnes détectées.
+
+    Zone gauche : blocs bruts détectés dans l'en-tête (texte + position x)
+    Zone droite : une liste ordonnée par colonne du template — l'utilisateur
+                  y assigne un ou plusieurs blocs, dans l'ordre de fusion.
+    Bouton "Valider" → construit {col_name: [indices]} et appelle le callback.
+    Bouton "Annuler" → callback(None), fallback automatique côté backend.
+
+    Le dialog est non-bloquant côté Tkinter (grab_set sans wait_window) :
+    c'est threading.Event dans l'appelant qui bloque le thread de travail.
+    """
+
+    def __init__(
+        self, parent,
+        candidate_blocks: list,
+        template_columns: list,
+        image_path: str,
+        on_result_callback,
+    ):
+        super().__init__(parent)
+        self._blocks = candidate_blocks
+        self._columns = template_columns
+        self._image_path = image_path
+        self._on_result = on_result_callback
+        self._col_listboxes = {}
+        self._assigned = {c: [] for c in template_columns}
+
+        self.title("Plus de 4 colonnes détectées — Classement manuel requis")
+        self.geometry("980x560")
+        self.minsize(820, 480)
+        self.resizable(True, True)
+        self.configure(bg=BG_MAIN)
+        self.grab_set()
+        self.protocol("WM_DELETE_WINDOW", self._annuler)
+
+        ico = _resource("icon.ico")
+        if ico.exists():
+            try:
+                self.iconbitmap(str(ico))
+            except Exception:
+                pass
+
+        self._build()
+
+    def _build(self):
+        hdr = tk.Frame(self, bg=BG_CARD, height=46)
+        hdr.pack(fill='x')
+        hdr.pack_propagate(False)
+        tk.Label(
+            hdr,
+            text=(
+                f"{len(self._blocks)} blocs détectés pour "
+                f"{len(self._columns)} colonnes du modèle — classez-les"
+            ),
+            font=FONT_H2, fg=FG_TEXT, bg=BG_CARD,
+        ).pack(side='left', padx=16, pady=10)
+
+        body = tk.Frame(self, bg=BG_MAIN)
+        body.pack(fill='both', expand=True, padx=10, pady=8)
+
+        left = tk.Frame(body, bg=BG_PANEL, width=280)
+        left.pack(side='left', fill='y', padx=(0, 6))
+        left.pack_propagate(False)
+        tk.Label(
+            left, text="Blocs détectés (en-tête)",
+            font=FONT_BOLD, fg=COL_ACC, bg=BG_PANEL, anchor='w',
+        ).pack(fill='x', padx=8, pady=(8, 4))
+        self._blocks_lb = tk.Listbox(
+            left, font=FONT_MONO, bg=BG_LOG, fg=FG_TEXT,
+            selectmode='single', relief='flat', activestyle='none',
+        )
+        self._blocks_lb.pack(fill='both', expand=True, padx=8, pady=(0, 8))
+        for i, b in enumerate(self._blocks):
+            self._blocks_lb.insert('end', f"{i}: {b['text']}  (x={b['x']})")
+
+        right = tk.Frame(body, bg=BG_MAIN)
+        right.pack(side='left', fill='both', expand=True)
+
+        cols_frame = tk.Frame(right, bg=BG_MAIN)
+        cols_frame.pack(fill='both', expand=True)
+        for i in range(max(len(self._columns), 1)):
+            cols_frame.columnconfigure(i, weight=1)
+        cols_frame.rowconfigure(0, weight=1)
+
+        for ci, col_name in enumerate(self._columns):
+            self._build_column_cell(cols_frame, ci, col_name)
+
+        btn_bar = tk.Frame(self, bg=BG_MAIN)
+        btn_bar.pack(fill='x', padx=10, pady=(0, 10))
+        tk.Button(
+            btn_bar, text="Annuler (classement automatique)",
+            font=FONT_MAIN, bg=BG_PANEL, fg=FG_TEXT, relief='flat',
+            activebackground=BG_CARD, command=self._annuler,
+        ).pack(side='left')
+        tk.Button(
+            btn_bar, text="Valider le classement",
+            font=FONT_BOLD, bg=COL_ACC, fg='white', relief='flat',
+            activebackground=BTN_HVR, command=self._valider,
+        ).pack(side='right')
+
+    def _build_column_cell(self, parent, ci: int, col_name: str):
+        cell = tk.Frame(parent, bg=BG_PANEL)
+        cell.grid(row=0, column=ci, sticky='nsew', padx=4, pady=4)
+        tk.Label(
+            cell, text=col_name,
+            font=FONT_BOLD, fg=COL_ACC2, bg=BG_PANEL,
+        ).pack(fill='x', padx=6, pady=(6, 2))
+        lb = tk.Listbox(
+            cell, font=FONT_MONO, bg=BG_LOG, fg=FG_TEXT,
+            selectmode='single', relief='flat', activestyle='none', height=10,
+        )
+        lb.pack(fill='both', expand=True, padx=6, pady=(0, 4))
+        self._col_listboxes[col_name] = lb
+
+        btns = tk.Frame(cell, bg=BG_PANEL)
+        btns.pack(fill='x', padx=6, pady=(0, 6))
+        tk.Button(
+            btns, text="← Ajouter", font=("Segoe UI", 8),
+            bg=BG_CARD, fg=FG_TEXT, relief='flat',
+            command=lambda c=col_name: self._ajouter_bloc(c),
+        ).pack(side='left')
+        tk.Button(
+            btns, text="Retirer", font=("Segoe UI", 8),
+            bg=BG_CARD, fg=FG_TEXT, relief='flat',
+            command=lambda c=col_name: self._retirer_bloc(c),
+        ).pack(side='left', padx=(4, 0))
+        tk.Button(
+            btns, text="↑", font=("Segoe UI", 8),
+            bg=BG_CARD, fg=FG_TEXT, relief='flat', width=2,
+            command=lambda c=col_name: self._deplacer_bloc(c, -1),
+        ).pack(side='left', padx=(4, 0))
+        tk.Button(
+            btns, text="↓", font=("Segoe UI", 8),
+            bg=BG_CARD, fg=FG_TEXT, relief='flat', width=2,
+            command=lambda c=col_name: self._deplacer_bloc(c, 1),
+        ).pack(side='left', padx=(2, 0))
+
+    def _ajouter_bloc(self, col_name: str):
+        sel = self._blocks_lb.curselection()
+        if not sel:
+            return
+        idx = sel[0]
+        if idx not in self._assigned[col_name]:
+            self._assigned[col_name].append(idx)
+            self._refresh_col_listbox(col_name)
+
+    def _retirer_bloc(self, col_name: str):
+        lb = self._col_listboxes[col_name]
+        sel = lb.curselection()
+        if not sel:
+            return
+        del self._assigned[col_name][sel[0]]
+        self._refresh_col_listbox(col_name)
+
+    def _deplacer_bloc(self, col_name: str, direction: int):
+        lb = self._col_listboxes[col_name]
+        sel = lb.curselection()
+        if not sel:
+            return
+        pos = sel[0]
+        new_pos = pos + direction
+        items = self._assigned[col_name]
+        if 0 <= new_pos < len(items):
+            items[pos], items[new_pos] = items[new_pos], items[pos]
+            self._refresh_col_listbox(col_name)
+            lb.selection_set(new_pos)
+
+    def _refresh_col_listbox(self, col_name: str):
+        lb = self._col_listboxes[col_name]
+        lb.delete(0, 'end')
+        for idx in self._assigned[col_name]:
+            texte = self._blocks[idx]['text'] if idx < len(self._blocks) else '?'
+            lb.insert('end', f"{idx}: {texte}")
+
+    def _valider(self):
+        mapping = {
+            col: list(indices)
+            for col, indices in self._assigned.items()
+            if indices
+        }
+        self._on_result(mapping)
+        self.destroy()
+
+    def _annuler(self):
+        self._on_result(None)
+        self.destroy()
+
+
+# ── Fenêtre de vérification de conversion ─────────────────────────────
+
+class VerificationDialog(tk.Toplevel):
+    """
+    Divergences entre la lecture du scan et la conversion.
+
+    Affichage uniquement : le calcul est fait par Converter.verifier_conversion().
+    """
+
+    _COLONNES = (
+        ('pages', "Pages (scan → converti)", 140),
+        ('ligne', "Ligne", 55),
+        ('colonne', "Colonne", 140),
+        ('scan', "Scan (lecture Tesseract)", 280),
+        ('converti', "Converti", 280),
+        ('raison', "Raison", 140),
+        ('conf', "Conf.", 50),
+    )
+
+    def __init__(self, parent, rapport):
+        super().__init__(parent)
+        self._rapport = rapport
+        self.title("Vérification de la conversion")
+        self.geometry("1180x560")
+        self.minsize(820, 420)
+        self.resizable(True, True)
+        self.configure(bg=BG_MAIN)
+        self.grab_set()
+
+        ico = _resource("icon.ico")
+        if ico.exists():
+            try:
+                self.iconbitmap(str(ico))
+            except Exception:
+                pass
+
+        self._build()
+
+    def _build(self):
+        r = self._rapport
+        hdr = tk.Frame(self, bg=BG_CARD, height=46)
+        hdr.pack(fill='x')
+        hdr.pack_propagate(False)
+        tk.Label(
+            hdr, text="Vérification de la conversion",
+            font=FONT_H2, fg=FG_TEXT, bg=BG_CARD,
+        ).pack(side='left', padx=16, pady=10)
+        tk.Label(
+            hdr,
+            text=f"{r.nb_cellules} cellules comparées  |  {r.nb_a_verifier} à vérifier  |  "
+                 f"concordance {r.concordance * 100:.1f} %",
+            font=FONT_MAIN, fg=FG_OK if not r.a_verifier else FG_WARN, bg=BG_CARD,
+        ).pack(side='right', padx=16)
+
+        if r.pages_ref_orphelines or r.pages_conv_orphelines:
+            tk.Label(
+                self,
+                text=f"⚠ Pages sans partenaire — scan : {r.pages_ref_orphelines or 'aucune'}"
+                     f"  |  converti : {r.pages_conv_orphelines or 'aucune'}",
+                font=FONT_MAIN, fg=FG_WARN, bg=BG_MAIN, anchor='w',
+            ).pack(fill='x', padx=16, pady=(8, 0))
+
+        body = tk.Frame(self, bg=BG_PANEL)
+        body.pack(fill='both', expand=True, padx=14, pady=10)
+        if not r.a_verifier:
+            tk.Label(
+                body, text="✓ Aucune divergence à vérifier.",
+                font=FONT_H2, fg=FG_OK, bg=BG_PANEL,
+            ).pack(expand=True)
+        else:
+            self._build_tableau(body)
+
+        barre = tk.Frame(self, bg=BG_MAIN)
+        barre.pack(fill='x', padx=14, pady=(0, 10))
+        tk.Button(
+            barre, text="Copier le rapport", font=FONT_MAIN,
+            bg=BG_PANEL, fg=FG_TEXT, relief='flat',
+            activebackground=BG_CARD, command=self._copier,
+        ).pack(side='left')
+        tk.Button(
+            barre, text="Fermer", font=FONT_BOLD,
+            bg=COL_ACC, fg='white', relief='flat',
+            activebackground=BTN_HVR, command=self.destroy,
+        ).pack(side='right')
+
+    def _build_tableau(self, parent):
+        vsb = ttk.Scrollbar(parent, orient='vertical')
+        noms = [c[0] for c in self._COLONNES]
+        tree = ttk.Treeview(
+            parent, columns=noms, show='headings',
+            yscrollcommand=vsb.set, selectmode='browse',
+        )
+        vsb.configure(command=tree.yview)
+        vsb.pack(side='right', fill='y')
+        tree.pack(side='left', fill='both', expand=True)
+        for nom, titre, largeur in self._COLONNES:
+            tree.heading(nom, text=titre, anchor='w')
+            tree.column(nom, width=largeur, anchor='w', stretch=nom in ('scan', 'converti'))
+        for i, e in enumerate(self._rapport.a_verifier):
+            tree.insert('', 'end', iid=str(i), values=(
+                f"{e.page_ref} → {e.page_conv}", e.ligne_ref or e.ligne_conv or '',
+                e.colonne, e.valeur_ref, e.valeur_conv, e.raison,
+                '' if e.confiance_ref is None else e.confiance_ref,
+            ))
+
+    def _copier(self):
+        r = self._rapport
+        lignes = [
+            f"Cellules comparées : {r.nb_cellules} — à vérifier : {r.nb_a_verifier} — "
+            f"concordance {r.concordance * 100:.1f} %"
+        ]
+        for e in r.a_verifier:
+            lignes.append(
+                f"page scan {e.page_ref} / converti {e.page_conv}, "
+                f"ligne {e.ligne_ref or e.ligne_conv}, {e.colonne} : "
+                f"scan « {e.valeur_ref} » ≠ converti « {e.valeur_conv} » [{e.raison}]"
+            )
+        self.clipboard_clear()
+        self.clipboard_append('\n'.join(lignes))
 
 
 # ── Fenêtre d'audit ───────────────────────────────────────────────────

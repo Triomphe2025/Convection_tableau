@@ -10,10 +10,36 @@
 
 ---
 
+## Équipe de développement IA — Toujours active
+
+L'équipe de 6 agents travaille en parallèle sur toute tâche de développement.
+**Commande unique :** `/equipe-dev [description de la tâche]`
+
+| Agent | Skill | Fichiers autorisés |
+|-------|-------|-------------------|
+| Analyste | `/agent-analyste` | Tous (lecture) — produit le plan |
+| Backend Dev | `/agent-backend` | converter.py, ocr_processor.py, generer_classeur.py, cad/, data_dictionary.py, config.py, template.py |
+| Frontend Dev | `/agent-frontend` | interface.py UNIQUEMENT |
+| Auditeur | `/agent-auditeur` | Tous (lecture) — vérifie la qualité |
+| Testeur | `/agent-testeur` | tests/, tous (lecture) |
+| Apprentissage | `/agent-apprentissage` | memory/*.md, .claude/Rules/*.md |
+
+**Ordre :** Analyste → Backend + Frontend (parallèle) → Auditeur + Testeur (parallèle) → Apprentissage
+
+**Mémoire de l'équipe :** `memory/equipe_lecons.md` — leçons cumulées de toutes les sessions.
+
+---
+
 ## Skills — Commandes disponibles pour ce projet
 
 Ces commandes slash sont utilisables directement dans Claude Code (`/nom-de-la-commande`).
 Les définitions sont dans `.claude\commands\`.
+
+### Point d'entrée principal — Senior Application Manager
+
+| Commande | Rôle |
+|----------|------|
+| `/manager` | **Coordinateur central** — Analyse chaque demande, sélectionne l'agent le mieux adapté parmi tous les agents disponibles, le lance, coordonne plusieurs agents si nécessaire, ou crée un nouvel agent si aucun n'existe. **Point d'entrée recommandé pour toute demande.** |
 
 ### Skills de configuration et maintenance quotidienne
 
@@ -71,6 +97,15 @@ Les définitions sont dans `.claude\commands\`.
 | `/valider-fidelite-log` | Vérifie qu'un fichier `*_claude.jsonl` est complet (`rows_data` présent) pour garantir un replay Excel 100 % fidèle à l'original |
 | `/optimiser-prompt-claude` | Agent interactif pour tester le prompt Claude Vision sur une image réelle, diagnostiquer les erreurs (colonne mal assignée, valeur perdue, OCR raté) et itérer jusqu'à obtenir un résultat satisfaisant |
 
+### Équipe chercheurs — Reconstruction mathématique de courbes TIF
+
+| Commande | Rôle |
+|----------|------|
+| `/equipe-chercheurs-courbes` | **Orchestrateur** — coordonne les 3 agents chercheurs pour améliorer la reconstruction de courbes TIF→DXF |
+| `/agent-mathematicien-courbes` | Expert géométrie — classifie les courbes (droite/arc/spline/polyligne) et propose les équations de fitting (B-spline, moindres carrés arc) |
+| `/agent-implementeur-formes` | Ingénieur numérique — implémente les équations dans `cad/curve_fitter.py` et les intègre dans le pipeline raster |
+| `/agent-comparateur-courbes` | Comparateur — mesure la fidélité original vs reconstruit (Hausdorff, RMS, continuité, courbure) et recommande des ajustements |
+
 ### Skills de livraison et version
 
 | Commande | Action |
@@ -125,6 +160,7 @@ Fichier Word source (.docx) — images de borniers scannés
 | `config.py` | **Tous** les paramètres modifiables (jamais coder en dur ailleurs) |
 | `data_dictionary.py` | Corrections OCR évolutives par colonne depuis `data_dictionary.json` |
 | `recuperer_image.py` | `ImageExtractor` + `ImageStorage` — extraction images du ZIP `.docx` |
+| `verificateur.py` | Vérification de conversion : compare deux lectures (format pivot) et classe les divergences en IDENTIQUE / BENIN / A_VERIFIER — module pur, appelé uniquement par `converter.py` (`Converter.verifier_conversion`) |
 
 ### Fichiers de packaging et outils
 
@@ -158,6 +194,9 @@ python interface.py
 # Génération en ligne de commande (sans interface)
 python generer_classeur.py
 
+# Vérification de conversion (scan contre document converti)
+python converter.py verifier scan.pdf converti.pdf --rapport rapport.txt
+
 # Tests
 pytest tests\ -v
 ```
@@ -178,6 +217,9 @@ pytest tests\ -v
 | `IMAGES_FOLDER_NAME` | `VD23111 PE 162` | Nom du dossier de sortie des images |
 
 Pour modifier un paramètre → utiliser `/changer-config`.
+
+Les paramètres `VERIF_*` (vérification de conversion : seuils d'appariement, confusions OCR,
+concordance) sont regroupés dans la section « VÉRIFICATION DE CONVERSION » de `config.py`.
 
 ---
 
@@ -338,6 +380,7 @@ Raccourci → `/build-exe`.
 | v1.7 | 2026-06 | Navigation simplifiée : onglets Paramètres/Mode OCR/Options cachés par défaut, révélés via toggle "⚙ Dev" |
 | v1.7 | 2026-06 | Bouton "Lancer la conversion" retiré de la toolbar — point d'entrée unique via stepper étape 3 |
 | v1.7 | 2026-06 | 2 nouveaux skills UX : `/implementer-workflow-ux` (5 phases) + `/apprendre-interface` (capitalisation leçons) |
+| v1.7 | 2026-09 | Vérification de conversion : bouton « 🔎 Vérifier » + `python converter.py verifier` — relecture Tesseract du scan comparée à la conversion, divergences cellule par cellule (`verificateur.py`, seuils `VERIF_*` dans `config.py`, méthode `Converter.verifier_conversion`) |
 
 ---
 

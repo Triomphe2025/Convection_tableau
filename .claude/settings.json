@@ -1,0 +1,92 @@
+{
+  "_comment": "Configuration Claude Code — TriosSeconverter v1.7",
+  "_doc": "Fichier de configuration principal de l'agent IA. Gère les permissions, hooks, environnement et comportements automatiques.",
+
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git tag *)",
+      "Bash(git branch *)",
+      "Bash(git show *)",
+      "Bash(env\\Scripts\\python.exe *)",
+      "Bash(env\\Scripts\\pip.exe install *)",
+      "Bash(env\\Scripts\\pip.exe list *)",
+      "Bash(env\\Scripts\\pip.exe show *)",
+      "Bash(env\\Scripts\\pytest.exe *)",
+      "Bash(env\\Scripts\\python.exe -m pytest *)",
+      "Bash(env\\Scripts\\python.exe -m py_compile *)",
+      "Bash(env\\Scripts\\python.exe -c *)",
+      "Read(*)",
+      "Edit(*)",
+      "Write(.claude/**)",
+      "Write(cad/**)",
+      "Write(tests/**)",
+      "Glob(*)",
+      "Grep(*)"
+    ],
+    "deny": [
+      "Bash(git push --force *)",
+      "Bash(git reset --hard *)",
+      "Bash(rm -rf *)",
+      "Bash(Remove-Item -Recurse -Force *)"
+    ]
+  },
+
+  "env": {
+    "PYTHONIOENCODING": "utf-8",
+    "PYTHONPATH": ".",
+    "PYTHONUTF8": "1"
+  },
+
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "env\\Scripts\\python.exe -c \"import ast; src=open('$CLAUDE_TOOL_FILE','r',encoding='utf-8').read(); ast.parse(src); print('[check] Syntaxe OK:', '$CLAUDE_TOOL_FILE')\" 2>&1 || true"
+          }
+        ]
+      }
+    ]
+  },
+
+  "model": "claude-sonnet-4-6",
+
+  "includeCoAuthoredBy": true,
+
+  "agents": {
+    "manager": {
+      "description": "Senior Application Manager — point d'entrée principal pour toutes les demandes",
+      "skill": "manager",
+      "autoLaunch": false
+    },
+    "ocr_debugger": {
+      "description": "Expert OCR — analyse et correction des problèmes d'extraction",
+      "skills": ["debug-bornier", "analyser-qualite-ocr", "analyser-image-profonde"],
+      "autoLaunch": false
+    },
+    "ux_engineer": {
+      "description": "Ingénieur UX — refonte et amélioration de l'interface",
+      "skills": ["implementer-workflow-ux", "ameliorer-interface", "apprendre-interface"],
+      "autoLaunch": false
+    },
+    "cad_engineer": {
+      "description": "Ingénieur CAD — pipeline PDF→DXF AutoCAD",
+      "skills": ["implementer-cad-vectoriel", "implementer-cad-blocs"],
+      "autoLaunch": false
+    },
+    "delivery_manager": {
+      "description": "Gestionnaire de livraison — version, exe, tests",
+      "skills": ["nouvelle-version", "build-exe", "tester", "rapport-livraison"],
+      "autoLaunch": false
+    }
+  },
+
+  "cleanupPeriodDays": 30
+}

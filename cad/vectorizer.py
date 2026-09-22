@@ -466,6 +466,112 @@ def _dedup_by_overlap(
     return [ent for i, ent in enumerate(entities) if i not in to_remove]
 
 
+def _vectorize_pdf_raster(
+    pdf_path: Path,
+    page_indices: Optional[list],
+    on_log: Optional[Callable],
+    on_step_start: Optional[Callable],
+    on_step_done: Optional[Callable],
+    params: Optional[dict],
+) -> CadDocument:
+    """
+    Vectorise un PDF raster (scanné, non-vectorisé) page par page.
+    Chaque page est rendue à 200 DPI en niveaux de gris, puis traitée
+    par le pipeline vectorize() standard — identique aux fichiers TIF.
+    """
+    import fitz
+    import tempfile
+    from PIL import Image as _PILImage
+
+    def _log(msg: str) -> None:
+        if on_log:
+            on_log(msg)
+
+    try:
+        pdf_doc = fitz.open(str(pdf_path))
+    except Exception as e:
+        raise ValueError(f"Impossible d'ouvrir le PDF raster : {e}")
+
+    n_total   = len(pdf_doc)
+    indices   = page_indices if page_indices is not None else list(range(n_total))
+    _log(f"  PDF raster : {n_total} page(s) détectées, {len(indices)} à vectoriser")
+
+    _cfg = __import__('config', fromlist=['Config']).Config
+    TARGET_DPI = getattr(_cfg, 'CAD_PDF_RASTER_DPI', 150.0)
+    MAX_MPX    = getattr(_cfg, 'CAD_PDF_MAX_MPX',    25.0)
+
+    all_cad_pages = []
+
+    for seq, page_idx in enumerate(indices):
+        if page_idx >= n_total:
+            _log(f"  ⚠ Page {page_idx + 1} hors limites — ignorée")
+            continue
+
+        pdf_page = pdf_doc[page_idx]
+
+        # DPI adaptatif : réduire automatiquement si la page dépasse MAX_MPX
+        # Les pages panoramiques (ex: 2100×900mm) atteignent 117 Mpx à 200 DPI
+        # → on plafonne à MAX_MPX pour garder un temps de squelettisation raisonnable
+        r = pdf_page.rect
+        w_at_target = r.width  * TARGET_DPI / 72.0
+        h_at_target = r.height * TARGET_DPI / 72.0
+        mpx_at_target = w_at_target * h_at_target / 1_000_000
+        if mpx_at_target > MAX_MPX:
+            dpi = TARGET_DPI * (MAX_MPX / mpx_at_target) ** 0.5
+        else:
+            dpi = TARGET_DPI
+        dpi = max(dpi, 60.0)   # jamais en dessous de 60 DPI (lisibilité minimale)
+
+        w_px = int(r.width  * dpi / 72.0)
+        h_px = int(r.height * dpi / 72.0)
+        mpx  = w_px * h_px / 1_000_000
+        if dpi < TARGET_DPI - 1:
+            _log(
+                f"━━ Page {page_idx + 1}/{n_total} : "
+                f"{r.width*25.4/72:.0f}×{r.height*25.4/72:.0f}mm"
+                f" — DPI {TARGET_DPI:.0f}→{dpi:.0f}"
+                f" ({mpx_at_target:.0f}Mpx→{mpx:.0f}Mpx)"
+            )
+        else:
+            _log(
+                f"━━ Page {page_idx + 1}/{n_total} :"
+                f" rendu à {dpi:.0f} DPI ({mpx:.1f} Mpx)…"
+            )
+
+        mat     = fitz.Matrix(dpi / 72.0, dpi / 72.0)
+        pix     = pdf_page.get_pixmap(matrix=mat, colorspace=fitz.csGRAY)
+        pil_img = _PILImage.frombytes('L', (pix.w, pix.h), pix.samples)
+
+        # Fichier temporaire avec métadonnées DPI — vectorize() lira le bon DPI
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tf:
+            tmp_path = Path(tf.name)
+        pil_img.save(str(tmp_path), dpi=(dpi, dpi))
+
+        try:
+            page_doc = vectorize(
+                tmp_path,
+                page_indices=None,
+                on_log=on_log,
+                on_step_start=on_step_start,
+                on_step_done=on_step_done,
+                params=params,
+            )
+            for cad_page in page_doc.pages:
+                cad_page.page_index = page_idx
+                all_cad_pages.append(cad_page)
+        except Exception as e:
+            _log(f"  ⚠ Page {page_idx + 1} échouée : {e}")
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
+    pdf_doc.close()
+
+    if not all_cad_pages:
+        _log("  ⚠ Aucune page vectorisée — document vide")
+
+    return CadDocument(source_path=pdf_path, pages=all_cad_pages)
+
+
 def vectorize(
     source_path: Path,
     page_indices: Optional[list] = None,
@@ -475,7 +581,7 @@ def vectorize(
     params: Optional[dict] = None,
 ) -> CadDocument:
     """
-    Vectorise un fichier image (TIF/PNG/JPG/BMP) en CadDocument.
+    Vectorise un fichier image (TIF/PNG/JPG/BMP) ou un PDF raster en CadDocument.
 
     Étapes nommées déclarées dans ETAPES :
       chargement → pretraitement → separation → squelettisation
@@ -498,6 +604,13 @@ def vectorize(
     import gc
 
     source_path = Path(source_path)
+
+    # PDF raster → rendu image page par page via _vectorize_pdf_raster()
+    if source_path.suffix.lower() == '.pdf':
+        return _vectorize_pdf_raster(
+            source_path, page_indices, on_log, on_step_start, on_step_done, params
+        )
+
     p = params or {}
     max_samples = int(p.get('max_samples', _MAX_SAMPLES))
 
@@ -517,6 +630,7 @@ def vectorize(
     _step_start("chargement")
     _log(f"  Chargement : {source_path.name}")
     from PIL import Image
+    Image.MAX_IMAGE_PIXELS = None   # plans TIF haute résolution dépassent le seuil par défaut
     try:
         pil_img  = Image.open(source_path)
         dpi_info = pil_img.info.get('dpi', (200, 200))

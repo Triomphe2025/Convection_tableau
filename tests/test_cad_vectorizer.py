@@ -410,3 +410,65 @@ def test_spur_pruning_une_seule_passe():
         "Aucune épine de 10px ne devrait être supprimée avec seuil 8px"
     )
     assert g.number_of_edges() == 3, "Graphe intact après 1 passe"
+
+
+# ── Tests PDF raster → vectorize() ────────────────────────────────────────────
+
+def test_detect_source_mode_pdf_raster():
+    """PDF sans drawings vectoriels → détecté comme 'raster'."""
+    import fitz
+    import tempfile
+    from pathlib import Path
+    from cad.source_detector import detect_source_mode
+
+    pdf_doc = fitz.open()
+    pdf_doc.new_page(width=200, height=200)   # page vide, pas de drawings
+    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tf:
+        pdf_path = Path(tf.name)
+    pdf_doc.save(str(pdf_path))
+    pdf_doc.close()
+
+    try:
+        mode = detect_source_mode(pdf_path)
+        assert mode == 'raster', f"Attendu 'raster', obtenu '{mode}'"
+    finally:
+        pdf_path.unlink(missing_ok=True)
+
+
+def test_vectorize_pdf_raster_sans_exception():
+    """vectorize() sur un PDF raster doit terminer sans exception."""
+    import fitz
+    import numpy as np
+    import tempfile
+    from pathlib import Path
+    from PIL import Image
+
+    # Image 200×200 avec une croix noire sur fond blanc
+    arr = np.ones((200, 200), dtype=np.uint8) * 255
+    arr[90:110, :] = 0    # ligne horizontale
+    arr[:, 90:110] = 0    # ligne verticale
+    pil = Image.fromarray(arr)
+
+    # Sauvegarder l'image temporaire
+    with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tf:
+        img_path = Path(tf.name)
+    pil.save(str(img_path), dpi=(200, 200))
+
+    # Créer un PDF contenant cette image
+    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tf:
+        pdf_path = Path(tf.name)
+    pdf_doc = fitz.open()
+    page = pdf_doc.new_page(width=200, height=200)
+    page.insert_image(fitz.Rect(0, 0, 200, 200), filename=str(img_path))
+    pdf_doc.save(str(pdf_path))
+    pdf_doc.close()
+    img_path.unlink(missing_ok=True)
+
+    try:
+        from cad.vectorizer import vectorize
+        doc = vectorize(pdf_path)
+        # Au minimum 1 page traitée sans exception
+        assert len(doc.pages) == 1, f"Attendu 1 page, obtenu {len(doc.pages)}"
+        assert doc.source_path == pdf_path
+    finally:
+        pdf_path.unlink(missing_ok=True)

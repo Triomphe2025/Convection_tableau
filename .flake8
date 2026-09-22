@@ -1,0 +1,8 @@
+[flake8]
+max-line-length = 99
+
+# E221 — alignement vertical des affectations (style délibéré pour la lisibilité
+#         des blocs de configuration dans config.py et les dicts de paramètres)
+# E128 — indentation visuelle dans les appels Tkinter multi-lignes
+# Ces deux règles sont tolérées dans la base de code TriosSeconverter.
+extend-ignore = E221, E128

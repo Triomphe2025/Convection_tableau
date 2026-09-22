@@ -13,6 +13,11 @@ openpyxl==3.1.5
 opencv-python>=4.8.0
 pytesseract>=0.3.10
 numpy>=1.24.0
+scipy>=1.10.0            # fitting B-spline et moindres carrés géométriques
+scikit-image>=0.21.0     # squelettisation Zhang-Suen (fallback cv2 si absent)
+networkx>=3.0.0          # graphe de squelette pour le vectorizer
+sknw>=0.0.0              # skeleton → graphe networkx topologique
+shapely>=2.0.0           # déduplication spatiale anti-doublons (STRtree) pipeline CAD
 pandas>=2.0.0
 
 # Generation de PDF (documentation)
@@ -20,3 +25,33 @@ fpdf2>=2.7.0
 
 # Packaging en executable autonome (optionnel)
 pyinstaller>=6.0.0
+
+# IA de détection de structure de tableau (optionnel — USE_TATR=True dans config.py)
+# Installation : pip install transformers torch torchvision timm
+# Mode Python uniquement — NE PAS inclure dans le .exe PyInstaller
+transformers>=4.40.0
+torch>=2.0.0
+torchvision>=0.15.0
+timm>=1.0.0
+
+# Extraction PDF avec couche texte vectorielle (mode PDF sans Tesseract)
+pymupdf>=1.24.0
+
+# Pipeline CAD : extraction géométrie PDF vectoriel et génération DXF AutoCAD
+ezdxf>=1.0.0
+
+# ── Moteurs OCR alternatifs (optionnels) ──────────────────────────────────────
+
+# Claude Vision API — activer avec OCR_MODE = "claude" dans config.py
+# Nécessite une clé API sur console.anthropic.com (~0.001 €/image avec Haiku)
+anthropic>=0.40.0
+
+# Ollama Vision local — activer avec OCR_MODE = "ollama" dans config.py
+# Gratuit, hors ligne — nécessite Ollama installé (https://ollama.com)
+# Modèle recommandé : ollama pull qwen2.5vl:7b
+ollama>=0.3.0
+
+# Docling IBM — activer avec OCR_MODE = "docling" dans config.py
+# IA locale (~500 Mo téléchargés au premier lancement), sans coût par appel
+# Installation : pip install docling
+# docling>=2.0.0   ← décommenter si vous souhaitez utiliser ce moteur

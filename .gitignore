@@ -37,3 +37,26 @@ build/
 
 # output folders
 VD23111 PE 162/
+
+# Données clients (plans, scans, rapports) — ne jamais committer
+*.dxf
+*.dwg
+*.tif
+*.tiff
+images_borniers/
+images_repartiteur/
+input/
+exemple traitement/
+LOT12-P-2025_717-6324-MI01/
+TriosSeconverter_Rapport_Evolution.pdf
+analyse_projet.pdf
+acad.err
+
+# Fichiers générés/scratch à la racine
+analysis_summary.json
+generer_classeur_log.txt
+data_dictionary_pending.json
+ocr_debug.log
+
+# Verrou de tâches planifiées Claude Code (état d'exécution local)
+.claude/scheduled_tasks.lock

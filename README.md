@@ -1,372 +1,205 @@
-# 📖 Guide Complet - Extraction d'Images depuis Word
+# TriosSeconverter — Guide utilisateur v1.7
 
-## 🎯 Objectif
-
-Ce projet vous permet d'extraire automatiquement **toutes les images** d'un fichier Word (.docx) et de les enregistrer dans un dossier organisé avec un **nommage automatique incrémental**.
+Convertit des tableaux de borniers électriques (Word, PDF, images) en classeur Excel formaté.
 
 ---
 
-## 📐 Architecture du Code
+## Démarrage rapide
 
-### Vue d'ensemble
+```powershell
+# 1. Installation (première fois seulement)
+install.bat
 
-```
-recuperer_image.py
-├── ImageExtractor           (Classe d'extraction)
-│   ├── Valide le fichier
-│   ├── Ouvre le .docx comme archive ZIP
-│   └── Récupère les images depuis word/media/
-│
-├── ImageStorage             (Classe de stockage)
-│   ├── Crée le dossier de destination
-│   └── Enregistre les images avec nommage auto (bornier_1, bornier_2, etc.)
-│
-├── ImageExtractionPipeline  (Orchestration)
-│   ├── Coordonne les classes
-│   ├── Gère les erreurs
-│   └── Fournit un résumé complet
-│
-└── main()                   (Point d'entrée)
-    └── Lance le processus complet
-```
-
-### Détail de chaque classe
-
-#### 1️⃣ **ImageExtractor**
-**Responsabilité**: Extraire les images du document Word
-
-**Fonctionnement**:
-- Un fichier .docx est en réalité une **archive ZIP**
-- Les images sont stockées dans le dossier `word/media/`
-- La classe ouvre le ZIP et récupère toutes les images avec leurs extensions
-
-**Méthodes principales**:
-- `__init__(word_path)` : Initialise et valide le fichier
-- `extract_images()` : Récupère toutes les images
-- `_validate_file()` : Vérifie que c'est un .docx valide
-
-#### 2️⃣ **ImageStorage**
-**Responsabilité**: Gérer le stockage des images
-
-**Fonctionnement**:
-- Crée le dossier de destination (`VD23111 PE 162` par défaut)
-- Enregistre chaque image avec un nom automatique
-- Nommage: `bornier_1.jpg`, `bornier_2.png`, etc.
-
-**Méthodes principales**:
-- `create_output_folder(base_path)` : Crée le dossier
-- `save_image(image_bytes, index, extension)` : Enregistre une image
-
-#### 3️⃣ **ImageExtractionPipeline**
-**Responsabilité**: Orchestrer tout le processus
-
-**Fonctionnement**:
-- Coordonne `ImageExtractor` et `ImageStorage`
-- Gère les erreurs globalement
-- Fournit un résumé avec statistiques
-
-**Méthode principale**:
-- `run()` : Lance l'extraction et enregistrement complets
-
----
-
-## 🚀 Installation et Configuration
-
-### Étape 1: Installer les dépendances
-
-```bash
-pip install python-docx Pillow
-```
-
-**Explications**:
-- `python-docx` : Pour manipuler les fichiers Word
-- `Pillow` : Pour les manipulations d'images (optionnel si vous voulez redimensionner, etc.)
-
-### Étape 2: Préparer votre fichier Word
-
-1. Placez votre fichier Word dans le même dossier que le script
-2. Ou utilisez un chemin complet
-
-### Étape 3: Configurer le chemin
-
-Ouvrez `recuperer_image.py` et modifiez la ligne 228:
-
-```python
-# Avant:
-word_file = "document.docx"  # À CONFIGURER
-
-# Après:
-word_file = "mon_document.docx"
-# ou chemin complet:
-# word_file = r"C:\Users\Utilisateur\Documents\rapport.docx"
+# 2. Lancer l'interface graphique
+env\Scripts\python.exe interface.py
 ```
 
 ---
 
-## 📋 Utilisation
+## Sources acceptées (Doc. 1)
 
-### Méthode 1: Exécution simple (Recommandée)
+| Type | Extension | Moteur |
+|------|-----------|--------|
+| Word avec images scannées | `.docx` | Tesseract / Claude Vision / Docling |
+| PDF vectoriel | `.pdf` | Extraction couche texte (PyMuPDF) + fallback OCR |
+| Dossier d'images | dossier `.png` / `.jpg` | Tesseract / Claude Vision / Docling |
+| Journal Claude à rejouer | `.jsonl` | Replay sans appel API |
 
-```bash
-python recuperer_image.py
-```
+Le **Doc. 2** (optionnel) est un fichier Word contenant des tableaux structurés — ils sont placés dans une feuille séparée "tableaux word" du classeur Excel.
 
-**Résultat**: Les images s'enregistrent dans un dossier `VD23111 PE 162` au même endroit que le script.
+---
 
-### Méthode 2: Utilisation avancée
+## Modes OCR (page "Mode OCR")
 
-Créez un fichier `main_custom.py`:
+### Tesseract (gratuit, local)
+- Aucun abonnement requis
+- Nécessite `C:\Tesseract\TesseractOCR\tesseract.exe` + langue française `fra.traineddata`
+- Corrections automatiques via `data_dictionary.json`
 
-```python
-from recuperer_image import ImageExtractionPipeline
+### Claude Vision (API Anthropic)
+- Meilleure précision sur tableaux complexes ou mal scannés
+- Nécessite une clé API Anthropic (champ dans l'interface)
+- Chaque image = 1 appel API (coût en tokens)
+- Journal des appels sauvegardé : `*_claude.jsonl` (permet de rejouer sans repayer)
 
-# Cas 1: Dossier de destination par défaut
-pipeline = ImageExtractionPipeline("mon_document.docx")
-results = pipeline.run()
+### Docling IBM (IA locale)
+- Modèle IA téléchargé automatiquement au premier lancement (~500 Mo)
+- Fonctionne sans GPU (CPU seul, 10–30 s/image)
+- Installation : `pip install docling`
 
-# Cas 2: Dossier personnalisé
-pipeline = ImageExtractionPipeline(
-    word_file="mon_document.docx",
-    output_folder="Mes Images Extraites"
-)
-results = pipeline.run()
+---
 
-# Accéder aux résultats
-print(f"Images trouvées: {results['total']}")
-print(f"Images enregistrées: {results['saved']}")
-print(f"Localisation: {results['output_path']}")
-```
+## Mode validation manuelle
 
-### Méthode 3: Avec gestion d'erreurs
+Activez "Validation page par page" dans l'interface avant de lancer.
 
-```python
-from recuperer_image import ImageExtractionPipeline
+Après chaque tableau extrait, une fenêtre affiche :
+- **Aperçu de l'image source** (vignette du bornier)
+- **Données extraites** avec code couleur :
+  - Orange = confiance OCR < 60 %
+  - Rouge = confiance OCR < 35 %
+- **Métadonnées** (PAGE, BORNIER, PET, NO_PLAN, INDICE)
 
-try:
-    pipeline = ImageExtractionPipeline("mon_document.docx")
-    results = pipeline.run()
-    
-    if results['errors'] > 0:
-        print(f"⚠ {results['errors']} image(s) n'a pas pu être enregistrée")
-    
-except FileNotFoundError:
-    print("Le fichier Word n'existe pas")
-except ValueError as e:
-    print(f"Erreur: {e}")
+Trois actions disponibles :
+| Bouton | Action |
+|--------|--------|
+| Valider et continuer | Accepte le tableau, passe au suivant |
+| Continuer automatiquement | Accepte ce tableau et désactive la validation pour la suite |
+| Relancer l'OCR avec ce feedback | Renvoie l'image à l'API Claude avec votre commentaire correctif |
+
+Les corrections validées sont mémorisées dans `data_dictionary.json` et appliquées aux tableaux suivants.
+
+---
+
+## Dictionnaire de correction OCR
+
+Stocké dans `data_dictionary.json` à la racine.
+
+Accessible depuis l'interface (page "Options" → "Consulter / modifier") :
+- Valeurs organisées par colonne (BORNE, COULEUR, SIGNAL, JARRETIERES…)
+- Recherche, ajout, modification, suppression en temps réel
+
+Pour alimenter automatiquement depuis un Excel corrigé manuellement :
+```powershell
+env\Scripts\python.exe -c "
+from data_dictionary import get_dictionary
+from pathlib import Path
+get_dictionary().update_from_excel(Path('tous_les_borniers_corrige.xlsx'))
+"
 ```
 
 ---
 
-## 📊 Exemple de résultat
+## Paramètres (`config.py`)
 
+| Paramètre | Défaut | Rôle |
+|-----------|--------|------|
+| `TESSERACT_PATH` | `C:\Tesseract\...\tesseract.exe` | Chemin Tesseract |
+| `OCR_LANGUAGE` | `fra` | Langue Tesseract |
+| `PAGE_SIZE` | `59` | Lignes par page A4 dans Excel |
+| `STATION_NAME` | `EPEULE` | PET de repli si OCR échoue |
+| `MIN_DATA_ROWS` | `3` | Lignes minimum pour valider un bornier |
+| `OCR_MODE` | `tesseract` | Mode OCR par défaut |
+| `CLAUDE_API_KEY` | *(vide)* | Clé API Anthropic |
+| `USE_TATR` | `False` | IA Microsoft TATR (mode Python uniquement) |
+
+---
+
+## Résultat généré
+
+Un fichier `<nom_source>.xlsx` dans le dossier de destination :
+
+| Feuille | Contenu |
+|---------|---------|
+| `Borniers` | Tous les tableaux OCR, un par bloc A4, avec pied de page |
+| `tableaux word` | Tableaux structurés du Doc. 2 (si fourni) |
+
+Les cellules à faible confiance OCR sont colorées en jaune dans l'Excel (`< 60 %`).
+Les tableaux issus d'images très floues (`> 80 %`) ont l'en-tête orange.
+
+---
+
+## Modèles de tableau
+
+Configurables dans l'onglet "Modèles" de l'interface ou via `/nouveau-template`.
+
+Modèle par défaut : **Bornier standard** — colonnes `[BORNE, COULEUR, SIGNAL, JARRETIERES]`
+
+Les modèles sont sauvegardés dans `templates.json`.
+
+---
+
+## Vérifier une conversion
+
+Après une conversion, le bouton **🔎 Vérifier** de la barre « OUTILS TABLEAUX » relit le
+scan avec Tesseract et le compare, cellule par cellule, à ce qui a été converti. Une fenêtre
+liste les divergences à vérifier (page, ligne, colonne, valeur du scan, valeur convertie,
+raison). Les écarts sans importance (espaces, confusions O/0, texte qui glisse d'une colonne
+à l'autre, mots que Tesseract a oubliés) ne sont pas signalés.
+
+La lecture Tesseract prend du temps (environ 20 s par page) ; le bouton devient
+« ⏹ Annuler la vérification » pendant son exécution.
+
+En ligne de commande :
+
+```powershell
+env\Scripts\python.exe converter.py verifier scan.pdf converti.pdf --rapport rapport.txt
+# converti peut aussi être un journal *_claude.jsonl (rejoué sans appel API)
+# code retour : 0 = rien à vérifier, 1 = divergences listées
 ```
-==================================================
-🚀 Début du traitement
-==================================================
-✓ Fichier validé: mon_document.docx
-✓ Dossier créé/existant: C:\...\VD23111 PE 162
-🔍 Extraction des images en cours...
-✓ Image enregistrée: bornier_1.jpg
-✓ Image enregistrée: bornier_2.png
-✓ Image enregistrée: bornier_3.jpeg
-✓ 3 image(s) extraite(s) avec succès
-==================================================
-✅ Traitement terminé
-   - Images trouvées: 3
-   - Images enregistrées: 3
-   - Erreurs: 0
-   - Localisation: C:\...\VD23111 PE 162
-==================================================
+
+Les seuils se règlent dans `config.py` (section « VÉRIFICATION DE CONVERSION »).
+
+---
+
+## Compiler en exécutable (.exe)
+
+```powershell
+env\Scripts\activate
+pyinstaller TriosSeconverter.spec --clean
+# → dist\TriosSeconverter.exe
+```
+
+Toujours tester l'exe sur une machine sans Python installé avant livraison.
+
+---
+
+## Tests automatisés
+
+```powershell
+env\Scripts\python.exe -m pytest tests\ -v
+# 487 tests passent, 0 échec (+ 1 échec attendu documenté, + 1 test lent facultatif)
 ```
 
 ---
 
-## 🔧 Bonnes pratiques implémentées
+## Architecture des fichiers principaux
 
-### 1. **Validation des entrées**
-```python
-# Vérifier que le fichier existe et est un .docx
-if not self.word_path.exists():
-    raise FileNotFoundError(...)
-```
-
-### 2. **Logging structuré**
-```python
-logger.info("✓ Fichier validé")
-logger.error("✗ Erreur lors de l'extraction")
-```
-
-### 3. **Type hints (annotations de types)**
-```python
-def extract_images(self) -> List[Tuple[bytes, str]]:
-    # Le code retourne clairement une liste de tuples
-```
-
-### 4. **Documentation (Docstrings)**
-```python
-def save_image(self, image_bytes: bytes, index: int, extension: str) -> Path:
-    """
-    Enregistre une image dans le dossier de destination.
-    
-    Args:
-        image_bytes: Données binaires de l'image
-        index: Numéro séquentiel de l'image (commence à 1)
-        extension: Extension du fichier (jpg, png, etc.)
-    
-    Returns:
-        Path: Chemin du fichier enregistré
-    """
-```
-
-### 5. **Gestion d'erreurs**
-```python
-try:
-    with zipfile.ZipFile(self.word_path, 'r') as docx_zip:
-        # Traitement
-except zipfile.BadZipFile:
-    raise ValueError(f"Le fichier n'est pas un .docx valide")
-except Exception as e:
-    logger.error(f"Erreur: {e}")
-```
-
-### 6. **Architecture modulaire**
-- Chaque classe a une responsabilité unique (Single Responsibility Principle)
-- Facile à tester, déboguer et étendre
-
-### 7. **Nommage incrémental automatique**
-```python
-# Format: bornier_1.jpg, bornier_2.png, etc.
-for index, (image_bytes, extension) in enumerate(images, start=1):
-    self.storage.save_image(image_bytes, index, extension)
-```
+| Fichier | Rôle |
+|---------|------|
+| `interface.py` | Interface graphique Tkinter |
+| `converter.py` | Orchestration du pipeline de conversion |
+| `ocr_processor.py` | OCR Tesseract — prétraitement, colonnes, cellules |
+| `claude_ocr.py` | OCR via API Claude Vision |
+| `docling_ocr.py` | OCR via Docling IBM |
+| `pdf_extractor.py` | Extraction couche texte PDF (PyMuPDF) |
+| `verificateur.py` | Vérification de conversion (compare le scan relu à la conversion) |
+| `generer_classeur.py` | Génération du classeur Excel |
+| `template.py` | Modèles de tableau paramétrables |
+| `config.py` | Tous les paramètres modifiables |
+| `data_dictionary.py` | Corrections OCR évolutives |
 
 ---
 
-## 🐛 Dépannage
+## Versions
 
-### ❌ "FileNotFoundError: Le fichier n'existe pas"
-
-**Solution**: Vérifiez le chemin du fichier Word
-```python
-# ❌ Incorrect (fichier dans un autre dossier)
-word_file = "rapport.docx"
-
-# ✅ Correct (chemin complet)
-word_file = r"C:\Users\Utilisateur\Documents\rapport.docx"
-```
-
-### ❌ "ValueError: Le fichier n'est pas un .docx valide"
-
-**Solution**: Assurez-vous que c'est bien un fichier .docx et non .doc
-- Microsoft Word 2007+ (.docx) ✅
-- Ancien format Word (.doc) ❌
-
-### ❌ "Aucune image trouvée"
-
-**Possible**: Le document Word ne contient pas d'images
-
-**À vérifier**:
-1. Ouvrez le document dans Word
-2. Vérifiez qu'il y a bien des images
-3. Les images sont directement insérées (pas des liens)
-
----
-
-## 📈 Extensions possibles
-
-Voici comment vous pourriez améliorer le code:
-
-### 1. **Redimensionner les images**
-```python
-from PIL import Image
-
-# Dans ImageStorage.save_image()
-img = Image.open(BytesIO(image_bytes))
-img.thumbnail((1024, 1024))  # Redimensionner
-img.save(file_path)
-```
-
-### 2. **Créer un rapport avec aperçus**
-```python
-# Générer un HTML avec les images
-html = "<html><body>"
-for index, path in enumerate(saved_paths, 1):
-    html += f"<h3>Image {index}</h3><img src='{path}' width='200'>"
-html += "</body></html>"
-```
-
-### 3. **Supporter plusieurs formats**
-```python
-# Modifier pour .doc, .odt, etc.
-if self.word_path.suffix.lower() == '.doc':
-    # Utiliser la librairie python-pptx pour PowerPoint, etc.
-```
-
-### 4. **Extraction sélective**
-```python
-# Extraire uniquement les images avec certaines dimensions
-if width > 100 and height > 100:
-    images.append((image_bytes, extension))
-```
-
----
-
-## 📝 Notes importantes
-
-1. **Sauvegarde**: Les images extraites ne sont pas supprimées du Word
-2. **Format**: Les images gardent leur format original (jpg, png, etc.)
-3. **Chemin absolu**: Préférez les chemins complets pour éviter les erreurs
-4. **Dossiers**: Le dossier de destination est créé automatiquement s'il n'existe pas
-
----
-
-## 🎓 Concepts clés expliqués
-
-### Tuple (Tuple)
-```python
-(image_bytes, extension)  # Paire de valeurs
-# Avantage: immutable et rapide
-```
-
-### Type hints
-```python
-def extract_images(self) -> List[Tuple[bytes, str]]:
-    # Clair: retourne une liste de tuples
-    # Format: (bytes, string)
-```
-
-### Enumerate avec start=1
-```python
-for index, item in enumerate(images, start=1):
-    # index: 1, 2, 3, ... (pas 0, 1, 2, ...)
-    print(f"bornier_{index}")  # bornier_1, bornier_2, ...
-```
-
-### Archive ZIP (.docx)
-```python
-# .docx = Dossier zippé avec cette structure:
-# ├── word/
-# │   ├── media/          ← Images ici
-# │   └── document.xml
-# ├── _rels/
-# └── [Content_Types].xml
-```
-
----
-
-## 📞 Support
-
-Pour toute question ou amélioration:
-1. Consultez les docstrings du code (`Ctrl + K, Ctrl + I` dans VS Code)
-2. Vérifiez les logs (messages ✓ et ✗)
-3. Utilisez les exemples dans `exemple_utilisation.py`
-
----
-
-**Bon extraction! 🎉**
-#   C o n v e c t i o n _ t a b l e a u  
- #   C o n v e c t i o n _ t a b l e a u  
- # Convection_tableau
-#   C o n v e c t i o n _ t a b l e a u  
- # Convection_tableau
-# Convection_tableau
+| Version | Changements principaux |
+|---------|----------------------|
+| v1.0 | Pipeline complet image → Excel, interface graphique |
+| v1.1 | PAGE_SIZE=48, sauts de page, corrections OCR évolutives |
+| v1.2 | Feuille "tableaux word" séparée |
+| v1.3 | Mode PDF vectoriel, corrections PDF O/0 |
+| v1.4 | OCR de repli PDF, pied de page configurable |
+| v1.5 | Corrections S↔5/O↔0 bornes, champs footer dynamiques |
+| v1.6 | Fidélité Claude Vision, mode validation manuelle, replay log |
+| v1.7 | Refonte UX en parcours de traitement : accueil à 3 cartes, assistant en 3 étapes, dashboard de conversion |

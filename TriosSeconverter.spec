@@ -42,6 +42,8 @@ a = Analysis(
         'numpy',
         'lxml',
         'lxml.etree',
+        # Modules du projet importés à la demande (vérification de conversion)
+        'verificateur',
     ],
     hookspath=[],
     hooksconfig={},

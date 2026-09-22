@@ -1,0 +1,6490 @@
+[
+ {
+  "success": false,
+  "page_num": 1,
+  "image_path": "page_1",
+  "headers": [
+   "BORNE",
+   "COULEUR",
+   "SIGNAL",
+   "JARRETIERES"
+  ],
+  "rows": [],
+  "metadata": {},
+  "detection_method": "pdf",
+  "blur_pct": 0.0
+ },
+ {
+  "success": false,
+  "page_num": 2,
+  "image_path": "page_2",
+  "headers": [
+   "BORNE",
+   "COULEUR",
+   "SIGNAL",
+   "JARRETIERES"
+  ],
+  "rows": [],
+  "metadata": {},
+  "detection_method": "pdf",
+  "blur_pct": 0.0
+ },
+ {
+  "success": true,
+  "page_num": 3,
+  "image_path": "page_3",
+  "headers": [
+   "BORNE",
+   "COULEUR",
+   "SIGNAL",
+   "JARRETIERES"
+  ],
+  "rows": [
+   {
+    "type": "data",
+    "cells": [
+     "10",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "11",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "12",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "13",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "14",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "15",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "16",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "17",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "18",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "20",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "21",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "22",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "23",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "24",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "25",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "26",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "27",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "28",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "30",
+     "C",
+     "OMMUN TS GR3 105TS",
+     "0013B 0014B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "31",
+     "P",
+     "ET/TS PORTE FERMEE",
+     "0015B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "32",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "33",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "34",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "35",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "36",
+     "E",
+     "P. STAT/TS DEFAUT ET IN",
+     "TERV.0016B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "37",
+     "E",
+     "P. STAT/TS ENTRETIEN PO",
+     "MPE 0017B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "38",
+     "E",
+     "P. STAT/TS DEBORDEMENT",
+     "0018B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "40",
+     "C",
+     "OMMUN TS GR4 105TS",
+     "0019B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "41",
+     "E",
+     "P. STAT/TS MANQUE 48V",
+     "0020B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "42",
+     "E",
+     "P. STAT/TS DEFAUT ISOLE",
+     "MENT0021B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "43",
+     "E",
+     "P. STAT/TS NIVEAU TROP",
+     "BAS 0022B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "44",
+     "E",
+     "P.STAT/TS DISCORDANCE P",
+     "OMPE0033B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "45",
+     "E",
+     "P. STAT/TS FUSION FUSIB",
+     "LE 0023B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "46",
+     "E",
+     "P. STAT/TS INTENSITE",
+     "0024B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "47",
+     "E",
+     "P. STAT/TS SURINTENSITE",
+     "0025B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "48",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "section",
+    "text": "NOM DU CABLE  GAT/C105"
+   },
+   {
+    "type": "blank",
+    "count": 1
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A01",
+     "BCG C",
+     "OMMUN TS GR1 105TS",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A02",
+     "BCBC +",
+     "48VG 105TS",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A03",
+     "BCB R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A04",
+     "BCJ R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A05",
+     "BCM R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A06",
+     "BCN R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A07",
+     "BCR R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A08",
+     "BCVE O",
+     "VG 105TS",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A09",
+     "B G C",
+     "OMMUN TS GR2 105TS",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A10",
+     "B BC R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A11",
+     "B B R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A12",
+     "B J R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A13",
+     "B M R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A14",
+     "B N R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A15",
+     "B R R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A16",
+     "B VE R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A17",
+     "J G C",
+     "OMMUN TS GR3 105TS",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A18",
+     "J BC R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A19",
+     "J B R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A20",
+     "J J R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A21",
+     "J M R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A22",
+     "J N R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A23",
+     "J R R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   }
+  ],
+  "metadata": {
+   "PET": "GARE TRAMWAY",
+   "BORNIER": "P105TS",
+   "NO_PLAN": "6A23111PE102",
+   "INDICE": "TP1",
+   "PAGE": "1"
+  },
+  "detection_method": "pdf",
+  "blur_pct": 0.0
+ },
+ {
+  "success": true,
+  "page_num": 4,
+  "image_path": "page_4",
+  "headers": [
+   "BORNE",
+   "COULEUR",
+   "SIGNAL",
+   "JARRETIERES"
+  ],
+  "rows": [
+   {
+    "type": "data",
+    "cells": [
+     "A24",
+     "J VE R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A25",
+     "M G C",
+     "OMMUN TS GR4 105TS",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A26",
+     "M BC R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A27",
+     "M B R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A28",
+     "M J R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A29",
+     "M M R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A30",
+     "M N R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A31",
+     "M R R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A32",
+     "M VE R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C01",
+     "N G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C02",
+     "N BC R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C03",
+     "N B R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C04",
+     "N J R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C05",
+     "N M R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C06",
+     "N N R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C07",
+     "N R R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C08",
+     "N VE R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C09",
+     "R G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C10",
+     "R BC R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C11",
+     "R B R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C12",
+     "R J R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C13",
+     "R M R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C14",
+     "R N R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C15",
+     "R R R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C16",
+     "R VE R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C17",
+     "VEG P",
+     "ET/TS PORTE FERMEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C18",
+     "VEBC R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C19",
+     "VEB R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C20",
+     "VEJ R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C21",
+     "VEM R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C22",
+     "VEN E",
+     "P. STAT/TS DEFAUT ET IN",
+     "TERV."
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C23",
+     "VER E",
+     "P. STAT/TS ENTRETIEN PO",
+     "MPE"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C24",
+     "VEVE E",
+     "P. STAT/TS DEBORDEMENT",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C25",
+     "VLG E",
+     "P. STAT/TS MANQUE 48V",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C26",
+     "VLBC E",
+     "P. STAT/TS DEFAUT ISOLE",
+     "MENT"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C27",
+     "VLB E",
+     "P. STAT/TS NIVEAU TROP",
+     "BAS"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C28",
+     "VLJ E",
+     "P.STAT/TS DISCORDANCE P",
+     "OMPE"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C29",
+     "VLM E",
+     "P. STAT/TS FUSION FUSIB",
+     "LE"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C30",
+     "VLN E",
+     "P. STAT/TS INTENSITE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C31",
+     "VLR E",
+     "P. STAT/TS SURINTENSITE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C32",
+     "VLVE R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "N1",
+     "O",
+     "VG 105TS",
+     "0027B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "N2",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "N3",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "N4",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "P1",
+     "",
+     "48VG 105TS",
+     "0026B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "P2",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "P3",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "P4",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   }
+  ],
+  "metadata": {
+   "PET": "GARE TRAMWAY",
+   "BORNIER": "P105TS",
+   "NO_PLAN": "6A23111PE102",
+   "INDICE": "TP1",
+   "PAGE": "2"
+  },
+  "detection_method": "pdf",
+  "blur_pct": 0.0
+ },
+ {
+  "success": true,
+  "page_num": 5,
+  "image_path": "page_5",
+  "headers": [
+   "BORNE",
+   "COULEUR",
+   "SIGNAL",
+   "JARRETIERES"
+  ],
+  "rows": [
+   {
+    "type": "data",
+    "cells": [
+     "10",
+     "C",
+     "OMMUN TS GR1 106TS",
+     "0035B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "11",
+     "E",
+     "PS2/TS DEFAUT AVEC INTE",
+     "RV. 0036B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "12",
+     "E",
+     "PS2/TS ENTRETIEN",
+     "0037B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "13",
+     "E",
+     "PS2/TS DEBORDEMENT",
+     "0038B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "14",
+     "E",
+     "PS2/TS ABSENCE 48V",
+     "0039B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "15",
+     "E",
+     "PS2/TS DEFAUT ISOLEMENT",
+     "0040B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "16",
+     "E",
+     "PS2/TS NIVEAU TROP BAS",
+     "0041B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "17",
+     "E",
+     "PS2/TS DISCORDANCE POMP",
+     "E 0042B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "18",
+     "E",
+     "PS2/TS FUSION FU POMPE",
+     "0043B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "20",
+     "C",
+     "OMMUN TS GR2 106TS",
+     "0044B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "21",
+     "E",
+     "PS2/ TS INTENSITE",
+     "0045B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "22",
+     "E",
+     "PS2/TS SURINTENSITE",
+     "0046B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "23",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "24",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "25",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "26",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "27",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "28",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "30",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "31",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "32",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "33",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "34",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "35",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "36",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "37",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "38",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "40",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "41",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "42",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "43",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "44",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "45",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "46",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "47",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "48",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A01",
+     "C",
+     "OMMUN TS GR1 106TS",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A02",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A03",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A04",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A05",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A06",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A07",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A08",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A09",
+     "C",
+     "OMMUN TS GR2 106TS",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A10",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A11",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A12",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A13",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A14",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A15",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A16",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A17",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A18",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A19",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A20",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A21",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A22",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A23",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A24",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A25",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   }
+  ],
+  "metadata": {
+   "PET": "GARE TRAMWAY",
+   "BORNIER": "P106TS",
+   "NO_PLAN": "6A23111PE102",
+   "INDICE": "R1",
+   "PAGE": "3"
+  },
+  "detection_method": "pdf",
+  "blur_pct": 0.0
+ },
+ {
+  "success": true,
+  "page_num": 6,
+  "image_path": "page_6",
+  "headers": [
+   "BORNE",
+   "COULEUR",
+   "SIGNAL",
+   "JARRETIERES"
+  ],
+  "rows": [
+   {
+    "type": "data",
+    "cells": [
+     "A26",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A27",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A28",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A29",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A30",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A31",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "A32",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C01",
+     "E",
+     "PS2/TS DEFAUT AVEC INTE",
+     "RV."
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C02",
+     "E",
+     "PS2/TS ENTRETIEN",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C03",
+     "E",
+     "PS2/TS DEBORDEMENT",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C04",
+     "E",
+     "PS2/TS ABSENCE 48V",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C05",
+     "E",
+     "PS2/TS DEFAUT ISOLEMENT",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C06",
+     "E",
+     "PS2/TS NIVEAU TROP BAS",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C07",
+     "E",
+     "PS2/TS DISCORDANCE POMP",
+     "E"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C08",
+     "E",
+     "PS2/TS FUSION FU POMPE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C09",
+     "E",
+     "PS2/ TS INTENSITE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C10",
+     "E",
+     "PS2/TS SURINTENSITE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C11",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C12",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C13",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C14",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C15",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C16",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C17",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C18",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C19",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C20",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C21",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C22",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C23",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C24",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C25",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C26",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C27",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C28",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C29",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C30",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C31",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "C32",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "N1",
+     "O",
+     "VG 106TS",
+     "0048B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "N2",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "N3",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "N4",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "P1",
+     "",
+     "48VG 106TS",
+     "0047B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "P2",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "P3",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "P4",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   }
+  ],
+  "metadata": {
+   "PET": "GARE TRAMWAY",
+   "BORNIER": "P106TS",
+   "NO_PLAN": "6A23111PE102",
+   "INDICE": "R1",
+   "PAGE": "4"
+  },
+  "detection_method": "pdf",
+  "blur_pct": 0.0
+ },
+ {
+  "success": true,
+  "page_num": 7,
+  "image_path": "page_7",
+  "headers": [
+   "BORNE",
+   "COULEUR",
+   "SIGNAL",
+   "JARRETIERES"
+  ],
+  "rows": [
+   {
+    "type": "section",
+    "text": "NOM DU CABLE  GAT/CA 01"
+   },
+   {
+    "type": "data",
+    "cells": [
+     "01",
+     "N +",
+     "48VG",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "02",
+     "B 0",
+     "VG",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "03",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "04",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "05",
+     "",
+     "48VG 105TS",
+     "0026B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "06",
+     "0",
+     "VG 105TS",
+     "0027B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "07",
+     "",
+     "48VG 106TS",
+     "0047B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "08",
+     "0",
+     "VG 106TS",
+     "0048B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "09",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "10",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "11",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "12",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "13",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "14",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "15",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "16",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "17",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "18",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "19",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "20",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "21",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "22",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "23",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "24",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "25",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "26",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "27",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "28",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   }
+  ],
+  "metadata": {
+   "PET": "GARE TRAMWAY",
+   "BORNIER": "P48VG",
+   "NO_PLAN": "6A23111PE102",
+   "INDICE": "R1",
+   "PAGE": "5"
+  },
+  "detection_method": "pdf",
+  "blur_pct": 0.0
+ },
+ {
+  "success": true,
+  "page_num": 8,
+  "image_path": "page_8",
+  "headers": [
+   "BORNE",
+   "COULEUR",
+   "SIGNAL",
+   "JARRETIERES"
+  ],
+  "rows": [
+   {
+    "type": "section",
+    "text": "NOM DU CABLE  EPS/GAT"
+   },
+   {
+    "type": "data",
+    "cells": [
+     "01",
+     "1 G C",
+     "OMMUN TS GR3 105TS",
+     "0013B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "02",
+     "1 BC E",
+     "P. STAT/TS DEFAUT ET IN",
+     "TERV.0016B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "03",
+     "1 I E",
+     "P. STAT/TS ENTRETIEN PO",
+     "MPE 0017B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "04",
+     "1 B E",
+     "P. STAT/TS DEBORDEMENT",
+     "0018B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "05",
+     "2 G E",
+     "P. STAT/TS MANQUE 4H",
+     "0020B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "06",
+     "2 J E",
+     "P. STAT/TS DEFAUT ISOLE",
+     "MENT0021B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "07",
+     "2 I E",
+     "P. STAT/TS NIVEAU TROP",
+     "BAS 0022B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "08",
+     "2 M E",
+     "P.STAT/TS DISCONTINUOSI",
+     "TE POMPE 0033B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "09",
+     "3 G E",
+     "P. STAT/TS FUSION FUSIB",
+     "LE 0023B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "10",
+     "3 N C",
+     "OMMUN TS GR4 105TS",
+     "0019B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "11",
+     "3 I E",
+     "P. STAT/TS INTENSITE",
+     "0024B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "12",
+     "3 R E",
+     "P. STAT/TS SURINTENSITÉ",
+     "0025B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "13",
+     "4 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "14",
+     "4 V R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "15",
+     "4 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "16",
+     "4 BC R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "17",
+     "5 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "18",
+     "5 B R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "19",
+     "5 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "20",
+     "5 J R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "21",
+     "6 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "22",
+     "6 M R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "23",
+     "6 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "24",
+     "6 N R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "25",
+     "7 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "26",
+     "7 R R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "27",
+     "7 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "28",
+     "7 V R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   }
+  ],
+  "metadata": {
+   "PET": "GARE TRAMWAY",
+   "BORNIER": "PA",
+   "NO_PLAN": "6A23111PE102",
+   "INDICE": "R",
+   "PAGE": "6"
+  },
+  "detection_method": "pdf",
+  "blur_pct": 0.0
+ },
+ {
+  "success": true,
+  "page_num": 9,
+  "image_path": "page_9",
+  "headers": [
+   "BORNE",
+   "COULEUR",
+   "SIGNAL",
+   "JARRETIERES"
+  ],
+  "rows": [
+   {
+    "type": "section",
+    "text": "NOM DU CABLE"
+   },
+   {
+    "type": "data",
+    "cells": [
+     "01",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "02",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "03",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "04",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "05",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "06",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "07",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "08",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "09",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "10",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "11",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "12",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "13",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "14",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "15",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "16",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "17",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "18",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "19",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "20",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "21",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "22",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "23",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "24",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "25",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "26",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "27",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "28",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   }
+  ],
+  "metadata": {
+   "PET": "GARE TRAMWAY",
+   "BORNIER": "PB",
+   "NO_PLAN": "6A23111PE102",
+   "INDICE": "TP1",
+   "PAGE": "7"
+  },
+  "detection_method": "pdf",
+  "blur_pct": 0.0
+ },
+ {
+  "success": true,
+  "page_num": 10,
+  "image_path": "page_10",
+  "headers": [
+   "BORNE",
+   "COULEUR",
+   "SIGNAL",
+   "JARRETIERES"
+  ],
+  "rows": [
+   {
+    "type": "section",
+    "text": "NOM DU CABLE  DT1.2/GAT 02"
+   },
+   {
+    "type": "data",
+    "cells": [
+     "01",
+     "1 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "02",
+     "1 BC R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "03",
+     "1 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "04",
+     "1 B R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "05",
+     "2 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "06",
+     "2 J R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "07",
+     "2 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "08",
+     "2 M R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "09",
+     "3 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "10",
+     "3 N R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "11",
+     "3 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "12",
+     "3 R R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "13",
+     "4 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "14",
+     "4 V R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "15",
+     "4 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "16",
+     "4 BC R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "17",
+     "5 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "18",
+     "5 B R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "19",
+     "5 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "20",
+     "5 J R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "21",
+     "6 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "22",
+     "6 M R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "23",
+     "6 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "24",
+     "6 N R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "25",
+     "7 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "26",
+     "7 R R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "27",
+     "7 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "28",
+     "7 V R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   }
+  ],
+  "metadata": {
+   "PET": "GARE TRAMWAY",
+   "BORNIER": "PC",
+   "NO_PLAN": "6A23111PE102",
+   "INDICE": "R",
+   "PAGE": "8"
+  },
+  "detection_method": "pdf",
+  "blur_pct": 0.0
+ },
+ {
+  "success": true,
+  "page_num": 11,
+  "image_path": "page_11",
+  "headers": [
+   "BORNE",
+   "COULEUR",
+   "SIGNAL",
+   "JARRETIERES"
+  ],
+  "rows": [
+   {
+    "type": "section",
+    "text": "NOM DU CABLE  GAT/FDC"
+   },
+   {
+    "type": "data",
+    "cells": [
+     "01",
+     "N C",
+     "OMMUN TS GR3 105TS",
+     "0014B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "02",
+     "B P",
+     "ET/TS PORTE FERMEE",
+     "0015B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "section",
+    "text": "NOM DU CABLE:"
+   },
+   {
+    "type": "data",
+    "cells": [
+     "03",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "04",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "05",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "06",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "07",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "08",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "09",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "10",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "11",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "12",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "13",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "14",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "15",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "16",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "17",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "18",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "19",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "20",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "21",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "22",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "23",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "24",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "25",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "26",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "27",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "28",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   }
+  ],
+  "metadata": {
+   "PET": "GARE TRAMWAY",
+   "BORNIER": "PD",
+   "NO_PLAN": "6A23111PE102",
+   "INDICE": "TP1",
+   "PAGE": "9"
+  },
+  "detection_method": "pdf",
+  "blur_pct": 0.0
+ },
+ {
+  "success": true,
+  "page_num": 12,
+  "image_path": "page_12",
+  "headers": [
+   "BORNE",
+   "COULEUR",
+   "SIGNAL",
+   "JARRETIERES"
+  ],
+  "rows": [
+   {
+    "type": "section",
+    "text": "NOM DU CABLE  GAT/PCC1B 02"
+   },
+   {
+    "type": "data",
+    "cells": [
+     "01",
+     "1 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "02",
+     "1 BC R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "03",
+     "1 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "04",
+     "1 B R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "05",
+     "2 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "06",
+     "2 J R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "07",
+     "2 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "08",
+     "2 M R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "09",
+     "3 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "10",
+     "3 N R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "11",
+     "3 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "12",
+     "3 R R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "13",
+     "4 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "14",
+     "4 V R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "15",
+     "4 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "16",
+     "4 BC R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "17",
+     "5 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "18",
+     "5 B R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "19",
+     "5 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "20",
+     "5 J R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "21",
+     "6 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "22",
+     "6 M R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "23",
+     "6 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "24",
+     "6 N R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "25",
+     "7 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "26",
+     "7 R R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "27",
+     "7 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "28",
+     "7 V R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   }
+  ],
+  "metadata": {
+   "PET": "GARE TRAMWAY",
+   "BORNIER": "PE",
+   "NO_PLAN": "6A23111PE102",
+   "INDICE": "R",
+   "PAGE": "10"
+  },
+  "detection_method": "pdf",
+  "blur_pct": 0.0
+ },
+ {
+  "success": true,
+  "page_num": 13,
+  "image_path": "page_13",
+  "headers": [
+   "BORNE",
+   "COULEUR",
+   "SIGNAL",
+   "JARRETIERES"
+  ],
+  "rows": [
+   {
+    "type": "data",
+    "cells": [
+     "01",
+     "1 G C",
+     "OMMUN TS GR1 106TS",
+     "0035B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "02",
+     "1 BC E",
+     "PS2/TS DEFAUT AVEC INTE",
+     "RV. 0036B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "03",
+     "1 I E",
+     "PS2/TS ENTRETIEN",
+     "0037B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "04",
+     "1 B E",
+     "PS2/TS DEBORDEMENT",
+     "0038B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "05",
+     "2 G E",
+     "PS2/TS ABSENCE 48V",
+     "0039B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "06",
+     "2 J E",
+     "PS2/TS DEFAUT ISOLEMENT",
+     "0040B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "07",
+     "2 I E",
+     "PS2/TS NIVEAU TROP BAS",
+     "0041B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "08",
+     "2 M E",
+     "PS2/TS DISCORDANCE POMP",
+     "E 0042B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "09",
+     "3 G E",
+     "PS2/TS FUSION FU POMPE",
+     "0043B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "10",
+     "3 N C",
+     "OMMUN TS GR2 106TS",
+     "0044B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "11",
+     "3 I E",
+     "PS2/ TS INTENSITE",
+     "0045B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "12",
+     "3 R E",
+     "PS2/TS SURINTENSITE",
+     "0046B"
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "13",
+     "4 G R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "14",
+     "4 V R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "15",
+     "4 I R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "16",
+     "4 BC R",
+     "ESERVE CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "17",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "18",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "19",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "20",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "21",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "22",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "23",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "24",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "25",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "26",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "27",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   },
+   {
+    "type": "data",
+    "cells": [
+     "28",
+     "R",
+     "ESERVE NON CABLEE",
+     ""
+    ],
+    "confidence": [
+     90,
+     90,
+     90,
+     90
+    ]
+   }
+  ],
+  "metadata": {
+   "PET": "GARE TRAMWAY",
+   "BORNIER": "PF",
+   "NO_PLAN": "6A23111PE102",
+   "INDICE": "R1",
+   "PAGE": "11"
+  },
+  "detection_method": "pdf",
+  "blur_pct": 0.0
+ }
+]

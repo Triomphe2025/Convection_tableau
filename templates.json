@@ -1,17 +1,17 @@
 {
-  "Bornier standard": {
-    "name": "Bornier standard",
+  "Répartiteur": {
+    "name": "Répartiteur",
     "columns": [
-      "BORNE",
-      "COULEUR",
-      "SIGNAL",
-      "JARRETIERES"
+      "TENANT",
+      "JAR",
+      "ABOUTISSANT",
+      "SIGNAL"
     ],
     "section_keyword": "NOM DU CABLE",
     "has_footer": true,
     "footer_left_label": "M  T  I",
-    "footer_row1_format": "P.E.T. : {PET}   BORNIER : {BORNIER}",
-    "footer_row2_format": "NO PLAN : {NO_PLAN}  |  INDICE : {INDICE}  |  PAGE : {PAGE}",
+    "footer_row1_format": "P.E.T.   :     {PET:<50}JARRETIERAGE",
+    "footer_row2_format": "NO PLAN    :   {NO_PLAN:<37}|  INDICE : {INDICE:<8}|  PAGE :   {PAGE}",
     "footer_detect_keywords": [
       "NO PLAN",
       "P.E.T",
@@ -23,13 +23,35 @@
       "T",
       "I"
     ],
+    "footer_extract_fields": [
+      {
+        "label": "P.E.T.",
+        "key": "PET"
+      },
+      {
+        "label": "BORNIER",
+        "key": "BORNIER"
+      },
+      {
+        "label": "NO PLAN",
+        "key": "NO_PLAN"
+      },
+      {
+        "label": "INDICE",
+        "key": "INDICE"
+      },
+      {
+        "label": "PAGE",
+        "key": "PAGE"
+      }
+    ],
     "col_widths": {
-      "BORNE": 8.0,
-      "COULEUR": 12.0,
-      "SIGNAL": 50.0,
-      "JARRETIERES": 15.0
+      "TENANT": 22,
+      "JAR": 10,
+      "ABOUTISSANT": 22,
+      "SIGNAL": 36
     },
-    "description": "Tableau de bornier : BORNE, COULEUR, SIGNAL, JARRETIERES"
+    "description": "Tableau répartiteur : TENANT / JAR / ABOUTISSANT / SIGNAL"
   },
   "REPARTITEUR": {
     "name": "REPARTITEUR",
@@ -42,8 +64,8 @@
     "section_keyword": "NOM DU CABLE",
     "has_footer": true,
     "footer_left_label": "M  T  I",
-    "footer_row1_format": "P.E.T. : {PET}   BORNIER : {BORNIER}",
-    "footer_row2_format": "NO PLAN : {NO_PLAN}  |  INDICE : {INDICE}  |  PAGE : {PAGE}",
+    "footer_row1_format": "P.E.T.   :     {PET:<50}JARRETIERAGE",
+    "footer_row2_format": "NO PLAN    :   {NO_PLAN:<37}|  INDICE : {INDICE:<8}|  PAGE :   {PAGE}",
     "footer_detect_keywords": [
       "NO PLAN",
       "P.E.T",
@@ -55,12 +77,87 @@
       "T",
       "I"
     ],
+    "footer_extract_fields": [
+      {
+        "label": "P.E.T.",
+        "key": "PET"
+      },
+      {
+        "label": "BORNIER",
+        "key": "BORNIER"
+      },
+      {
+        "label": "NO PLAN",
+        "key": "NO_PLAN"
+      },
+      {
+        "label": "INDICE",
+        "key": "INDICE"
+      },
+      {
+        "label": "PAGE",
+        "key": "PAGE"
+      }
+    ],
     "col_widths": {
-      "TENANT": 22.0,
-      "JAR": 10.0,
-      "ABOUTISSANT": 22.0,
-      "SIGNAL": 36.0
+      "TENANT": 20.0,
+      "JAR": 20.0,
+      "ABOUTISSANT": 20.0,
+      "SIGNAL": 20.0
     },
-    "description": "Tableau répartiteur : TENANT, JAR., ABOUTISSANT, SIGNAL (documents VD23111 PE 163)"
+    "description": ""
+  },
+  "REPARTITEUR 2": {
+    "name": "REPARTITEUR 2",
+    "columns": [
+      "FIL",
+      "TENANT",
+      "SIGNAL",
+      "ABOUTISSANT"
+    ],
+    "section_keyword": "NOM DU CABLE",
+    "has_footer": true,
+    "footer_left_label": "SIEMENS",
+    "footer_row1_format": "CABLE :     {CABLE:<40}TYPE :    {TYPE}",
+    "footer_row2_format": "N° PLAN  :   {NO_PLAN:<37}|  INDICE : {INDICE:<8}|  PAGE :   {PAGE}",
+    "footer_detect_keywords": [
+      "CABLE",
+      "TYPE",
+      "NO PLAN",
+      "INDICE",
+      "BORNIER :"
+    ],
+    "footer_mti_tokens": [
+      "SIEMENS"
+    ],
+    "footer_extract_fields": [
+      {
+        "label": "CABLE",
+        "key": "CABLE"
+      },
+      {
+        "label": "TYPE",
+        "key": "TYPE"
+      },
+      {
+        "label": "NO PLAN",
+        "key": "NO_PLAN"
+      },
+      {
+        "label": "INDICE",
+        "key": "INDICE"
+      },
+      {
+        "label": "PAGE",
+        "key": "PAGE"
+      }
+    ],
+    "col_widths": {
+      "FIL": 8.0,
+      "TENANT": 22.0,
+      "SIGNAL": 40.0,
+      "ABOUTISSANT": 22.0
+    },
+    "description": "Répartiteur câbles : FIL / TENANT / SIGNAL / ABOUTISSANT — pied CABLE/TYPE"
   }
 }

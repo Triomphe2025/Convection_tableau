@@ -43,12 +43,12 @@ _UNICODE_MAP = str.maketrans({
     "─": "-",    # ─
     "═": "=",    # ═
     "•": "-",    # •
-    "✓": "[OK]", # ✓
+    "✓": "[OK]",  # ✓
     "✗": "[X]",  # ✗
     "✕": "[X]",  # ✕
     "✘": "[X]",  # ✘
-    "✔": "[OK]", # ✔
-    "✅": "[OK]", # ✅
+    "✔": "[OK]",  # ✔
+    "✅": "[OK]",  # ✅
     "❌": "[X]",  # ❌
     "⚠": "[!]",  # ⚠
     "ℹ": "[i]",  # ℹ
@@ -283,7 +283,7 @@ def section_architecture(pdf: Doc):
 
     couches = [
         ("Interface (interface.py)",    "Fenêtre tkinter, interaction utilisateur"),
-        ("Orchestration (converter.py)","Pipeline complet avec callbacks"),
+        ("Orchestration (converter.py)", "Pipeline complet avec callbacks"),
         ("Génération (generer_classeur.py)", "Assemblage Excel et Word"),
         ("OCR (ocr_processor.py)",      "Extraction du texte depuis les images"),
         ("Extraction (recuperer_image.py)", "Décompression des images du .docx"),
