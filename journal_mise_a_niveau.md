@@ -160,11 +160,40 @@ pas de la conversion) :
 colonnes par le même découpeur que la conversion (`extract_page_grille`). La mesure y vérifie
 les caractères et la chaîne d'écriture (routage, dictionnaire, Excel), pas le découpage.
 
+### Étape 4 (suite) — routage étendu à tous les modes, images cumulées
+
+Décisions du 2026-09-28 :
+- **Tous les modes** : le routage dépend de la nature de la page, pas du moteur. En mode
+  tesseract/docling, `PdfTableExtractor._extract_page_routee` : vectoriel → grille ; couche OCR
+  invisible → couche ignorée, repli image `_extract_page_ocr` ; scan → chemin v1.7.
+  Ollama reste dans le routage des modes vision.
+- **Nouvelle règle** (ordre) : texte vectoriel exploitable → grille ; sinon images CUMULÉES ≥
+  `PDF_SEUIL_IMAGE` (0,10) → pipeline scan ; sinon page ignorée, avec dans le journal
+  « page N ignorée : <raison>, images = X % de la page ». Les gardes 3 et 5 de 223400PE137
+  (4 bandes de 10 %) repassent donc en scan : **2 appels API en mode Claude** (pages classées
+  non-listing par Claude), **0 en mode Tesseract**. Choix complémentaire : une page en police
+  non intégrée avec ≥ 20 caractères visibles va au pipeline scan plutôt que d'être ignorée.
+- **Lignes de section dans la grille** : « NOM DU CABLE : … » (6A23111PE102, export Excel)
+  était pris pour un pied de page (« CABLE : ») et vidait les pages 7 à 12 ; il est désormais
+  reconnu comme ligne de section, comme dans le lecteur v1.7. Régression détectée par
+  `test_lecture_du_pdf_final_par_le_converter` (5 pages avec tableau au lieu de 11).
+
+Contrôles mesurés :
+
+| Contrôle | Résultat |
+|----------|----------|
+| 223111PE011 complet (129 pages, Paper Capture), classement | **25 vectoriel** (pages 2, 16, 24, 26, 28, 35, 37, 38, 39, 40, 46, 50, 51, 52, 108, 109, 111, 116, 117, 118, 119, 120, 123, 126, 128) + **104 couche OCR invisible** — conforme à la liste attendue, aucune page en désaccord |
+| Extrait 10 pages en mode Tesseract (réel, 49 s) | **9 pages sur 10 avec lignes** (étape 3 : 5 sur 10) ; la 10ᵉ est la page 104, câble « RESERVE », sans ligne de données ni dans le PDF ni dans la vérité terrain |
+| Page 52 de l'extrait redécoupée en 4 bandes de 10 % | routée en pipeline scan (faux moteur vision appelé une fois) |
+| 6A23111PE102 final (export Excel), grille contre lecteur v1.7 | mêmes nombres de lignes sur les 13 pages ; la grille ne coupe plus les mots (v1.7 : « R » │ « ESERVE NON CABLEE ») |
+
+Le test « 10 pages sur 10 » demandé à l'étape 3 est écrit en « 9 pages sur 10, la page 104
+n'ayant pas de ligne » (`test_extrait_toutes_les_pages_a_tableau_produisent_des_lignes`).
+
 ### Reste ouvert
 
-- **Mode Tesseract** : non concerné par ce routage (toujours `PdfTableExtractor.extract_all`).
-  Le constat de l'étape 3 (Paper Capture : 5 pages sur 10 sans aucune ligne) reste valable
-  dans ce mode, ainsi que son test à écrire.
-- **Pages « vides »** : une page sans texte dont les images couvrent moins de 80 % est
-  ignorée. Un vrai tableau scanné collé en petite image sur une page serait donc perdu ;
-  aucun cas rencontré sur les fixtures.
+- **Qualité du repli image Tesseract** sur les pages Paper Capture : lignes lues en réel,
+  page 52 (60 lignes dans la vérité) → 8 lignes, page 119 (60) → 42. Le routage n'y est pour
+  rien : c'est la lecture Tesseract de ces scans qu'il faudra mesurer et améliorer.
+- **Numéro de page « 122a »** lu « 122 » dans les métadonnées : `_extract_meta` ne retient que
+  les chiffres de PAGE (comportement v1.7, non modifié).

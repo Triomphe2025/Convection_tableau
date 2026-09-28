@@ -115,18 +115,24 @@ class Config:
     MAX_AUTO_COLUMNS = 4
 
     # ========================================
-    # 📄 ROUTAGE PDF PAR PAGE (modes vision)
+    # 📄 ROUTAGE PDF PAR PAGE (tous modes OCR)
     # ========================================
 
-    # True : en mode claude/ollama/hybrid/agent, chaque page d'un PDF est
-    # classée — texte vectoriel exact → lecture de la couche texte en grille
-    # (aucun appel API) ; couche OCR invisible ou scan → rastérisation et
-    # relecture par vision (pipeline v1.7). False : comportement v1.7 (toutes
-    # les pages rastérisées puis relues par vision).
+    # True : chaque page d'un PDF est classée selon sa nature, quel que soit
+    # le moteur — texte vectoriel exact → lecture de la couche texte en grille
+    # (aucun OCR ni appel API) ; couche OCR invisible → couche ignorée, page
+    # relue comme un scan ; scan → pipeline OCR du mode choisi. False :
+    # comportement v1.7.
     PDF_ROUTAGE_VECTORIEL = True
 
-    # Part de la page couverte par des images au-delà de laquelle la page
-    # est une image pleine page (scan) et non un document vectoriel.
+    # Surface cumulée des images (part de la page) à partir de laquelle une
+    # page sans texte exploitable part dans le pipeline scan ; en dessous elle
+    # est ignorée (motif journalisé). Bas à dessein : les gardes scannées de
+    # 223400PE137 sont stockées en 4 bandes de 10 % chacune.
+    PDF_SEUIL_IMAGE = 0.10
+
+    # Au-delà de cette couverture, un texte posé sur l'image n'est pas lu en
+    # grille (image pleine page : ce texte est une couche OCR, pas le document).
     PDF_SEUIL_IMAGE_PLEINE_PAGE = 0.8
 
     # Nombre minimal de caractères visibles pour traiter une page comme du

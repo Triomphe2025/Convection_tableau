@@ -9,7 +9,7 @@ Chaque fichier Python du projet a un rôle unique. Ne jamais mélanger les rôle
 | `interface.py` | Interface graphique Tkinter — affichage UNIQUEMENT, zéro logique métier |
 | `converter.py` | Orchestration des étapes avec callbacks `on_progress` / `on_log` |
 | `ocr_processor.py` | `BornierTableExtractor` : prétraitement → OCR → colonnes → cellules |
-| `pdf_extractor.py` | `PdfTableExtractor` : extraction des tableaux d'un PDF par couche texte (PyMuPDF), repli OCR Tesseract sur les pages raster ; classement d'une page (`classer_page` : vectoriel / OCR invisible / scan / vide) et lecture exacte en grille de caractères (`grille_page`, `extract_page_grille`) |
+| `pdf_extractor.py` | `PdfTableExtractor` : extraction des tableaux d'un PDF par couche texte (PyMuPDF), repli OCR Tesseract sur les pages raster ; classement d'une page (`diagnostiquer_page`/`classer_page` : vectoriel / OCR invisible / scan / vide) et routage en mode tesseract/docling (`_extract_page_routee`) et lecture exacte en grille de caractères (`grille_page`, `extract_page_grille`) |
 | `claude_ocr.py` | `ClaudeVisionExtractor` : OCR via Claude Vision (API Anthropic) + `LogReplayer` (replay du journal sans appel API) + parseur pipe partagé par les moteurs vision |
 | `ollama_ocr.py` | `OllamaVisionExtractor` : OCR via un modèle vision local Ollama (sans API externe) |
 | `hybrid_ocr.py` | `HybridVisionExtractor` : Ollama classe les colonnes, Claude corrige les caractères (2 passes) |

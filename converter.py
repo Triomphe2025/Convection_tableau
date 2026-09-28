@@ -131,6 +131,24 @@ class Converter:
         logging.info(msg)
         self._on_log(msg)
 
+    def _journaliser_routage(self, numero: int, total: int, diagnostic: Dict) -> None:
+        """Journalise le traitement choisi pour une page PDF (routage par nature)."""
+        from pdf_extractor import OCR_INVISIBLE, SCAN, VECTORIEL, motif_page_ignoree
+        nature = diagnostic.get('nature')
+        images = round(diagnostic.get('couverture', 0.0) * 100)
+        libelles = {
+            VECTORIEL: "texte vectoriel → lecture de la couche texte (sans OCR)",
+            OCR_INVISIBLE: "couche OCR invisible → couche ignorée, traitée en scan",
+            SCAN: "scan → OCR",
+        }
+        if nature in libelles:
+            self._log(f"  Page {numero}/{total} : {libelles[nature]}, images = {images} %")
+        else:
+            self._log(
+                f"  page {numero} ignorée : {motif_page_ignoree(diagnostic)}, "
+                f"images = {images} % de la page"
+            )
+
     def _progress(self, pct: float, msg: str) -> None:
         self._on_progress(pct, msg)
 
@@ -347,9 +365,7 @@ class Converter:
                 "Installez-le avec : pip install pymupdf"
             )
 
-        from pdf_extractor import (
-            OCR_INVISIBLE, SCAN, VECTORIEL, VIDE, PdfTableExtractor, classer_page,
-        )
+        from pdf_extractor import SCAN, VECTORIEL, VIDE, PdfTableExtractor, diagnostiquer_page
 
         ocr_mode = getattr(Config, 'OCR_MODE', 'tesseract').lower()
         routage = getattr(Config, 'PDF_ROUTAGE_VECTORIEL', False)
@@ -367,12 +383,6 @@ class Converter:
             for ancienne in images_dir.glob('page_*.png'):
                 ancienne.unlink()
 
-        libelles = {
-            VECTORIEL: "texte vectoriel → lecture de la couche texte (sans OCR)",
-            OCR_INVISIBLE: "image + couche OCR invisible → couche ignorée, traitée en scan",
-            SCAN: "scan → OCR",
-            VIDE: "ni texte ni image pleine page → ignorée",
-        }
         lecteur_grille = PdfTableExtractor(self.template)
         par_page: Dict[int, Dict] = {}
         pages_image: List[int] = []
@@ -384,9 +394,10 @@ class Converter:
             if self._est_annule():
                 self._log(f"  ⏹ Rastérisation arrêtée — {i}/{total_pages} pages traitées.")
                 break
-            nature = classer_page(page) if routage else SCAN
+            diagnostic = diagnostiquer_page(page) if routage else {'nature': SCAN}
+            nature = diagnostic['nature']
             if routage:
-                self._log(f"  Page {i}/{total_pages} : {libelles[nature]}")
+                self._journaliser_routage(i, total_pages, diagnostic)
             if nature == VECTORIEL:
                 par_page[i] = lecteur_grille.extract_page_grille(page, i - 1)
             elif nature == VIDE:
@@ -491,6 +502,8 @@ class Converter:
         }.get(_ocr_mode_pdf, 'Tesseract')
 
         def _page_callback(done: int, total: int, result: dict) -> None:
+            if 'routage' in result:
+                self._journaliser_routage(done, total, result['routage'])
             pct = 0.05 + (done / total) * 0.55   # 5 % → 60 %
             rows = sum(1 for r in result.get('rows', []) if r.get('type') == 'data')
             ok_flag = f"{rows} lignes" if result.get('success') else "vide"

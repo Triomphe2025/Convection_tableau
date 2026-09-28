@@ -69,6 +69,42 @@ class FauxVision:
         }
 
 
+def _pdf_en_bandes(tmp, chemin, numero, bandes=4, part=0.10):
+    """Rend une page scannée en `bandes` bandes d'image couvrant chacune `part`
+    de la page, sans texte — comme les gardes de 223400PE137."""
+    sortie = fitz.open()
+    with fitz.open(str(chemin)) as src:
+        origine = src[numero - 1]
+        largeur, hauteur = origine.rect.width, origine.rect.height
+        page = sortie.new_page(width=largeur, height=hauteur)
+        for k in range(bandes):
+            clip = fitz.Rect(0, k * hauteur / bandes, largeur, (k + 1) * hauteur / bandes)
+            y = k * hauteur * part * 1.5
+            page.insert_image(
+                fitz.Rect(0, y, largeur, y + hauteur * part),
+                pixmap=origine.get_pixmap(clip=clip),
+            )
+    chemin_sortie = Path(tmp) / 'bandes.pdf'
+    sortie.save(str(chemin_sortie))
+    sortie.close()
+    return chemin_sortie
+
+
+def _petite_image():
+    return fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 4, 4), 0)
+
+
+def _pdf_petite_image(tmp):
+    """Page sans texte avec une image couvrant 4 % de la page."""
+    sortie = fitz.open()
+    page = sortie.new_page(width=100, height=100)
+    page.insert_image(fitz.Rect(0, 0, 20, 20), pixmap=_petite_image())
+    chemin = Path(tmp) / 'petite.pdf'
+    sortie.save(str(chemin))
+    sortie.close()
+    return chemin
+
+
 def _vision_interdite(*args, **kwargs):
     raise AssertionError("appel au moteur vision (API) alors qu'aucun n'est attendu")
 
@@ -87,9 +123,10 @@ class TestClasserPage(unittest.TestCase):
         self.assertEqual(pe.classer_page(page), pe.VECTORIEL)
         doc.close()
 
-    def test_page_de_garde_en_bandes_est_vide(self):
+    def test_page_de_garde_en_bandes_est_un_scan(self):
+        # 4 bandes d'image de ~10 % : images cumulées ≥ PDF_SEUIL_IMAGE.
         doc, page = _page(PE137, 3)
-        self.assertEqual(pe.classer_page(page), pe.VIDE)
+        self.assertEqual(pe.classer_page(page), pe.SCAN)
         doc.close()
 
     def test_paper_capture_est_ocr_invisible(self):
@@ -112,6 +149,13 @@ class TestClasserPage(unittest.TestCase):
         page = doc.new_page()
         page.insert_text((72, 72), 'TEXTE EN HELVETICA NON INTEGREE ' * 3)
         self.assertEqual(pe.classer_page(page), pe.SCAN)
+        doc.close()
+
+    def test_petite_image_sans_texte_est_ignoree(self):
+        doc = fitz.open()
+        page = doc.new_page(width=100, height=100)
+        page.insert_image(fitz.Rect(0, 0, 20, 20), pixmap=_petite_image())
+        self.assertEqual(pe.classer_page(page), pe.VIDE)
         doc.close()
 
     def test_page_blanche_est_vide(self):
@@ -329,17 +373,35 @@ class _BaseConverter(unittest.TestCase):
 
 class TestRoutageConverter(_BaseConverter):
 
-    def test_pe137_sans_aucun_appel_api(self):
-        results, extractor = self._extraire(PE137, 'REPARTITEUR', vision=_vision_interdite)
+    def test_pe137_seules_les_gardes_scannees_vont_en_vision(self):
+        results, extractor = self._extraire(PE137, 'REPARTITEUR')
         self.assertEqual(len(results), 53)
-        self.assertEqual(sum(1 for r in results if r['success']), 48)
-        self.assertEqual(list((Path(self.tmp) / 'sortie' / 'images_pdf').glob('*.png')), [])
+        self.assertEqual(FauxVision.images, ['page_003.png', 'page_005.png'])
+        grille = [r for r in results if r['detection_method'] == 'pdf-grille']
+        self.assertEqual(len(grille), 51)
+        self.assertEqual(sum(1 for r in grille if r['success']), 48)
         self.assertIsNotNone(extractor)
 
     def test_mode_choisi_journalise_pour_chaque_page(self):
-        self._extraire(PE137, 'REPARTITEUR', vision=_vision_interdite)
+        self._extraire(PE137, 'REPARTITEUR')
         for numero in range(1, 54):
             self.assertTrue(any(f'Page {numero}/53 :' in m for m in self.logs), numero)
+        self.assertTrue(any('Page 3/53 : scan → OCR, images = ' in m for m in self.logs))
+
+    def test_scan_en_bandes_de_10_pour_cent_passe_par_l_ocr(self):
+        # Page 52 de l'extrait (scan) découpée en 4 bandes de 10 % de la page.
+        pdf = _pdf_en_bandes(self.tmp, EXTRAIT, 5)
+        results, _ = self._extraire(pdf, 'REPARTITEUR 2')
+        self.assertEqual(FauxVision.images, ['page_001.png'])
+        self.assertEqual(results[0]['detection_method'], 'claude-vision')
+
+    def test_page_ignoree_journalise_motif_et_images(self):
+        pdf = _pdf_petite_image(self.tmp)
+        results, _ = self._extraire(pdf, 'REPARTITEUR', vision=_vision_interdite)
+        self.assertEqual(results[0]['detection_method'], 'pdf-vide')
+        attendu = ('page 1 ignorée : aucun texte et images sous le seuil de 10 %, '
+                   'images = 4 % de la page')
+        self.assertTrue(any(m.strip() == attendu for m in self.logs), self.logs)
 
     def test_page_scannee_passe_toujours_par_l_ocr(self):
         pdf = _pdf_compose(self.tmp, [(PE137, 6), (SCAN, 1)])
@@ -368,6 +430,70 @@ class TestRoutageConverter(_BaseConverter):
         pdf = _pdf_compose(self.tmp, [(PE137, 6)])
         self._extraire(pdf, 'REPARTITEUR', vision=_vision_interdite)
         self.assertFalse((images / 'page_001.png').exists())
+
+
+class TestRoutageModeTesseract(unittest.TestCase):
+    """Mode tesseract : routage dans PdfTableExtractor.extract_all (repli image simulé)."""
+
+    def setUp(self):
+        self._routage = Config.PDF_ROUTAGE_VECTORIEL
+        Config.PDF_ROUTAGE_VECTORIEL = True
+        self.ocr = []
+
+    def tearDown(self):
+        Config.PDF_ROUTAGE_VECTORIEL = self._routage
+
+    def _faux_repli(self, ex_self, page, page_num):
+        self.ocr.append(page_num + 1)
+        return {'success': True, 'page_num': page_num + 1, 'headers': ex_self._tpl.columns,
+                'rows': [{'type': 'data', 'cells': ['OCR'] * len(ex_self._tpl.columns),
+                          'confidence': [100] * len(ex_self._tpl.columns)}],
+                'metadata': {}, 'detection_method': 'pdf_ocr', 'blur_pct': 0.0}
+
+    def _lire(self, pdf, modele):
+        ex = pe.PdfTableExtractor(_tpl(modele))
+        faux = lambda ex_self, page, num: self._faux_repli(ex_self, page, num)  # noqa: E731
+        with patch.object(pe.PdfTableExtractor, '_extract_page_ocr', faux):
+            results, _ = ex.extract_all(pdf)
+        return results
+
+    def test_extrait_paper_capture_couche_ignoree_repli_image(self):
+        results = self._lire(EXTRAIT, 'REPARTITEUR 2')
+        # 8 pages Paper Capture → repli image ; pages 104 et 122a → grille.
+        self.assertEqual(self.ocr, [1, 2, 3, 4, 5, 7, 8, 10])
+        self.assertEqual([r['detection_method'] for r in results].count('pdf-grille'), 2)
+        self.assertEqual(results[0]['routage']['nature'], pe.OCR_INVISIBLE)
+
+    def test_extrait_toutes_les_pages_a_tableau_produisent_des_lignes(self):
+        results = self._lire(EXTRAIT, 'REPARTITEUR 2')
+        avec_lignes = [i + 1 for i, r in enumerate(results) if r['rows']]
+        # La page 104 (6e de l'extrait, câble « RESERVE ») n'a aucune ligne de
+        # données, ni dans le PDF ni dans la vérité terrain.
+        self.assertEqual(avec_lignes, [1, 2, 3, 4, 5, 7, 8, 9, 10])
+
+    def test_pe137_gardes_en_repli_image_texte_en_grille(self):
+        results = self._lire(PE137, 'REPARTITEUR')
+        self.assertEqual(self.ocr, [3, 5])
+        self.assertEqual([r['detection_method'] for r in results].count('pdf-grille'), 51)
+
+    def test_routage_desactive_rend_la_v17(self):
+        Config.PDF_ROUTAGE_VECTORIEL = False
+        results = self._lire(EXTRAIT, 'REPARTITEUR 2')
+        self.assertNotIn('pdf-grille', [r['detection_method'] for r in results])
+        self.assertTrue(all('routage' not in r for r in results))
+
+
+class TestSectionsDansLaGrille(unittest.TestCase):
+
+    def test_ligne_nom_du_cable_est_une_section_pas_un_pied(self):
+        # 6A23111PE102 exporté d'Excel : « NOM DU CABLE : » suit l'en-tête ;
+        # pris pour un pied (« CABLE : »), il vidait les pages 7 à 12.
+        with fitz.open(str(FIXTURES / 'final_6A23111PE102_13p.pdf')) as doc:
+            r = pe.PdfTableExtractor(_tpl('Bornier standard')).extract_page_grille(doc[6], 6)
+        self.assertEqual(r['rows'][0], {'type': 'section', 'text': 'NOM DU CABLE : GAT/CA 01'})
+        self.assertEqual(sum(1 for x in r['rows'] if x['type'] == 'data'), 28)
+        self.assertEqual(r['rows'][1]['cells'], ['01', 'N', '+ 48VG', ''])
+        self.assertEqual(r['metadata'].get('PAGE'), '5')
 
 
 class TestRoutageDesactive(_BaseConverter):

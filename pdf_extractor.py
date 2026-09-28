@@ -57,15 +57,20 @@ def couverture_image(page) -> float:
     return min(1.0, total / aire)
 
 
-def classer_page(page) -> str:
-    """Nature d'une page : VECTORIEL, OCR_INVISIBLE, SCAN ou VIDE.
+def diagnostiquer_page(page) -> Dict:
+    """Mesures qui décident du traitement d'une page, et la nature retenue.
 
-    VECTORIEL : texte visible en polices intégrées, sans image pleine page —
-    la couche texte est exacte. OCR_INVISIBLE : couche OCR invisible (ou
-    texte posé sur une image pleine page) — la couche est ignorée, la page
-    est traitée comme un scan. SCAN : image sans texte, ou texte dont
-    l'exactitude n'est pas garantie. VIDE : ni texte, ni image pleine page
-    (page de garde en bandes, schéma) — rien à lire en tableau.
+    Ordre de décision :
+    1. texte vectoriel exploitable (visible, ≥ PDF_MIN_CARS_VECTORIEL caractères,
+       police intégrée, aucune couche invisible, pas posé sur une image pleine
+       page) → VECTORIEL, lu en grille ;
+    2. sinon, images cumulées ≥ PDF_SEUIL_IMAGE → pipeline scan : OCR_INVISIBLE
+       si la page porte une couche texte (ignorée), SCAN sinon. Le seuil est bas
+       à dessein : un scan peut être stocké en bandes de 10 % (gardes de
+       223400PE137) et serait sinon perdu ;
+    3. sinon, texte visible non garanti (police non intégrée) → SCAN, pour ne
+       pas perdre une page qui a du contenu ;
+    4. sinon → VIDE, page ignorée (le motif est journalisé).
     """
     from config import Config
     visibles = invisibles = 0
@@ -75,18 +80,36 @@ def classer_page(page) -> str:
             invisibles += n
         else:
             visibles += n
-    pleine_page = couverture_image(page) >= Config.PDF_SEUIL_IMAGE_PLEINE_PAGE
+    couverture = couverture_image(page)
     polices_integrees = any(police[1] != 'n/a' for police in page.get_fonts())
+    assez_de_texte = visibles >= Config.PDF_MIN_CARS_VECTORIEL
 
-    if invisibles or (visibles and pleine_page):
-        return OCR_INVISIBLE
-    if pleine_page:
-        return SCAN
-    if visibles >= Config.PDF_MIN_CARS_VECTORIEL and polices_integrees:
-        return VECTORIEL
-    if visibles:
-        return SCAN
-    return VIDE
+    if (assez_de_texte and polices_integrees and not invisibles
+            and couverture < Config.PDF_SEUIL_IMAGE_PLEINE_PAGE):
+        nature = VECTORIEL
+    elif couverture >= Config.PDF_SEUIL_IMAGE:
+        nature = OCR_INVISIBLE if (visibles or invisibles) else SCAN
+    elif assez_de_texte:
+        nature = SCAN
+    else:
+        nature = VIDE
+    return {
+        'nature': nature, 'visibles': visibles, 'invisibles': invisibles,
+        'couverture': couverture,
+    }
+
+
+def classer_page(page) -> str:
+    """Nature d'une page : VECTORIEL, OCR_INVISIBLE, SCAN ou VIDE (voir diagnostiquer_page)."""
+    return diagnostiquer_page(page)['nature']
+
+
+def motif_page_ignoree(diagnostic: Dict) -> str:
+    """Raison lisible pour laquelle une page VIDE est ignorée."""
+    from config import Config
+    visibles = diagnostic.get('visibles', 0)
+    texte = f"texte trop court ({visibles} caractères)" if visibles else "aucun texte"
+    return f"{texte} et images sous le seuil de {round(Config.PDF_SEUIL_IMAGE * 100)} %"
 
 
 # -- Lecture de la couche texte en grille de caractères ----------------
@@ -279,6 +302,36 @@ class PdfTableExtractor:
         quelle que soit la présence d'une couche texte vectorielle.
         """
         from config import Config
+        if getattr(Config, 'PDF_ROUTAGE_VECTORIEL', False):
+            return self._extract_page_routee(page, page_num)
+        return self._extract_page_v17(page, page_num)
+
+    def _extract_page_routee(self, page, page_num: int) -> Dict:
+        """Routage par nature de page (tous modes passant par extract_all).
+
+        Le diagnostic est joint au résultat (clé 'routage') pour que
+        l'appelant journalise le mode choisi.
+        """
+        diagnostic = diagnostiquer_page(page)
+        nature = diagnostic['nature']
+        if nature == VECTORIEL:
+            result = self.extract_page_grille(page, page_num)
+        elif nature == OCR_INVISIBLE:
+            # Couche Paper Capture illisible : elle suffisait à sauter le repli
+            # image (assez de mots) puis faisait échouer l'analyse — 5 pages
+            # sur 10 sans aucune ligne sur l'extrait 223111PE011.
+            result = self._extract_page_ocr(page, page_num)
+        elif nature == VIDE:
+            result = self._fail(page_num)
+            result['detection_method'] = 'pdf-vide'
+        else:
+            result = self._extract_page_v17(page, page_num)
+        result['routage'] = diagnostic
+        return result
+
+    def _extract_page_v17(self, page, page_num: int) -> Dict:
+        """Chemin v1.7 : couche texte, repli OCR si la page n'a pas de mots."""
+        from config import Config
         ocr_mode = getattr(Config, 'OCR_MODE', 'tesseract').lower().strip()
 
         # Moteur IA : rendre toutes les pages comme images (ignore la couche texte)
@@ -467,9 +520,13 @@ class PdfTableExtractor:
             result['detection_method'] = 'pdf-grille'
             return result
 
-        corps, pied = [], []
+        # Lignes de section (« NOM DU CABLE : GAT/CA 01 ») testées AVANT le pied :
+        # « CABLE : » est aussi un libellé de pied, et la section suit l'en-tête.
+        corps, pied, sections = [], [], {}
         for lg in lignes[idx_entete + 1:]:
-            if pied or _PIED_GRILLE_RE.search(lg) or self._is_footer(lg.upper()):
+            if not pied and self._is_section(lg.upper()):
+                sections[len(corps)] = ' '.join(lg.split())
+            elif pied or _PIED_GRILLE_RE.search(lg) or self._is_footer(lg.upper()):
                 pied.append(lg)
             elif not _SEPARATEUR_RE.match(lg):
                 corps.append(lg)
@@ -501,11 +558,14 @@ class PdfTableExtractor:
                 for c in cellules_par_ligne:
                     c[k] = c[k][retrait:]
 
-        rows = [
-            {'type': 'data', 'cells': cellules, 'confidence': [100] * n}
-            for cellules in cellules_par_ligne
-            if any(c.strip() for c in cellules)
-        ]
+        rows = []
+        for i, cellules in enumerate(cellules_par_ligne):
+            if i in sections:
+                rows.append({'type': 'section', 'text': sections[i]})
+            if any(c.strip() for c in cellules):
+                rows.append({'type': 'data', 'cells': cellules, 'confidence': [100] * n})
+        if len(cellules_par_ligne) in sections:
+            rows.append({'type': 'section', 'text': sections[len(cellules_par_ligne)]})
         # Espaces réduits pour le pied seulement : _extract_meta borne à 30
         # caractères l'écart entre « PET : GRAND-BUT » et « JARRETIERAGE ».
         meta = self._extract_meta([[(0, 0, 0, 0, ' '.join(lg.split()))] for lg in pied])

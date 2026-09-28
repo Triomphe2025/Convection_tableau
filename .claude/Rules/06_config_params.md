@@ -45,13 +45,15 @@ La confiance basse réutilise `OCR_REOCR_THRESHOLD` (pas de paramètre dédié).
 
 ## Routage PDF par page (section « ROUTAGE PDF PAR PAGE »)
 
-En mode vision (claude/ollama/hybrid/agent), chaque page d'un PDF est classée avant
-rastérisation (`pdf_extractor.classer_page`) ; seules les pages scannées partent en OCR.
+Dans tous les modes OCR, chaque page d'un PDF est classée (`pdf_extractor.diagnostiquer_page`) :
+texte vectoriel exploitable → grille ; sinon images cumulées ≥ `PDF_SEUIL_IMAGE` → pipeline
+scan ; sinon page ignorée (motif et part d'images journalisés).
 
 | Paramètre | Valeur défaut | Rôle |
 |-----------|--------------|------|
-| `PDF_ROUTAGE_VECTORIEL` | `True` | `False` = comportement v1.7 (toutes les pages rastérisées et relues par vision) |
-| `PDF_SEUIL_IMAGE_PLEINE_PAGE` | `0.8` | Part de page couverte par des images au-delà de laquelle la page est un scan |
+| `PDF_ROUTAGE_VECTORIEL` | `True` | `False` = comportement v1.7 |
+| `PDF_SEUIL_IMAGE` | `0.10` | Images cumulées (part de page) à partir desquelles une page sans texte exploitable part en pipeline scan ; en dessous elle est ignorée |
+| `PDF_SEUIL_IMAGE_PLEINE_PAGE` | `0.8` | Au-delà, un texte posé sur l'image n'est pas lu en grille (couche OCR, pas le document) |
 | `PDF_MIN_CARS_VECTORIEL` | `20` | Caractères visibles minimum pour lire la page en couche texte |
 | `PDF_GRILLE_TOLERANCE_Y` | `2.0` | Écart vertical (pt) sous lequel deux spans sont sur la même ligne de la grille |
 

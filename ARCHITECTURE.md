@@ -101,21 +101,23 @@ Selon la source :
 | `.docx` | `recuperer_image` extrait les images du ZIP, puis OCR image par image |
 | Dossier d'images | OCR image par image |
 | `.pdf` avec `OCR_MODE` = `claude`, `ollama`, `hybrid` ou `agent` | **Routage par page** (`PDF_ROUTAGE_VECTORIEL`, voir ci-dessous) ; les pages scannées sont rastérisées (PyMuPDF) puis OCR image par image |
-| `.pdf` avec `OCR_MODE` = `tesseract` ou `docling` | `PdfTableExtractor` : couche texte du PDF, repli OCR sur les pages raster |
+| `.pdf` avec `OCR_MODE` = `tesseract` ou `docling` | `PdfTableExtractor` : routage par page (voir ci-dessous), puis couche texte ou repli OCR selon la nature de la page |
 | `.jsonl` | `LogReplayer` relit le journal Claude — aucun appel API |
 
-**Routage PDF par page (modes vision).** `Converter._extraire_pdf_comme_images` classe chaque
-page avec `pdf_extractor.classer_page` et journalise le mode choisi :
+**Routage PDF par page (tous modes).** Chaque page est classée par
+`pdf_extractor.diagnostiquer_page` — dans `Converter._extraire_pdf_comme_images` (modes vision)
+et dans `PdfTableExtractor._extract_page_routee` (modes tesseract/docling) — et le mode choisi
+est journalisé (`Converter._journaliser_routage`) :
 
-| Nature | Critère | Traitement |
-|--------|---------|-----------|
-| Vectoriel | texte visible ≥ `PDF_MIN_CARS_VECTORIEL`, police intégrée, pas d'image pleine page | `PdfTableExtractor.extract_page_grille` : grille de caractères, cellules aux « \| » ou aux colonnes de l'en-tête (pages sans cadre), espaces intérieurs conservés — aucun OCR, aucun appel API |
-| OCR invisible | texte en mode de rendu 3 (ex. Adobe Paper Capture), ou texte sur image pleine page | couche ignorée, traitée en scan |
-| Scan | image pleine page sans texte, ou texte dont l'exactitude n'est pas garantie | rastérisation puis OCR (pipeline v1.7) |
-| Vide | ni texte ni image pleine page (garde en bandes, schéma) | ignorée |
+| Nature | Critère (dans l'ordre) | Traitement |
+|--------|------------------------|-----------|
+| Vectoriel | texte visible ≥ `PDF_MIN_CARS_VECTORIEL`, police intégrée, aucune couche invisible, pas d'image pleine page | `extract_page_grille` : grille de caractères, cellules aux « \| » ou aux gouttières sous l'en-tête (pages sans cadre), lignes de section reconnues, espaces intérieurs conservés — aucun OCR, aucun appel API |
+| OCR invisible | images cumulées ≥ `PDF_SEUIL_IMAGE` et couche texte présente (ex. Adobe Paper Capture) | couche ignorée : repli image `_extract_page_ocr` (tesseract/docling) ou rastérisation + vision |
+| Scan | images cumulées ≥ `PDF_SEUIL_IMAGE` sans texte, ou texte visible non garanti (police non intégrée) | pipeline OCR du mode choisi (inchangé) |
+| Vide | ni texte exploitable ni images ≥ `PDF_SEUIL_IMAGE` | ignorée ; journal : « page N ignorée : <raison>, images = X % de la page » |
 
-`PDF_ROUTAGE_VECTORIEL = False` rend le comportement v1.7. Le mode Tesseract/Docling n'est pas
-concerné (il passe toujours par `PdfTableExtractor.extract_all`).
+Les images sont **cumulées** : un scan peut être stocké en bandes (gardes de 223400PE137 :
+4 bandes de 10 %). `PDF_ROUTAGE_VECTORIEL = False` rend le comportement v1.7.
 
 L'OCR image par image (`_extraire_avec_progres`) choisit le moteur selon `Config.OCR_MODE`
 (tableau du §2). Un `BornierTableExtractor` est **toujours** créé, même avec un moteur
