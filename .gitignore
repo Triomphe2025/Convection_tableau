@@ -31,6 +31,9 @@ build/
 # Historique local de mesurer_precision.py
 mesures.csv
 
+# Sorties de mesures de modèles (passages Haiku, Opus…) : données de travail locales
+mesures/
+
 # Word and document files
 *.docx
 *.doc
