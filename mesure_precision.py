@@ -331,7 +331,7 @@ def classer_cellule(valeur_ref, valeur_conv) -> str:
 # ── Pieds de page : paires LIBELLÉ : valeur, sans liste figée ─────────
 
 _LABEL_PIED_RE = re.compile(
-    r"((?:N°|NO)\s?PLAN|P\.?E\.?T\.?|\bCABLE|\bTYPE|INDICE|BORNIER|REF\s+CE)\s*:\s*"
+    r"((?:N°|NO)\s?PLAN|P\.?E\.?T\.?|\bCABLE|\bTYPE|INDICE|BORNIER|REF\s+CE|COMPL[EÉ]MENT)\s*:\s*"
     r"|(PAGE)\s*:?\s*(?=\w)",
     re.IGNORECASE,
 )
@@ -352,15 +352,30 @@ def extraire_pied(texte: str) -> Dict[str, str]:
         cle = re.sub(r'\s+', ' ', (m.group(1) or m.group(2)).upper())
         cle = cle.replace('NO PLAN', 'N° PLAN').replace('N°PLAN', 'N° PLAN')
         cle = cle.replace('P.E.T.', 'PET').replace('P.E.T', 'PET')
+        cle = cle.replace('COMPLÉMENT', 'COMPLEMENT')
         if valeur:
             paires[cle] = ' '.join(valeur.split())
     return paires
 
 
 def _pied_page(page: dict) -> Dict[str, str]:
+    """Paires du pied d'une page, le complément séparé de la valeur qu'il suit.
+
+    Une vérité donne le complément sous son propre libellé (« COMPLEMENT : 8/10 ») ;
+    une sortie l'écrit en texte libre après la valeur du TYPE (« TYPE : 2P.279 8/10 »).
+    Pour chaque libellé de Config.MESURE_LIBELLES_A_COMPLEMENT sans complément
+    explicite, la valeur est son 1er mot et le reste devient COMPLEMENT : les deux
+    formes se comparent champ par champ, et un complément perdu reste un pied faux.
+    """
     fusion: Dict[str, str] = {}
     for ligne in page.get('pied_texte') or []:
         fusion.update(extraire_pied(ligne))
+    if 'COMPLEMENT' not in fusion:
+        for libelle in getattr(Config, 'MESURE_LIBELLES_A_COMPLEMENT', ()):
+            valeur, _, reste = fusion.get(libelle, '').partition(' ')
+            if valeur:
+                fusion[libelle] = valeur
+                fusion['COMPLEMENT'] = reste.strip()
     return fusion
 
 

@@ -225,6 +225,11 @@ class Config:
     # mesurer_precision.py), à la racine du projet.
     MESURE_CSV_PATH = "mesures.csv"
 
+    # Libellés de pied dont la valeur peut être suivie d'un complément en texte
+    # libre (« TYPE : 2P.279 8/10 » → TYPE 2P.279, complément 8/10), comparé
+    # comme un champ à part au « Complement » d'une vérité terrain.
+    MESURE_LIBELLES_A_COMPLEMENT = ("TYPE",)
+
     # ========================================
     # 📐 PARAMÈTRES FORMATAGE EXCEL
     # ========================================

@@ -70,6 +70,10 @@ class TestExtrairePied(unittest.TestCase):
         self.assertIn('N° PLAN', mp.extraire_pied('NO PLAN : 223400PE137'))
         self.assertIn('PET', mp.extraire_pied('P.E.T. : EPEULE'))
 
+    def test_libelle_complement_reconnu(self):
+        paires = mp.extraire_pied('TYPE : 7P.279  COMPLÉMENT : 6/10')
+        self.assertEqual(paires, {'TYPE': '7P.279', 'COMPLEMENT': '6/10'})
+
     def test_texte_sans_libelle_retourne_vide(self):
         self.assertEqual(mp.extraire_pied('juste du texte quelconque'), {})
 
@@ -109,6 +113,29 @@ class TestComparerPieds(unittest.TestCase):
         ecarts = mp.comparer_pieds(ref, conv, 0, 0)
         self.assertEqual([e.libelle for e in ecarts], ['INDICE'])
         self.assertEqual(ecarts[0].valeur_ref, '')
+
+    def test_complement_de_la_verite_compare_au_texte_libre_apres_le_type(self):
+        ref = _page([], pied=['TYPE : 2P.279  COMPLEMENT : 8/10'])
+        conv = _page([], pied=['TYPE :    2P.279 8/10'])
+        self.assertEqual(mp.comparer_pieds(ref, conv, 0, 0), [])
+
+    def test_complement_perdu_reste_un_pied_faux(self):
+        ref = _page([], pied=['TYPE : 3PC200  COMPLEMENT : REF CE 8707905'])
+        conv = _page([], pied=['TYPE :    3PC200'])
+        ecarts = mp.comparer_pieds(ref, conv, 0, 0)
+        self.assertEqual([(e.libelle, e.valeur_ref, e.valeur_conv) for e in ecarts],
+                         [('COMPLEMENT', 'REF CE 8707905', '')])
+
+    def test_complement_contenant_le_mot_type(self):
+        ref = _page([], pied=['TYPE : 30P887  COMPLEMENT : CORDON TYPE 40'])
+        conv = _page([], pied=['TYPE :    30P887 CORDON TYPE 40'])
+        self.assertEqual(mp.comparer_pieds(ref, conv, 0, 0), [])
+
+    def test_type_different_signale_sur_le_type_seul(self):
+        ref = _page([], pied=['TYPE : 2P.279  COMPLEMENT : 8/10'])
+        conv = _page([], pied=['TYPE : 2P.297 8/10'])
+        ecarts = mp.comparer_pieds(ref, conv, 0, 0)
+        self.assertEqual([e.libelle for e in ecarts], ['TYPE'])
 
     def test_pas_de_pied_du_tout(self):
         self.assertEqual(mp.comparer_pieds(_page([]), _page([]), 0, 0), [])
