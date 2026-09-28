@@ -184,7 +184,7 @@ env/Scripts/python.exe campagne_mesure.py --modele claude-opus-5-5 --effort medi
 
 Chaque passage convertit l'extrait 223111PE011 (par défaut) avec ce modèle et cet effort
 (`--effort aucun` : effort non envoyé), sans modifier `config.py`, range la sortie dans
-`mesures/<modele>_<effort>_<n>/`, la mesure contre la vérité et ajoute une ligne à
+`mesures/<document>_<modele>_<effort>_<n>/`, la mesure contre la vérité et ajoute une ligne à
 `mesures/campagne.csv` (cellules fausses par catégorie, tokens, coût estimé, durée). La
 campagne s'arrête avant un passage si le coût cumulé atteint `CAMPAGNE_BUDGET_MAX_USD`.
 
@@ -206,7 +206,7 @@ Toujours tester l'exe sur une machine sans Python installé avant livraison.
 
 ```powershell
 env\Scripts\python.exe -m pytest tests\ -v
-# 691 tests passent, 0 échec (+ 1 échec attendu documenté, + 1 test lent facultatif)
+# 692 tests passent, 0 échec (+ 1 échec attendu documenté, + 1 test lent facultatif)
 ```
 
 ---

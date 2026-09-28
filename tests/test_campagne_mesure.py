@@ -106,9 +106,17 @@ class TestLancerCampagne(_BaseCampagne):
     def test_passage_range_dans_son_dossier(self):
         self._campagne(passages=2)
         for n in (1, 2):
-            dossier = self.racine / f'claude-haiku-4-5-20251001_aucun_{n}'
+            dossier = self.racine / f'extrait_2p_claude-haiku-4-5-20251001_aucun_{n}'
             self.assertTrue((dossier / 'extrait_2p.xlsx').exists())
             self.assertTrue((dossier / 'extrait_2p_claude.jsonl').exists())
+
+    def test_numerotation_propre_a_chaque_document(self):
+        self._campagne()
+        autre = self.dossier / 'autre_doc.pdf'
+        autre.write_bytes(self.pdf.read_bytes())
+        self.pdf = autre
+        self._campagne()
+        self.assertTrue((self.racine / 'autre_doc_claude-haiku-4-5-20251001_aucun_1').exists())
 
     def test_plafond_arrete_la_campagne(self):
         # 1er passage : 0,0035 $ ; plafond 0,001 $ → arrêt avant le 2e.

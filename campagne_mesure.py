@@ -11,7 +11,7 @@ Usage :
 
 Chaque passage convertit le PDF en mode claude avec le modèle et l'effort
 demandés (surcharge en mémoire : config.py n'est jamais modifié sur le disque),
-range la sortie dans mesures/<modele>_<effort>_<n>/, la mesure contre la vérité
+range la sortie dans mesures/<document>_<modele>_<effort>_<n>/, la mesure contre la vérité
 et ajoute une ligne à mesures/campagne.csv. La campagne s'arrête avant un passage
 si le coût cumulé atteint Config.CAMPAGNE_BUDGET_MAX_USD.
 
@@ -147,12 +147,16 @@ def mesurer_sortie(xlsx: Path, verite: Path, gabarit: str) -> Dict:
     }
 
 
-def _dossier_passage(racine: Path, modele: str, effort: str) -> Path:
-    """Premier dossier <modele>_<effort>_<n> libre : un passage n'écrase jamais un autre."""
+def _dossier_passage(racine: Path, document: str, modele: str, effort: str) -> Path:
+    """Premier dossier <document>_<modele>_<effort>_<n> libre : jamais d'écrasement.
+
+    Le document fait partie du nom : sans lui, la conversion de 223400PE137 avait
+    pris le numéro suivant des passages de l'extrait (…_medium_3).
+    """
     n = 1
-    while (racine / f"{modele}_{effort}_{n}").exists():
+    while (racine / f"{document}_{modele}_{effort}_{n}").exists():
         n += 1
-    return racine / f"{modele}_{effort}_{n}"
+    return racine / f"{document}_{modele}_{effort}_{n}"
 
 
 def executer_passage(pdf: Path, verite: Path, gabarit: str, modele: str, effort: str,
@@ -162,7 +166,7 @@ def executer_passage(pdf: Path, verite: Path, gabarit: str, modele: str, effort:
     from mesurer_precision import _version_git
     from template import TemplateManager
 
-    dossier = _dossier_passage(racine, modele, effort)
+    dossier = _dossier_passage(racine, pdf.stem, modele, effort)
     dossier.mkdir(parents=True)
     journal_conversion = dossier / 'conversion.log'
     debut = time.monotonic()
