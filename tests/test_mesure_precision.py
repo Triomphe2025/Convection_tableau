@@ -1,0 +1,327 @@
+"""
+Tests de mesure_precision.py, sur données entièrement fabriquées : une classe
+par fonction publique, cas nominal + cas limites + cas d'erreur (Règle 07).
+
+Lancement :
+    env\\Scripts\\python.exe -m pytest tests/test_mesure_precision.py -v
+"""
+import unittest
+
+import mesure_precision as mp
+
+COLONNES = ['FIL', 'TENANT', 'SIGNAL', 'ABOUTISSANT']
+
+
+def _ligne(cells, exact=False):
+    ligne = {'type': 'data', 'cells': list(cells), 'confidence': [100] * len(cells)}
+    if exact:
+        ligne['exact'] = True
+    return ligne
+
+
+def _page(rows, pied=None):
+    return {'success': True, 'rows': rows, 'metadata': {}, 'pied_texte': pied or []}
+
+
+class TestClasserCellule(unittest.TestCase):
+
+    def test_valeurs_identiques(self):
+        self.assertEqual(mp.classer_cellule('PH TA106 01', 'PH TA106 01'), mp.IDENTIQUE)
+
+    def test_espacement_seul(self):
+        # Un espace déplacé change la césure des mots sans changer leur texte.
+        self.assertEqual(mp.classer_cellule('PHA 104', 'PH A104'), mp.ESPACEMENT)
+
+    def test_confusion_de_caractere(self):
+        # O/0 : paire dans Config.MESURE_CONFUSIONS_OCR
+        self.assertEqual(mp.classer_cellule('B0RNE', 'BORNE'), mp.CONFUSION)
+
+    def test_confusion_t_i(self):
+        self.assertEqual(mp.classer_cellule('TSPAT ITIN', 'TSPAT ITTN'), mp.CONFUSION)
+
+    def test_contenu_different_sans_rapport_avec_confusion(self):
+        self.assertEqual(mp.classer_cellule('PH QTEL2 21', 'PH QUEL2 21'), mp.CONTENU_DIFFERENT)
+
+    def test_reference_vide(self):
+        self.assertEqual(mp.classer_cellule('', 'PH TB203 05'), mp.AJOUTE)
+
+    def test_converti_vide(self):
+        self.assertEqual(mp.classer_cellule('PH TB203 05', ''), mp.MANQUANT)
+
+    def test_les_deux_vides_sont_identiques(self):
+        self.assertEqual(mp.classer_cellule('', ''), mp.IDENTIQUE)
+
+    def test_none_traite_comme_vide(self):
+        self.assertEqual(mp.classer_cellule(None, 'TENANT'), mp.AJOUTE)
+
+
+class TestExtrairePied(unittest.TestCase):
+
+    def test_paires_multiples_sur_une_ligne(self):
+        texte = 'CABLE : ACC/PH01  TYPE : 2P.279  N° PLAN : 223111PE011  INDICE : R  PAGE : 1'
+        paires = mp.extraire_pied(texte)
+        self.assertEqual(paires['CABLE'], 'ACC/PH01')
+        self.assertEqual(paires['TYPE'], '2P.279')
+        self.assertEqual(paires['N° PLAN'], '223111PE011')
+        self.assertEqual(paires['INDICE'], 'R')
+        self.assertEqual(paires['PAGE'], '1')
+
+    def test_variantes_de_libelle_normalisees(self):
+        self.assertIn('N° PLAN', mp.extraire_pied('NO PLAN : 223400PE137'))
+        self.assertIn('PET', mp.extraire_pied('P.E.T. : EPEULE'))
+
+    def test_texte_sans_libelle_retourne_vide(self):
+        self.assertEqual(mp.extraire_pied('juste du texte quelconque'), {})
+
+    def test_chaine_vide(self):
+        self.assertEqual(mp.extraire_pied(''), {})
+
+    def test_none(self):
+        self.assertEqual(mp.extraire_pied(None), {})
+
+
+class TestComparerPieds(unittest.TestCase):
+
+    def test_libelle_different_remonte_un_ecart(self):
+        ref = _page([], pied=['CABLE : ACC/PH01  PAGE : 1'])
+        conv = _page([], pied=['CABLE : ACC/PH02  PAGE : 1'])
+        ecarts = mp.comparer_pieds(ref, conv, 0, 0)
+        self.assertEqual(len(ecarts), 1)
+        self.assertEqual(ecarts[0].libelle, 'CABLE')
+        self.assertEqual(ecarts[0].valeur_ref, 'ACC/PH01')
+        self.assertEqual(ecarts[0].valeur_conv, 'ACC/PH02')
+
+    def test_libelles_identiques_aucun_ecart(self):
+        ref = _page([], pied=['CABLE : ACC/PH01  PAGE : 1'])
+        conv = _page([], pied=['CABLE : ACC/PH01  PAGE : 1'])
+        self.assertEqual(mp.comparer_pieds(ref, conv, 0, 0), [])
+
+    def test_libelle_present_seulement_cote_reference(self):
+        ref = _page([], pied=['CABLE : ACC/PH01  TYPE : 2P.279'])
+        conv = _page([], pied=['CABLE : ACC/PH01'])
+        ecarts = mp.comparer_pieds(ref, conv, 0, 0)
+        self.assertEqual([e.libelle for e in ecarts], ['TYPE'])
+        self.assertEqual(ecarts[0].valeur_conv, '')
+
+    def test_libelle_present_seulement_cote_converti(self):
+        ref = _page([], pied=['CABLE : ACC/PH01'])
+        conv = _page([], pied=['CABLE : ACC/PH01  INDICE : R'])
+        ecarts = mp.comparer_pieds(ref, conv, 0, 0)
+        self.assertEqual([e.libelle for e in ecarts], ['INDICE'])
+        self.assertEqual(ecarts[0].valeur_ref, '')
+
+    def test_pas_de_pied_du_tout(self):
+        self.assertEqual(mp.comparer_pieds(_page([]), _page([]), 0, 0), [])
+
+
+class TestAlignerLignes(unittest.TestCase):
+
+    def test_lignes_identiques_appariees_1_pour_1(self):
+        lignes = [_ligne(['1', 'A', 'X', 'Y']), _ligne(['2', 'B', 'X', 'Y'])]
+        self.assertEqual(mp.aligner_lignes(lignes, lignes), [(0, 0), (1, 1)])
+
+    def test_ligne_manquante_cote_converti(self):
+        ref = [_ligne(['1', 'A', 'X', 'Y']), _ligne(['2', 'B', 'X', 'Y'])]
+        conv = [_ligne(['1', 'A', 'X', 'Y'])]
+        couples = mp.aligner_lignes(ref, conv)
+        self.assertIn((1, None), couples)
+
+    def test_ligne_en_trop_cote_converti(self):
+        ref = [_ligne(['1', 'A', 'X', 'Y'])]
+        conv = [_ligne(['1', 'A', 'X', 'Y']), _ligne(['2', 'B', 'X', 'Y'])]
+        couples = mp.aligner_lignes(ref, conv)
+        self.assertIn((None, 1), couples)
+
+    def test_listes_vides(self):
+        self.assertEqual(mp.aligner_lignes([], []), [])
+
+    def test_bloc_different_aligne_par_needleman_wunsch(self):
+        # Une ligne mal lue au milieu doit rester appariée à son homologue,
+        # pas décalée sur toute la suite du bloc.
+        ref = [_ligne(['1', 'A', 'SIGNAL UN', 'Y']), _ligne(['2', 'B', 'SIGNAL DEUX', 'Y'])]
+        conv = [_ligne(['1', 'A', 'SIGNAL UN', 'Y']), _ligne(['2', 'B', 'SIGNAL DEUZ', 'Y'])]
+        couples = mp.aligner_lignes(ref, conv)
+        self.assertIn((1, 1), couples)
+
+
+class TestApparierPagesParContenu(unittest.TestCase):
+
+    def _page_avec_contenu(self, tag):
+        lignes = [_ligne([f'{tag}{i}', 'A', 'SIGNAL', 'ABOUT']) for i in range(5)]
+        return _page(lignes)
+
+    def test_deux_documents_identiques(self):
+        pages = [self._page_avec_contenu('A'), self._page_avec_contenu('B')]
+        paires, ref_orph, conv_orph = mp.apparier_pages_par_contenu(pages, pages)
+        self.assertEqual(paires, [(0, 0), (1, 1)])
+        self.assertEqual(ref_orph, [])
+        self.assertEqual(conv_orph, [])
+
+    def test_page_reference_absente_du_converti(self):
+        ref = [self._page_avec_contenu('A'), self._page_avec_contenu('B')]
+        conv = [self._page_avec_contenu('A')]
+        paires, ref_orph, conv_orph = mp.apparier_pages_par_contenu(ref, conv)
+        self.assertEqual(paires, [(0, 0)])
+        self.assertEqual(ref_orph, [1])
+
+    def test_pages_rangees_dans_un_autre_ordre_toutes_appariees(self):
+        # La sortie range B avant A : un appariement monotone en perdrait une.
+        ref = [self._page_avec_contenu('A'), self._page_avec_contenu('B')]
+        conv = [self._page_avec_contenu('B'), self._page_avec_contenu('A')]
+        paires, ref_orph, conv_orph = mp.apparier_pages_par_contenu(ref, conv)
+        self.assertEqual(paires, [(0, 1), (1, 0)])
+        self.assertEqual((ref_orph, conv_orph), ([], []))
+
+    def test_un_seul_candidat_par_page_suffit_pour_des_pages_distinctes(self):
+        from unittest.mock import patch
+        ref = [self._page_avec_contenu(t) for t in 'ABC']
+        conv = [self._page_avec_contenu(t) for t in 'CAB']
+        with patch.object(mp.Config, 'MESURE_CANDIDATS_PAGE', 1):
+            paires, ref_orph, conv_orph = mp.apparier_pages_par_contenu(ref, conv)
+        self.assertEqual(paires, [(0, 1), (1, 2), (2, 0)])
+
+    def test_page_sans_ligne_de_donnees_mais_avec_pied_reste_utile(self):
+        ref = [_page([], pied=['CABLE : RESERVE  PAGE : 104'])]
+        conv = [_page([], pied=[])]
+        paires, ref_orph, conv_orph = mp.apparier_pages_par_contenu(ref, conv)
+        # Aucune page utile côté converti -> la page réf reste orpheline.
+        self.assertEqual(paires, [])
+        self.assertEqual(ref_orph, [0])
+
+    def test_page_entierement_vide_ignoree_des_deux_cotes(self):
+        ref = [_page([])]
+        conv = [_page([])]
+        paires, ref_orph, conv_orph = mp.apparier_pages_par_contenu(ref, conv)
+        self.assertEqual((paires, ref_orph, conv_orph), ([], [], []))
+
+    def test_listes_vides(self):
+        self.assertEqual(mp.apparier_pages_par_contenu([], []), ([], [], []))
+
+
+class TestMotsEtJaccard(unittest.TestCase):
+
+    def test_mots_de_toutes_les_cellules(self):
+        page = _page([_ligne(['PH A104', 'RESERVE CABLEE'])])
+        self.assertEqual(mp._mots_page(page), {'PH', 'A104', 'RESERVE', 'CABLEE'})
+
+    def test_page_sans_ligne(self):
+        self.assertEqual(mp._mots_page(_page([])), set())
+
+    def test_jaccard(self):
+        self.assertEqual(mp._jaccard({'A', 'B'}, {'B', 'C'}), 1 / 3)
+        self.assertEqual(mp._jaccard(set(), set()), 1.0)
+        self.assertEqual(mp._jaccard({'A'}, set()), 0.0)
+
+
+class TestComparerPage(unittest.TestCase):
+
+    def test_cellule_differente_remonte_un_ecart(self):
+        ref = _page([_ligne(['G', 'PH QTEL2 21', 'TEL PET', 'PH TELPH/A 01'])])
+        conv = _page([_ligne(['G', 'PH QUEL2 21', 'TEL PET', 'PH TELPH/A 01'])])
+        ecarts, positions, orph = mp.comparer_page(ref, conv, 0, 0, COLONNES)
+        self.assertEqual(len(ecarts), 1)
+        self.assertEqual(ecarts[0].colonne, 'TENANT')
+        self.assertEqual(orph, [])
+
+    def test_cellule_manquante_cote_converti(self):
+        ref = _page([_ligne(['5 M', 'PH QC 05', 'OC FS 14 50', 'PH TB203 05'])])
+        conv = _page([_ligne(['5 M', 'PH QC 05', 'OC FS 14 50', ''])])
+        ecarts, positions, orph = mp.comparer_page(ref, conv, 0, 0, COLONNES)
+        self.assertEqual(len(ecarts), 1)
+        self.assertEqual(ecarts[0].classe, mp.MANQUANT)
+        self.assertEqual(ecarts[0].colonne, 'ABOUTISSANT')
+
+    def test_ligne_orpheline_remontee(self):
+        ref = _page([_ligne(['1', 'A', 'X', 'Y']), _ligne(['2', 'B', 'X', 'Y'])])
+        conv = _page([_ligne(['1', 'A', 'X', 'Y'])])
+        ecarts, positions, orph = mp.comparer_page(ref, conv, 0, 0, COLONNES)
+        self.assertEqual(len(orph), 1)
+        self.assertEqual(orph[0].cote, mp._LIGNE_MANQUANTE)
+
+    def test_ecart_de_position_si_reference_exacte(self):
+        # Même texte une fois les espaces réduits (donc IDENTIQUE), mais la
+        # césure d'origine diffère : la référence exacte doit le signaler.
+        ref = _page([_ligne(['1', 'A', 'PH   A104', 'Y'], exact=True)])
+        conv = _page([_ligne(['1', 'A', 'PH A104', 'Y'])])
+        ecarts, positions, orph = mp.comparer_page(ref, conv, 0, 0, COLONNES)
+        self.assertEqual(ecarts, [])
+        self.assertEqual(len(positions), 1)
+        self.assertEqual(positions[0].colonne, 'SIGNAL')
+
+    def test_pages_vides(self):
+        ecarts, positions, orph = mp.comparer_page(_page([]), _page([]), 0, 0, COLONNES)
+        self.assertEqual((ecarts, positions, orph), ([], [], []))
+
+
+class TestMesurer(unittest.TestCase):
+
+    def test_cas_reel_discordance_tel2(self):
+        pied = ['CABLE : WPHR/TEL  PAGE : 122']
+        ref = [_page([_ligne(['G', 'PH QTEL2 21', 'TEL PET', 'PH TELPH/A 01'])], pied=pied)]
+        conv = [_page([_ligne(['G', 'PH QUEL2 21', 'TEL PET', 'PH TELPH/A 01'])], pied=pied)]
+        rapport = mp.mesurer(ref, conv, COLONNES)
+        self.assertEqual(len(rapport.ecarts_cellules), 1)
+        self.assertIn('QTEL2', rapport.ecarts_cellules[0].valeur_ref)
+
+    def test_page_absente_remontee(self):
+        utile = [_ligne(['1', 'A', 'X', 'Y'])]
+        ref = [_page(utile), _page([], pied=['CABLE : RESERVE  PAGE : 104'])]
+        conv = [_page(utile)]
+        rapport = mp.mesurer(ref, conv, COLONNES)
+        self.assertEqual(rapport.pages_ref_orphelines, [1])
+
+    def test_precision_1_0_si_tout_identique(self):
+        utile = [_ligne(['1', 'A', 'X', 'Y'])]
+        rapport = mp.mesurer([_page(utile)], [_page(utile)], COLONNES)
+        self.assertEqual(rapport.precision, 1.0)
+
+    def test_deux_listes_vides(self):
+        rapport = mp.mesurer([], [], COLONNES)
+        self.assertEqual(rapport.nb_cellules_comparees, 0)
+        self.assertEqual(rapport.precision, 1.0)
+
+
+class TestRapportMesure(unittest.TestCase):
+
+    def test_precision_sans_cellule_comparee(self):
+        self.assertEqual(mp.RapportMesure().precision, 1.0)
+
+    def test_cellules_par_classe_compte_par_categorie(self):
+        rapport = mp.RapportMesure(ecarts_cellules=[
+            mp.EcartCellule(0, 0, 0, 0, 'SIGNAL', 'A', 'B', mp.CONTENU_DIFFERENT),
+            mp.EcartCellule(0, 0, 1, 1, 'SIGNAL', 'C', 'D', mp.CONTENU_DIFFERENT),
+            mp.EcartCellule(0, 0, 2, 2, 'SIGNAL', 'E', '', mp.MANQUANT),
+        ])
+        self.assertEqual(rapport.cellules_par_classe(), {mp.CONTENU_DIFFERENT: 2, mp.MANQUANT: 1})
+
+    def test_cellules_par_classe_vide(self):
+        self.assertEqual(mp.RapportMesure().cellules_par_classe(), {})
+
+
+class TestFormaterRapport(unittest.TestCase):
+
+    def test_contient_les_comptes_principaux(self):
+        ecart = mp.EcartCellule(0, 0, 0, 0, 'SIGNAL', 'A', 'B', mp.CONTENU_DIFFERENT)
+        rapport = mp.RapportMesure(
+            pages_appariees=[(0, 0)], nb_cellules_comparees=10, nb_cellules_identiques=9,
+            ecarts_cellules=[ecart],
+        )
+        texte = mp.formater_rapport(rapport)
+        self.assertIn('Pages appariées', texte)
+        self.assertIn('90.0%', texte)
+        self.assertIn('CONTENU_DIFFERENT', texte)
+
+    def test_max_ecarts_tronque_la_liste(self):
+        ecarts = [
+            mp.EcartCellule(0, 0, i, i, 'SIGNAL', 'A', 'B', mp.CONTENU_DIFFERENT) for i in range(5)
+        ]
+        texte = mp.formater_rapport(mp.RapportMesure(ecarts_cellules=ecarts), max_ecarts=2)
+        self.assertIn('supplémentaire', texte)
+
+    def test_rapport_vide(self):
+        texte = mp.formater_rapport(mp.RapportMesure())
+        self.assertIn('100.0%', texte)
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -161,6 +161,8 @@ Fichier Word source (.docx) — images de borniers scannés
 | `data_dictionary.py` | Corrections OCR évolutives par colonne depuis `data_dictionary.json` |
 | `recuperer_image.py` | `ImageExtractor` + `ImageStorage` — extraction images du ZIP `.docx` |
 | `verificateur.py` | Vérification de conversion : compare deux lectures (format pivot) et classe les divergences en IDENTIQUE / BENIN / A_VERIFIER — module pur, appelé uniquement par `converter.py` (`Converter.verifier_conversion`) |
+| `mesure_precision.py` | Mesure de précision : compare une sortie à une référence organisée à l'avance (PDF vectoriel ou Excel de vérité terrain), classe les écarts cellule/pied/position — module pur, outil de QA indépendant du produit livré |
+| `mesurer_precision.py` | Script CLI : `python mesurer_precision.py <sortie.xlsx> <reference>` — lit les fichiers, appelle `mesure_precision`, écrit une ligne dans `mesures.csv` |
 
 ### Fichiers de packaging et outils
 
@@ -218,7 +220,8 @@ pytest tests\ -v
 
 Pour modifier un paramètre → utiliser `/changer-config`.
 
-Les paramètres `VERIF_*` (vérification de conversion : seuils d'appariement, confusions OCR,
+Les paramètres `PDF_*` (routage PDF par page, section « ROUTAGE PDF PAR PAGE ») pilotent
+la lecture des PDF en mode vision. Les paramètres `VERIF_*` (vérification de conversion : seuils d'appariement, confusions OCR,
 concordance) sont regroupés dans la section « VÉRIFICATION DE CONVERSION » de `config.py`.
 
 ---
@@ -381,6 +384,8 @@ Raccourci → `/build-exe`.
 | v1.7 | 2026-06 | Bouton "Lancer la conversion" retiré de la toolbar — point d'entrée unique via stepper étape 3 |
 | v1.7 | 2026-06 | 2 nouveaux skills UX : `/implementer-workflow-ux` (5 phases) + `/apprendre-interface` (capitalisation leçons) |
 | v1.7 | 2026-09 | Vérification de conversion : bouton « 🔎 Vérifier » + `python converter.py verifier` — relecture Tesseract du scan comparée à la conversion, divergences cellule par cellule (`verificateur.py`, seuils `VERIF_*` dans `config.py`, méthode `Converter.verifier_conversion`) |
+| v1.7 | 2026-09 | Mesure de précision (outil de QA) : `python mesurer_precision.py <sortie.xlsx> <reference>` — compare à un PDF vectoriel ou un Excel de vérité terrain, alignement `difflib` + Needleman-Wunsch, pieds de page en paires LIBELLÉ:valeur libres, historique `mesures.csv` (`mesure_precision.py`, seuils `MESURE_*` dans `config.py`) |
+| v1.7 | 2026-09 | Routage PDF par page (modes vision) : texte vectoriel → lecture exacte de la couche texte en grille, sans appel API (`pdf_extractor.classer_page`/`extract_page_grille`) ; couche OCR invisible et scan → pipeline OCR ; `PDF_ROUTAGE_VECTORIEL` dans `config.py` (False = v1.7). 223400PE137.pdf : 0 appel API au lieu de 53 |
 
 ---
 

@@ -65,10 +65,14 @@ tests/
   test_verificateur_golden.py        → Cas réel 6A 23111PE102 (scan contre conversion), lectures figées
   test_converter_verification.py     → Converter.verifier_conversion et ses aides privées
   test_non_regression_xlsx.py        → Le .xlsx du pipeline reste identique à l'instantané d'avant
+  test_mesure_precision.py           → mesure_precision.py, une classe par fonction publique, dicts fabriqués
+  test_mesurer_precision.py          → mesurer_precision.py (lecture xlsx/vérité/PDF, CSV, CLI), fichiers fabriqués
+  test_mesurer_precision_golden.py   → Sortie v1.7 figée 223111PE011 contre la vérité terrain (écarts nommés, sans pipeline)
+  test_routage_pdf.py                → Routage PDF par page : classement, grille, PE137 sans appel API, scan toujours en OCR
 ```
 
-**487 tests passent** (`pytest tests\`, relevé le 2026-09-20), plus 1 échec attendu documenté
-(`test_criteres_du_cahier_des_charges`, cibles chiffrées non atteintes) et 1 test lent facultatif
+**609 tests passent** (`pytest tests\`, relevé le 2026-09-28), plus 1 échec attendu documenté
+(`test_criteres_du_cahier_des_charges` du vérificateur, cibles chiffrées non atteintes) et 1 test lent facultatif
 (`VERIF_TEST_LENT=1`, relecture Tesseract de 15 pages). Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.
 

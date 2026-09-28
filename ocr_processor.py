@@ -3114,7 +3114,7 @@ class BornierTableExtractor:
         blur_pct = result.get('blur_pct', 0.0)
         # Claude Vision, Log Replay et Hybrid : données fidèles, aucune correction
         _skip_dict = result.get('detection_method') in (
-            'claude-vision', 'log-replay', 'hybrid'
+            'claude-vision', 'pdf-grille', 'log-replay', 'hybrid'
         )
 
         # ── Calcul de la hauteur du bloc ─────────────────────────────

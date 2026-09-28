@@ -2,7 +2,7 @@
 
 Ce document décrit l'organisation réelle du code. Les règles à respecter en modifiant le
 projet sont dans `.claude/Rules/01_architecture.md` ; ici, on explique en plus **comment le
-pipeline fonctionne**. Contenu relevé dans le code le 2026-09-20.
+pipeline fonctionne**. Contenu relevé dans le code le 2026-09-25.
 
 ---
 
@@ -51,6 +51,8 @@ Règle de base : **1 fichier = 1 responsabilité**.
 | `generer_classeur.py` | Génération du classeur Excel : feuille « Borniers » et feuille « tableaux word » |
 | `audit_claude.py` | Audit du classeur Excel : règles métier hors ligne + analyse Claude en ligne (optionnelle) |
 | `verificateur.py` | Vérification de conversion : compare deux lectures au format pivot et classe les divergences (IDENTIQUE / BENIN / A_VERIFIER) — module pur, appelé uniquement par `converter.py` |
+| `mesure_precision.py` | Mesure de précision : compare une sortie à une référence organisée à l'avance (PDF vectoriel ou Excel de vérité terrain), classe les écarts (cellule, pied de page, position) — module pur, outil de QA indépendant, appelé uniquement par `mesurer_precision.py` |
+| `mesurer_precision.py` | Script CLI : lit `.xlsx`, vérité terrain ou PDF vectoriel, appelle `mesure_precision`, écrit `mesures.csv` |
 
 ### Moteurs d'extraction
 
@@ -59,7 +61,7 @@ Tous retournent le même format de résultat (§4).
 | Fichier | Rôle unique | `Config.OCR_MODE` |
 |---------|-------------|-------------------|
 | `ocr_processor.py` | `BornierTableExtractor` : prétraitement → OCR → colonnes → cellules → métadonnées | `tesseract` |
-| `pdf_extractor.py` | `PdfTableExtractor` : extraction d'un PDF par couche texte (PyMuPDF), repli OCR Tesseract sur les pages raster | *(chemin PDF, voir §3)* |
+| `pdf_extractor.py` | `PdfTableExtractor` : extraction d'un PDF par couche texte (PyMuPDF), repli OCR Tesseract sur les pages raster ; classement des pages et lecture exacte en grille (routage §3) | *(chemin PDF, voir §3)* |
 | `claude_ocr.py` | `ClaudeVisionExtractor` (API Anthropic) + `LogReplayer` (replay d'un journal `*_claude.jsonl` sans appel API) + parseur pipe partagé par les moteurs vision | `claude` |
 | `ollama_ocr.py` | `OllamaVisionExtractor` : modèle vision local Ollama, sans API externe | `ollama` |
 | `hybrid_ocr.py` | `HybridVisionExtractor` : Ollama classe les colonnes, Claude corrige les caractères (2 passes) | `hybrid` |
@@ -98,9 +100,22 @@ Selon la source :
 |--------|--------|
 | `.docx` | `recuperer_image` extrait les images du ZIP, puis OCR image par image |
 | Dossier d'images | OCR image par image |
-| `.pdf` avec `OCR_MODE` = `claude`, `ollama`, `hybrid` ou `agent` | Le PDF est rastérisé page par page (PyMuPDF), puis OCR image par image |
+| `.pdf` avec `OCR_MODE` = `claude`, `ollama`, `hybrid` ou `agent` | **Routage par page** (`PDF_ROUTAGE_VECTORIEL`, voir ci-dessous) ; les pages scannées sont rastérisées (PyMuPDF) puis OCR image par image |
 | `.pdf` avec `OCR_MODE` = `tesseract` ou `docling` | `PdfTableExtractor` : couche texte du PDF, repli OCR sur les pages raster |
 | `.jsonl` | `LogReplayer` relit le journal Claude — aucun appel API |
+
+**Routage PDF par page (modes vision).** `Converter._extraire_pdf_comme_images` classe chaque
+page avec `pdf_extractor.classer_page` et journalise le mode choisi :
+
+| Nature | Critère | Traitement |
+|--------|---------|-----------|
+| Vectoriel | texte visible ≥ `PDF_MIN_CARS_VECTORIEL`, police intégrée, pas d'image pleine page | `PdfTableExtractor.extract_page_grille` : grille de caractères, cellules aux « \| » ou aux colonnes de l'en-tête (pages sans cadre), espaces intérieurs conservés — aucun OCR, aucun appel API |
+| OCR invisible | texte en mode de rendu 3 (ex. Adobe Paper Capture), ou texte sur image pleine page | couche ignorée, traitée en scan |
+| Scan | image pleine page sans texte, ou texte dont l'exactitude n'est pas garantie | rastérisation puis OCR (pipeline v1.7) |
+| Vide | ni texte ni image pleine page (garde en bandes, schéma) | ignorée |
+
+`PDF_ROUTAGE_VECTORIEL = False` rend le comportement v1.7. Le mode Tesseract/Docling n'est pas
+concerné (il passe toujours par `PdfTableExtractor.extract_all`).
 
 L'OCR image par image (`_extraire_avec_progres`) choisit le moteur selon `Config.OCR_MODE`
 (tableau du §2). Un `BornierTableExtractor` est **toujours** créé, même avec un moteur
@@ -220,7 +235,30 @@ Limites connues (mesure du 2026-09-20 sur le cas réel) :
 
 ---
 
-## 9. Dépendances entre modules
+## 9. Mesure de précision (outil de QA)
+
+`mesurer_precision.py sortie.xlsx reference` compare une sortie **à une référence organisée
+à l'avance** (Excel de vérité terrain relu et validé à la main, ou PDF vectoriel dont la
+couche texte fait foi) — contrairement à `verificateur.py` (§8), qui compare à une relecture
+indépendante sans vérité terrain. Complémentaire, pas un remplacement : l'un vérifie une
+conversion en direct sur n'importe quel document client, l'autre mesure la précision du
+pipeline sur un jeu de test connu et suit les progrès de version en version (`mesures.csv`).
+
+| Élément | Détail |
+|---------|--------|
+| Lecture sortie | `mesurer_precision.lire_xlsx` : un bloc en-tête → données → pied devient une page pivot (mêmes mots-clés de détection que le reformatage `generer_classeur.reformatter_excel`) |
+| Lecture référence | `lire_verite_excel` (feuilles `Verite_tableaux` + `Verite_pieds`, colonnes déduites de l'en-tête — aucune liste figée) ou `lire_pdf_vectoriel` (`--modele` requis, grille de caractères à positions exactes, port de `outils_reference/grille.py`) |
+| Comparaison | `mesure_precision.mesurer` : appariement des pages par contenu, ni par numéro ni par position (la sortie peut ranger les pages dans un autre ordre) ; alignement `difflib` puis Needleman-Wunsch dans les blocs différents ; classement IDENTIQUE / ESPACEMENT / CONFUSION / CONTENU_DIFFERENT / MANQUANT / AJOUTE ; pieds de page en paires LIBELLÉ:valeur libres ; position (colonne de départ des mots) si la référence est exacte |
+| Seuils | `config.py`, section « MESURE DE PRÉCISION » (`MESURE_*`), séparés de `VERIF_*` |
+| Sortie | Rapport texte (pages manquantes, écarts par catégorie, pieds faux, positions fausses) + ligne ajoutée à `mesures.csv` (date, document, version Git, chiffres) |
+
+Origine : `outils_reference/` (`comparateur.py`, `pieds.py`, `grille.py`) — prototypes
+fonctionnels mais hors standard du projet, portés dans `mesure_precision.py`/
+`mesurer_precision.py` avec seuils dans `config.py`, type hints et tests par fonction publique.
+
+---
+
+## 10. Dépendances entre modules
 
 Sens unique, sans import circulaire. Relevé par analyse des imports (imports différés
 dans les fonctions inclus) :
@@ -238,11 +276,13 @@ dans les fonctions inclus) :
 | `agent_ocr` | `claude_ocr`, `config` |
 | `claude_ocr` | `config` |
 | `verificateur` | `config` |
+| `mesure_precision` | `config`, `verificateur` (réutilise `normaliser`/`similarite`) |
+| `mesurer_precision` | `config`, `mesure_precision`, `pdf_extractor` (grille), `template` |
 | `docling_ocr`, `word_table_importer`, `template`, `data_dictionary`, `config`, `audit_claude` | *(aucun)* |
 
 ---
 
-## 10. Ajouter un moteur OCR
+## 11. Ajouter un moteur OCR
 
 D'après la structure actuelle de `converter.py` :
 

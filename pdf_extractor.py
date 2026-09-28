@@ -28,6 +28,187 @@ def is_pymupdf_available() -> bool:
         return False
 
 
+# -- Routage par page : nature de la page PDF --------------------------
+
+VECTORIEL = 'vectoriel'
+OCR_INVISIBLE = 'ocr_invisible'
+SCAN = 'scan'
+VIDE = 'vide'
+
+# Mode de rendu PDF 3 = texte invisible (couche OCR posée sur une image,
+# ex. Adobe Paper Capture) : ce texte n'est pas ce qu'on voit à l'écran.
+_RENDU_INVISIBLE = 3
+
+
+def couverture_image(page) -> float:
+    """Part de la page couverte par des images (somme des aires, bornée à 1).
+
+    Somme et non maximum : un scan peut être découpé en bandes (page de
+    garde de 223400PE137 : 4 bandes).
+    """
+    import fitz
+    aire = page.rect.width * page.rect.height
+    if not aire:
+        return 0.0
+    total = sum(
+        (fitz.Rect(info['bbox']) & page.rect).get_area()
+        for info in page.get_image_info()
+    )
+    return min(1.0, total / aire)
+
+
+def classer_page(page) -> str:
+    """Nature d'une page : VECTORIEL, OCR_INVISIBLE, SCAN ou VIDE.
+
+    VECTORIEL : texte visible en polices intégrées, sans image pleine page —
+    la couche texte est exacte. OCR_INVISIBLE : couche OCR invisible (ou
+    texte posé sur une image pleine page) — la couche est ignorée, la page
+    est traitée comme un scan. SCAN : image sans texte, ou texte dont
+    l'exactitude n'est pas garantie. VIDE : ni texte, ni image pleine page
+    (page de garde en bandes, schéma) — rien à lire en tableau.
+    """
+    from config import Config
+    visibles = invisibles = 0
+    for trace in page.get_texttrace():
+        n = len(trace.get('chars', ()))
+        if trace.get('type') == _RENDU_INVISIBLE:
+            invisibles += n
+        else:
+            visibles += n
+    pleine_page = couverture_image(page) >= Config.PDF_SEUIL_IMAGE_PLEINE_PAGE
+    polices_integrees = any(police[1] != 'n/a' for police in page.get_fonts())
+
+    if invisibles or (visibles and pleine_page):
+        return OCR_INVISIBLE
+    if pleine_page:
+        return SCAN
+    if visibles >= Config.PDF_MIN_CARS_VECTORIEL and polices_integrees:
+        return VECTORIEL
+    if visibles:
+        return SCAN
+    return VIDE
+
+
+# -- Lecture de la couche texte en grille de caractères ----------------
+
+def grille_page(page) -> List[str]:
+    """Reconstruit une page de texte vectoriel en lignes à positions exactes.
+
+    Port de outils_reference/grille.py : le pas (largeur d'un caractère) est
+    mesuré sur les origines des caractères, colonne = round((x - x0) / pas),
+    chaque span est posé à sa colonne de départ. Écart assumé : les spans
+    sont regroupés en lignes avec une tolérance en y (Config.PDF_GRILLE_
+    TOLERANCE_Y) plutôt que par round(y) — une cellule posée 0,7 pt plus haut
+    que sa ligne (223400PE137 page 38) formait sinon une ligne à elle seule.
+    """
+    from collections import Counter
+    from config import Config
+
+    spans = []
+    for bloc in page.get_text('rawdict')['blocks']:
+        for ligne in bloc.get('lines', []):
+            for span in ligne['spans']:
+                caracteres = span['chars']
+                texte = ''.join(c['c'] for c in caracteres)
+                if not texte.strip('_ '):
+                    continue
+                xs = [c['origin'][0] for c in caracteres]
+                if len(xs) > 1:
+                    pas = Counter(round(b - a, 2) for a, b in zip(xs, xs[1:])).most_common(1)[0][0]
+                else:
+                    pas = round(caracteres[0]['bbox'][2] - caracteres[0]['bbox'][0], 2)
+                spans.append((span['origin'][1], xs[0], pas, texte))
+    if not spans:
+        return []
+
+    pas_page = Counter(s[2] for s in spans if s[2] > 0).most_common(1)[0][0]
+    x0 = min(s[1] for s in spans)
+
+    groupes: List[List[Tuple[float, str]]] = []
+    y_groupe = None
+    for y, x, _, texte in sorted(spans):
+        if y_groupe is None or y - y_groupe > Config.PDF_GRILLE_TOLERANCE_Y:
+            groupes.append([])
+            y_groupe = y
+        groupes[-1].append((x, texte))
+
+    sortie = []
+    for groupe in groupes:
+        ligne: List[str] = []
+        for x, texte in sorted(groupe):
+            k = round((x - x0) / pas_page)
+            if len(ligne) < k:
+                ligne += [' '] * (k - len(ligne))
+            ligne[k:k + len(texte)] = list(texte)
+        sortie.append(''.join(ligne).rstrip())
+    return sortie
+
+
+# Libellés de pied de page reconnus dans une grille (repris de
+# outils_reference/comparateur.py) : la détection par mots-clés du modèle
+# rate « P.E.T. : » et « N° PLAN » sur 223400PE137.
+_PIED_GRILLE_RE = re.compile(
+    r"N°\s?PLAN|NO\s?PLAN|P\.?E\.?T\.?\s*:|CABLE\s*:|TYPE\s*:|INDICE\s*:"
+    r"|PAGE\s*:?\s*\d|M\s?A\s?T\s?R\s?A|SIEMENS|JARRETIERAGE",
+    re.IGNORECASE,
+)
+_SEPARATEUR_RE = re.compile(r'^[\s|\-_°=]*$')
+
+
+def _mot_cle(texte: str) -> str:
+    return re.sub(r'[^A-Z0-9]', '', texte.upper())
+
+
+def _positions_entete(ligne: str, colonnes: List[str]) -> Optional[List[int]]:
+    """Colonne de départ de chaque titre de colonne dans la ligne, dans l'ordre."""
+    positions = []
+    debut = 0
+    mots = [(m.start(), _mot_cle(m.group())) for m in re.finditer(r'\S+', ligne)]
+    for nom in colonnes:
+        cible = _mot_cle(nom)
+        trouve = next((p for p, mot in mots if p >= debut and mot == cible), None)
+        if trouve is None:
+            return None
+        positions.append(trouve)
+        debut = trouve + 1
+    return positions
+
+
+def _coupures_par_gouttieres(lignes: List[str], entete: List[int]) -> List[int]:
+    """Frontières de colonnes d'une page sans cadre (format TP2).
+
+    Les titres sont centrés au-dessus des colonnes (SIGNAL commence 11
+    caractères après ses données sur 223400PE137) : couper au début de chaque
+    titre enverrait le SIGNAL dans ABOUTISSANT. Entre deux titres
+    consécutifs, la frontière est posée après la plus large bande de colonnes
+    vide sur toutes les lignes de données (repli : début du titre suivant).
+    """
+    largeur = max((len(lg) for lg in lignes), default=0)
+    occupe = [False] * largeur
+    for lg in lignes:
+        for i, c in enumerate(lg):
+            if c != ' ':
+                occupe[i] = True
+
+    coupures = [0]
+    for k in range(1, len(entete)):
+        gauche, droite = entete[k - 1], entete[k]
+        meilleure, taille = None, 0
+        i = gauche
+        while i < min(droite, largeur):
+            if occupe[i]:
+                i += 1
+                continue
+            j = i
+            while j < min(droite, largeur) and not occupe[j]:
+                j += 1
+            if j - i > taille:
+                meilleure, taille = j, j - i
+            i = j
+        coupures.append(meilleure if meilleure is not None else droite)
+    return coupures
+
+
 class PdfTableExtractor:
     """Extrait les tableaux de borniers depuis les pages d'un PDF."""
 
@@ -257,6 +438,85 @@ class PdfTableExtractor:
             'rows': rows,
             'metadata': meta,
             'detection_method': 'pdf',
+            'blur_pct': 0.0,
+        }
+
+    # -- Lecture exacte d'une page vectorielle (grille) --------------------
+
+    def extract_page_grille(self, page, page_num: int) -> Dict:
+        """Lit une page VECTORIEL en grille de caractères, sans OCR.
+
+        Cellules découpées aux séparateurs « | » (pages à cadre) ou aux
+        colonnes de l'en-tête (pages sans cadre). Les espaces intérieurs des
+        cellules sont conservés tels quels ; seuls le blanc de marge après
+        « | » et les espaces de fin sont retirés. Une page sans ligne
+        d'en-tête du modèle (garde, modifications) rend success=False.
+        """
+        colonnes = list(self._tpl.columns)
+        n = len(colonnes)
+        lignes = grille_page(page)
+
+        idx_entete, entete = None, None
+        for i, lg in enumerate(lignes):
+            entete = _positions_entete(lg, colonnes)
+            if entete is not None:
+                idx_entete = i
+                break
+        if idx_entete is None:
+            result = self._fail(page_num)
+            result['detection_method'] = 'pdf-grille'
+            return result
+
+        corps, pied = [], []
+        for lg in lignes[idx_entete + 1:]:
+            if pied or _PIED_GRILLE_RE.search(lg) or self._is_footer(lg.upper()):
+                pied.append(lg)
+            elif not _SEPARATEUR_RE.match(lg):
+                corps.append(lg)
+
+        a_cadre = lignes[idx_entete].count('|') >= n + 1
+        if a_cadre:
+            cellules_par_ligne = []
+            for lg in corps:
+                segments = lg.split('|')[1:-1]
+                if len(segments) != n:
+                    continue
+                cellules_par_ligne.append([
+                    (s[1:] if s.startswith(' ') else s).rstrip() for s in segments
+                ])
+        else:
+            coupures = _coupures_par_gouttieres(corps, entete) + [None]
+            cellules_par_ligne = [
+                [lg[coupures[k]:coupures[k + 1]].rstrip() for k in range(n)]
+                for lg in corps
+            ]
+            # Marge commune retirée colonne par colonne : elle vient de la
+            # position de la coupure, pas du document ; l'alignement relatif
+            # des lignes entre elles est conservé.
+            for k in range(n):
+                marges = [
+                    len(c[k]) - len(c[k].lstrip()) for c in cellules_par_ligne if c[k].strip()
+                ]
+                retrait = min(marges, default=0)
+                for c in cellules_par_ligne:
+                    c[k] = c[k][retrait:]
+
+        rows = [
+            {'type': 'data', 'cells': cellules, 'confidence': [100] * n}
+            for cellules in cellules_par_ligne
+            if any(c.strip() for c in cellules)
+        ]
+        # Espaces réduits pour le pied seulement : _extract_meta borne à 30
+        # caractères l'écart entre « PET : GRAND-BUT » et « JARRETIERAGE ».
+        meta = self._extract_meta([[(0, 0, 0, 0, ' '.join(lg.split()))] for lg in pied])
+        return {
+            'success': bool(rows),
+            'page_num': page_num + 1,
+            'image_path': f'page_{page_num + 1}',
+            'headers': colonnes,
+            'rows': rows,
+            'metadata': meta,
+            'detection_method': 'pdf-grille',
             'blur_pct': 0.0,
         }
 

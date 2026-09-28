@@ -115,6 +115,29 @@ class Config:
     MAX_AUTO_COLUMNS = 4
 
     # ========================================
+    # 📄 ROUTAGE PDF PAR PAGE (modes vision)
+    # ========================================
+
+    # True : en mode claude/ollama/hybrid/agent, chaque page d'un PDF est
+    # classée — texte vectoriel exact → lecture de la couche texte en grille
+    # (aucun appel API) ; couche OCR invisible ou scan → rastérisation et
+    # relecture par vision (pipeline v1.7). False : comportement v1.7 (toutes
+    # les pages rastérisées puis relues par vision).
+    PDF_ROUTAGE_VECTORIEL = True
+
+    # Part de la page couverte par des images au-delà de laquelle la page
+    # est une image pleine page (scan) et non un document vectoriel.
+    PDF_SEUIL_IMAGE_PLEINE_PAGE = 0.8
+
+    # Nombre minimal de caractères visibles pour traiter une page comme du
+    # texte vectoriel (en dessous : titre isolé, tampon — pipeline actuel).
+    PDF_MIN_CARS_VECTORIEL = 20
+
+    # Écart vertical (points PDF) en dessous duquel deux spans sont sur la
+    # même ligne de la grille ; l'interligne des listings est d'environ 11 pt.
+    PDF_GRILLE_TOLERANCE_Y = 2.0
+
+    # ========================================
     # 🔎 VÉRIFICATION DE CONVERSION
     # ========================================
 
@@ -150,6 +173,51 @@ class Config:
     # Concordance minimale (cellules identiques ou bénignes / cellules
     # comparées) au-dessus de laquelle la conversion est jugée fidèle.
     VERIF_SEUIL_CONCORDANCE = 0.98
+
+    # ========================================
+    # 📏 MESURE DE PRÉCISION (outil de QA sur jeu de test connu)
+    # ========================================
+    # Compare une sortie .xlsx à une référence organisée à l'avance (PDF
+    # vectoriel ou Excel de vérité terrain). Seuils séparés de VERIF_* :
+    # cet outil a besoin d'une vérité terrain et sert au suivi de version en
+    # version, contrairement à verificateur.py qui vérifie une conversion en
+    # direct sans référence préparée.
+
+    # Similarité minimale (0-1) entre deux pages pour les apparier par contenu.
+    MESURE_SEUIL_PAGE = 0.30
+
+    # Au-delà de cette similarité de lignes identiques, deux pages sont
+    # appariées sans chercher les lignes proches (économie de calcul).
+    MESURE_SEUIL_PAGE_EXACTE = 0.9
+
+    # Nombre de pages converties, les plus proches en mots, sur lesquelles
+    # chaque page de référence est comparée finement (coût quadratique sinon).
+    MESURE_CANDIDATS_PAGE = 3
+
+    # Pénalité par insertion/suppression dans l'alignement Needleman-Wunsch
+    # (négative : plus elle est proche de 0, plus les trous sont tolérés).
+    MESURE_PENALITE_GAP = -0.35
+
+    # Bonus retranché à la similarité de deux lignes appariées (calibré pour
+    # que deux lignes proches mais imparfaites restent préférées à un trou).
+    MESURE_BONUS_APPARIEMENT = 0.5
+
+    # Au-delà de N*M paires lignes_ref × lignes_conv, l'alignement optimal
+    # Needleman-Wunsch est trop coûteux : repli sur un appariement 1-pour-1.
+    MESURE_NW_MAX_PAIRES = 250000
+
+    # Paires de caractères facilement confondus par l'OCR (classification
+    # "Confusion de caractère" : un seul caractère substitué par sa paire).
+    # Reprise telle quelle de outils_reference/comparateur.py (ITIN/ITTN = T/I).
+    MESURE_CONFUSIONS_OCR = (
+        "1I", "1L", "IL", "0O", "0D", "DO", "5S", "8B", "2Z", "6G",
+        "PF", " _", "'\"", "R_", "MN", "EF", "CG", "HK", "UV", "VY",
+        "17", "RK", "TI",
+    )
+
+    # Fichier d'historique des mesures (une ligne par exécution de
+    # mesurer_precision.py), à la racine du projet.
+    MESURE_CSV_PATH = "mesures.csv"
 
     # ========================================
     # 📐 PARAMÈTRES FORMATAGE EXCEL

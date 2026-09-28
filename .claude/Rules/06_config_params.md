@@ -43,6 +43,36 @@ Config.TESSERACT_PATH   # référencer uniquement
 
 La confiance basse réutilise `OCR_REOCR_THRESHOLD` (pas de paramètre dédié).
 
+## Routage PDF par page (section « ROUTAGE PDF PAR PAGE »)
+
+En mode vision (claude/ollama/hybrid/agent), chaque page d'un PDF est classée avant
+rastérisation (`pdf_extractor.classer_page`) ; seules les pages scannées partent en OCR.
+
+| Paramètre | Valeur défaut | Rôle |
+|-----------|--------------|------|
+| `PDF_ROUTAGE_VECTORIEL` | `True` | `False` = comportement v1.7 (toutes les pages rastérisées et relues par vision) |
+| `PDF_SEUIL_IMAGE_PLEINE_PAGE` | `0.8` | Part de page couverte par des images au-delà de laquelle la page est un scan |
+| `PDF_MIN_CARS_VECTORIEL` | `20` | Caractères visibles minimum pour lire la page en couche texte |
+| `PDF_GRILLE_TOLERANCE_Y` | `2.0` | Écart vertical (pt) sous lequel deux spans sont sur la même ligne de la grille |
+
+## Mesure de précision (section « MESURE DE PRÉCISION »)
+
+Outil de QA distinct de la vérification de conversion : compare une sortie à une
+référence organisée à l'avance (PDF vectoriel ou Excel de vérité terrain), pas à
+une relecture indépendante. Seuils **séparés** de `VERIF_*` pour ne pas perturber
+le calibrage déjà fait sur `verificateur.py`.
+
+| Paramètre | Valeur défaut | Rôle |
+|-----------|--------------|------|
+| `MESURE_SEUIL_PAGE` | `0.30` | Similarité minimale pour apparier deux pages par contenu |
+| `MESURE_SEUIL_PAGE_EXACTE` | `0.9` | Au-delà, deux pages sont appariées sans chercher les lignes proches |
+| `MESURE_CANDIDATS_PAGE` | `3` | Pages converties (les plus proches en mots) comparées finement à chaque page de référence |
+| `MESURE_PENALITE_GAP` | `-0.35` | Pénalité par trou dans l'alignement Needleman-Wunsch |
+| `MESURE_BONUS_APPARIEMENT` | `0.5` | Bonus retranché à la similarité de deux lignes appariées (NW) |
+| `MESURE_NW_MAX_PAIRES` | `250000` | Au-delà, repli sur un appariement 1-pour-1 (NW trop coûteux) |
+| `MESURE_CONFUSIONS_OCR` | paires de caractères confondus | Classification "Confusion de caractère" |
+| `MESURE_CSV_PATH` | `mesures.csv` | Historique des mesures (une ligne par exécution) |
+
 ## Ajouter un nouveau paramètre
 
 1. Ajouter dans `Config` (class dans config.py) avec valeur par défaut

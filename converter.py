@@ -347,52 +347,98 @@ class Converter:
                 "Installez-le avec : pip install pymupdf"
             )
 
+        from pdf_extractor import (
+            OCR_INVISIBLE, SCAN, VECTORIEL, VIDE, PdfTableExtractor, classer_page,
+        )
+
         ocr_mode = getattr(Config, 'OCR_MODE', 'tesseract').lower()
+        routage = getattr(Config, 'PDF_ROUTAGE_VECTORIEL', False)
         self._log(
-            f"Étape 1 — Rastérisation du PDF "
+            f"Étape 1 — {'Routage par page' if routage else 'Rastérisation'} du PDF "
             f"({ocr_mode}) : {self.word_file.name}…"
         )
         self._progress(0.03, "Rastérisation du PDF en images…")
 
         images_dir = self.output_dir / "images_pdf"
         images_dir.mkdir(parents=True, exist_ok=True)
+        if routage:
+            # _extraire_avec_progres relit toutes les images du dossier : celles
+            # d'un passage précédent renverraient des pages vectorielles en vision.
+            for ancienne in images_dir.glob('page_*.png'):
+                ancienne.unlink()
+
+        libelles = {
+            VECTORIEL: "texte vectoriel → lecture de la couche texte (sans OCR)",
+            OCR_INVISIBLE: "image + couche OCR invisible → couche ignorée, traitée en scan",
+            SCAN: "scan → OCR",
+            VIDE: "ni texte ni image pleine page → ignorée",
+        }
+        lecteur_grille = PdfTableExtractor(self.template)
+        par_page: Dict[int, Dict] = {}
+        pages_image: List[int] = []
 
         doc = fitz.open(str(self.word_file))
         total_pages = len(doc)
-        saved = 0
 
         for i, page in enumerate(doc, 1):
             if self._est_annule():
                 self._log(f"  ⏹ Rastérisation arrêtée — {i}/{total_pages} pages traitées.")
                 break
-            try:
-                # Matrix(3, 3) ≈ 216 DPI — bon compromis qualité / taille
-                pix = page.get_pixmap(matrix=fitz.Matrix(3, 3))
-                img_path = images_dir / f"page_{i:03d}.png"
-                pix.save(str(img_path))
-                saved += 1
-            except Exception as e:
-                self._log(f"  ⚠ Rastérisation page {i} ignorée : {e}")
+            nature = classer_page(page) if routage else SCAN
+            if routage:
+                self._log(f"  Page {i}/{total_pages} : {libelles[nature]}")
+            if nature == VECTORIEL:
+                par_page[i] = lecteur_grille.extract_page_grille(page, i - 1)
+            elif nature == VIDE:
+                vide = lecteur_grille._fail(i - 1)
+                vide['detection_method'] = 'pdf-vide'
+                par_page[i] = vide
+            else:
+                try:
+                    # Matrix(3, 3) ≈ 216 DPI — bon compromis qualité / taille
+                    pix = page.get_pixmap(matrix=fitz.Matrix(3, 3))
+                    pix.save(str(images_dir / f"page_{i:03d}.png"))
+                    pages_image.append(i)
+                except Exception as e:
+                    self._log(f"  ⚠ Rastérisation page {i} ignorée : {e}")
             pct = 0.03 + (i / total_pages) * 0.22   # 3 % → 25 %
             self._progress(pct, f"Rastérisation {i}/{total_pages}…")
 
         doc.close()
+        if routage:
+            n_grille = sum(
+                1 for r in par_page.values() if r.get('detection_method') == 'pdf-grille'
+            )
+            self._log(
+                f"  → {n_grille} page(s) lue(s) en couche texte, "
+                f"{len(pages_image)} page(s) à relire par OCR, "
+                f"{len(par_page) - n_grille} page(s) ignorée(s)."
+            )
         self._log(
-            f"  → {saved} / {total_pages} pages rastérisées : {images_dir}"
+            f"  → {len(pages_image)} / {total_pages} pages rastérisées : {images_dir}"
         )
-        self._progress(0.25, f"{saved} pages rastérisées.")
-        self._log(
-            f"Étape 2 — OCR ({self.template.name}) sur chaque page…"
-        )
-        self._progress(0.28, "OCR en cours…")
-        self._activer_log_claude()
+        self._progress(0.25, f"{len(pages_image)} pages rastérisées.")
 
-        try:
-            results, extractor = self._extraire_avec_progres(images_dir, saved)
-        except Exception as exc:
-            raise RuntimeError(f"OCR échoué : {exc}") from exc
+        extractor = None
+        if pages_image:
+            self._log(
+                f"Étape 2 — OCR ({self.template.name}) sur chaque page…"
+            )
+            self._progress(0.28, "OCR en cours…")
+            self._activer_log_claude()
+            try:
+                results_ocr, extractor = self._extraire_avec_progres(
+                    images_dir, len(pages_image)
+                )
+            except Exception as exc:
+                raise RuntimeError(f"OCR échoué : {exc}") from exc
+            # Même ordre que _extraire_avec_progres : images triées par numéro de page.
+            par_page.update(zip(pages_image, results_ocr))
 
-        return results, extractor
+        results = [par_page[i] for i in sorted(par_page)]
+        # generer_excel a besoin d'un extracteur même si aucune page n'est
+        # passée par l'OCR ; PdfTableExtractor délègue la mise en forme.
+        return results, extractor or lecteur_grille
 
     # ── Extraction depuis PDF (couche texte vectorielle) ──────────────
 

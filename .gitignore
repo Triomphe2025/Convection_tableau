@@ -25,6 +25,11 @@ build/
 # Generated Excel / test outputs
 *.xlsx
 *.xls
+# Sauf les fixtures des tests dorés (données d'entrée figées)
+!tests/fixtures/*.xlsx
+
+# Historique local de mesurer_precision.py
+mesures.csv
 
 # Word and document files
 *.docx

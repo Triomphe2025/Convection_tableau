@@ -152,6 +152,28 @@ Les seuils se règlent dans `config.py` (section « VÉRIFICATION DE CONVERSION 
 
 ---
 
+## Mesurer la précision (outil de QA)
+
+Outil distinct du bouton « Vérifier » : compare une sortie `.xlsx` à une **référence
+organisée à l'avance** (Excel de vérité terrain relu et validé à la main, ou PDF vectoriel
+dont la couche texte fait foi) — utile pour suivre les progrès du pipeline sur un document
+connu, pas pour contrôler une conversion en direct sur un document client quelconque.
+
+```powershell
+env\Scripts\python.exe mesurer_precision.py sortie.xlsx verite_terrain.xlsx
+# ou avec un PDF vectoriel comme référence (--modele requis) :
+env\Scripts\python.exe mesurer_precision.py sortie.xlsx plan_vectoriel.pdf --modele "REPARTITEUR 2"
+```
+
+Affiche les pages manquantes, les cellules fausses par catégorie (espacement, confusion de
+caractère, contenu différent, manquant, ajouté), les pieds de page faux et — si la référence
+est un PDF vectoriel — les positions fausses. Ajoute une ligne à `mesures.csv` (date, document,
+version Git, chiffres) à chaque exécution.
+
+Les seuils se règlent dans `config.py` (section « MESURE DE PRÉCISION »).
+
+---
+
 ## Compiler en exécutable (.exe)
 
 ```powershell
@@ -168,7 +190,7 @@ Toujours tester l'exe sur une machine sans Python installé avant livraison.
 
 ```powershell
 env\Scripts\python.exe -m pytest tests\ -v
-# 487 tests passent, 0 échec (+ 1 échec attendu documenté, + 1 test lent facultatif)
+# 609 tests passent, 0 échec (+ 1 échec attendu documenté, + 1 test lent facultatif)
 ```
 
 ---
@@ -182,8 +204,9 @@ env\Scripts\python.exe -m pytest tests\ -v
 | `ocr_processor.py` | OCR Tesseract — prétraitement, colonnes, cellules |
 | `claude_ocr.py` | OCR via API Claude Vision |
 | `docling_ocr.py` | OCR via Docling IBM |
-| `pdf_extractor.py` | Extraction couche texte PDF (PyMuPDF) |
+| `pdf_extractor.py` | Extraction couche texte PDF (PyMuPDF), classement des pages, lecture en grille |
 | `verificateur.py` | Vérification de conversion (compare le scan relu à la conversion) |
+| `mesure_precision.py` | Mesure de précision (compare une sortie à une référence organisée) |
 | `generer_classeur.py` | Génération du classeur Excel |
 | `template.py` | Modèles de tableau paramétrables |
 | `config.py` | Tous les paramètres modifiables |

@@ -1,0 +1,321 @@
+"""Mesure la précision d'une sortie TriosSeconverter contre une référence.
+
+Usage :
+    python mesurer_precision.py <sortie.xlsx> <reference.xlsx|reference.pdf>
+
+`sortie.xlsx` est un classeur produit par TriosSeconverter (feuille "Borniers").
+`reference` est soit un Excel de vérité terrain (feuilles "Verite_tableaux" +
+"Verite_pieds", cf. tests/fixtures/*_verite.xlsx), soit un PDF vectoriel dont
+la couche texte fait foi (--modele requis dans ce cas, pour connaître les
+noms de colonnes).
+
+Affiche pages manquantes, cellules fausses par catégorie, pieds faux,
+positions fausses, et ajoute une ligne à mesures.csv (Config.MESURE_CSV_PATH).
+
+Code retour : 0 si aucun écart, 1 sinon.
+"""
+
+import argparse
+import csv
+import re
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import List, Optional, Tuple
+
+import openpyxl
+
+from config import Config
+from mesure_precision import (
+    AJOUTE, CONFUSION, CONTENU_DIFFERENT, ESPACEMENT, MANQUANT,
+    formater_rapport, mesurer,
+)
+from template import TemplateManager
+
+# Mêmes vocabulaires que le reformatage dans generer_classeur.py, pour
+# reconnaître les mêmes lignes d'en-tête et de pied de page dans un .xlsx
+# déjà produit par le pipeline.
+_COL_KEYWORDS = {
+    'BORNE', 'COULEUR', 'SIGNAL', 'JARRETIERES',
+    'TENANT', 'ABOUTISSANT', 'FIL', 'JAR',
+    'REPERE', 'DESIGNATION', 'TYPE',
+}
+_FOOTER_KWS_EXACT = {'MTI', 'SIEMENS', 'ALSTOM', 'SCHNEIDER', 'MATRA'}
+# « PET : » sans points : pied des pages TP2 de 223400PE137.
+_FOOTER_KWS_SUBSTR = {
+    'P.E.T', 'PET :', 'BORNIER :', 'N° PLAN', 'NO PLAN',
+    'CABLE :', 'TYPE :', 'INDICE :', 'PAGE :',
+}
+
+
+def _est_entete(valeurs: List[str]) -> bool:
+    return any(v.strip().upper() in _COL_KEYWORDS for v in valeurs)
+
+
+def _est_pied(valeurs: List[str]) -> bool:
+    haut = [v.strip().upper() for v in valeurs]
+    joint = ' '.join(haut)
+    return any(v for v in haut) and (
+        any(mk in haut for mk in _FOOTER_KWS_EXACT)
+        or any(mk in joint for mk in _FOOTER_KWS_SUBSTR)
+    )
+
+
+def lire_xlsx(chemin: Path, feuille: Optional[str] = None) -> List[dict]:
+    """Lit un classeur TriosSeconverter : une page pivot par tableau (bloc
+    en-tête → données → pied), regroupement par ligne d'en-tête détectée.
+    """
+    wb = openpyxl.load_workbook(str(chemin), data_only=True)
+    ws = wb[feuille] if feuille else wb.worksheets[0]
+
+    pages: List[dict] = []
+    lignes: List[dict] = []
+    pied: List[str] = []
+    commence = False
+
+    def _clore():
+        if lignes or pied:
+            pages.append({
+                'success': True, 'rows': lignes[:], 'metadata': {}, 'pied_texte': pied[:],
+            })
+
+    for row in ws.iter_rows():
+        valeurs = ['' if c.value is None else str(c.value) for c in row]
+        if not any(v.strip() for v in valeurs):
+            continue
+        if _est_entete(valeurs):
+            if commence:
+                _clore()
+            lignes, pied = [], []
+            commence = True
+            continue
+        if _est_pied(valeurs):
+            pied.append(' '.join(v for v in valeurs if v.strip()))
+            continue
+        if commence:
+            lignes.append({'type': 'data', 'cells': valeurs, 'confidence': [100] * len(valeurs)})
+    if commence:
+        _clore()
+    return pages
+
+
+def lire_verite_excel(chemin: Path) -> Tuple[List[dict], List[str]]:
+    """Lit un Excel de vérité terrain (feuilles Verite_tableaux/Verite_pieds).
+
+    Colonnes de données déduites de l'en-tête de Verite_tableaux : tout ce
+    qui suit "Ligne" et précède la 1ère colonne d'annotation ("A verifier…",
+    "Valide…") — aucune liste de noms de colonnes figée.
+    """
+    wb = openpyxl.load_workbook(str(chemin), data_only=True)
+    ws_tab = wb['Verite_tableaux']
+    entetes = [str(c.value or '') for c in next(ws_tab.iter_rows(min_row=1, max_row=1))]
+    debut = entetes.index('Ligne') + 1
+    fin = next(
+        (i for i in range(debut, len(entetes))
+         if re.search(r'verifier|valide', entetes[i], re.IGNORECASE)),
+        len(entetes),
+    )
+    colonnes = entetes[debut:fin]
+
+    lignes_par_page: dict = {}
+    for row in ws_tab.iter_rows(min_row=2):
+        valeurs = [c.value for c in row]
+        if valeurs[0] is None:
+            continue
+        extrait = int(valeurs[0])
+        cellules = ['' if v is None else str(v) for v in valeurs[debut:fin]]
+        lignes_par_page.setdefault(extrait, []).append(
+            {'type': 'data', 'cells': cellules, 'confidence': [100] * len(cellules)},
+        )
+
+    pieds_par_page: dict = {}
+    if 'Verite_pieds' in wb.sheetnames:
+        ws_pied = wb['Verite_pieds']
+        entetes_p = [str(c.value or '') for c in next(ws_pied.iter_rows(min_row=1, max_row=1))]
+        libelles = [
+            e for e in entetes_p
+            if e not in ('Page extrait', 'Page document')
+            and not re.search(r'verifier|valide', e, re.I)
+        ]
+        for row in ws_pied.iter_rows(min_row=2):
+            valeurs = {entetes_p[i]: row[i].value for i in range(len(entetes_p))}
+            if valeurs.get('Page extrait') is None:
+                continue
+            extrait = int(valeurs['Page extrait'])
+            texte = '  '.join(
+                f"{lib.upper()} : {valeurs[lib]}"
+                for lib in libelles if valeurs.get(lib) not in (None, '')
+            )
+            pieds_par_page.setdefault(extrait, []).append(texte)
+
+    pages = []
+    for extrait in sorted(set(lignes_par_page) | set(pieds_par_page)):
+        pages.append({
+            'success': True,
+            'rows': lignes_par_page.get(extrait, []),
+            'metadata': {},
+            'pied_texte': pieds_par_page.get(extrait, []),
+        })
+    return pages, colonnes
+
+
+# ── Référence PDF vectoriel (couche texte reconstruite en grille) ────
+
+def _est_entete_grille(ligne: str, colonnes: List[str]) -> bool:
+    mots = {re.sub(r'[^A-Z0-9]', '', m.upper()) for m in ligne.split()}
+    return all(re.sub(r'[^A-Z0-9]', '', c.upper()) in mots for c in colonnes)
+
+
+def lire_pdf_vectoriel(chemin: Path, colonnes: List[str], template=None) -> List[dict]:
+    """Lit un PDF vectoriel : une page pivot par page PDF, lignes gardant leur
+    espacement d'origine (`exact=True`) pour la comparaison de position.
+
+    Pages à cadre : découpage indépendant aux « | ». Pages sans cadre (TP2) :
+    découpage de pdf_extractor.extract_page_grille — le découpage en colonnes
+    de ces pages n'est donc PAS vérifié indépendamment (même découpeur que la
+    conversion) ; les caractères et la chaîne d'écriture le sont.
+    """
+    import dataclasses
+
+    import fitz
+    from pdf_extractor import PdfTableExtractor, grille_page
+    from template import DEFAULT_TEMPLATE
+
+    tpl = template or dataclasses.replace(DEFAULT_TEMPLATE, columns=list(colonnes))
+    lecteur = PdfTableExtractor(tpl)
+    doc = fitz.open(str(chemin))
+    n = len(colonnes)
+    pages = []
+    for num, pdf_page in enumerate(doc):
+        texte_lignes = grille_page(pdf_page)
+        a_cadre = any(lg.count('|') >= n + 1 for lg in texte_lignes)
+        lignes, pied = [], []
+        for ligne in texte_lignes:
+            if _est_pied([ligne]):
+                pied.append(ligne)
+                continue
+            if not a_cadre or _est_entete_grille(ligne, colonnes):
+                continue
+            segs = ligne.split('|')[1:-1]
+            if len(segs) != n:
+                continue
+            cellules = [s[1:].rstrip() if s.startswith(' ') else s.rstrip() for s in segs]
+            if not any(re.search(r'[A-Za-z0-9]', c) for c in cellules):
+                continue   # ligne vide du cadre ou soulignement « °°°° »
+            lignes.append({
+                'type': 'data', 'cells': cellules, 'confidence': [100] * n, 'exact': True,
+            })
+        if not a_cadre:
+            lignes = [
+                dict(row, exact=True)
+                for row in lecteur.extract_page_grille(pdf_page, num)['rows']
+            ]
+        pages.append({'success': True, 'rows': lignes, 'metadata': {}, 'pied_texte': pied})
+    return pages
+
+
+# ── Historique CSV ─────────────────────────────────────────────────────
+
+def _version_git() -> str:
+    try:
+        resultat = subprocess.run(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            capture_output=True, text=True, cwd=str(Path(__file__).parent), timeout=5,
+        )
+        return resultat.stdout.strip() or '?'
+    except (subprocess.SubprocessError, OSError, FileNotFoundError):
+        return '?'
+
+
+def ecrire_mesure_csv(chemin_csv: Path, document: Path, rapport) -> None:
+    """Ajoute une ligne de mesure à l'historique CSV (créé si absent)."""
+    chemin_csv = Path(chemin_csv)
+    nouveau = not chemin_csv.exists()
+    compte = rapport.cellules_par_classe()
+    with open(chemin_csv, 'a', newline='', encoding='utf-8') as f:
+        w = csv.writer(f)
+        if nouveau:
+            w.writerow([
+                'date', 'document', 'version_git', 'precision',
+                'cellules_comparees', 'cellules_identiques',
+                'espacement', 'confusion', 'contenu_different', 'manquant', 'ajoute',
+                'pages_ref_orphelines', 'pages_conv_orphelines',
+                'ecarts_pieds', 'ecarts_positions',
+            ])
+        w.writerow([
+            datetime.now().strftime('%Y-%m-%d %H:%M'),
+            document.name,
+            _version_git(),
+            f"{rapport.precision:.4f}",
+            rapport.nb_cellules_comparees,
+            rapport.nb_cellules_identiques,
+            compte.get(ESPACEMENT, 0),
+            compte.get(CONFUSION, 0),
+            compte.get(CONTENU_DIFFERENT, 0),
+            compte.get(MANQUANT, 0),
+            compte.get(AJOUTE, 0),
+            len(rapport.pages_ref_orphelines),
+            len(rapport.pages_conv_orphelines),
+            len(rapport.ecarts_pieds),
+            len(rapport.ecarts_positions),
+        ])
+
+
+# ── Ligne de commande ──────────────────────────────────────────────────
+
+def main(argv: Optional[List[str]] = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog='mesurer_precision.py',
+        description="Mesure la précision d'une sortie TriosSeconverter contre une référence.",
+    )
+    parser.add_argument('sortie', help='Classeur .xlsx produit par TriosSeconverter')
+    parser.add_argument(
+        'reference', help='Excel de vérité terrain (.xlsx) ou PDF vectoriel (.pdf)',
+    )
+    parser.add_argument(
+        '--modele', default=None, help='Nom du template (requis si référence = PDF)',
+    )
+    parser.add_argument('--max-ecarts', type=int, default=30, help='Écarts affichés au maximum')
+    parser.add_argument(
+        '--csv', default=None, help='Chemin du fichier de mesures (défaut : config)',
+    )
+    args = parser.parse_args(argv)
+
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
+    chemin_sortie = Path(args.sortie)
+    chemin_reference = Path(args.reference)
+    if not chemin_sortie.exists():
+        raise FileNotFoundError(f"Sortie introuvable : {chemin_sortie}")
+    if not chemin_reference.exists():
+        raise FileNotFoundError(f"Référence introuvable : {chemin_reference}")
+
+    if chemin_reference.suffix.lower() == '.xlsx':
+        reference, colonnes = lire_verite_excel(chemin_reference)
+    elif chemin_reference.suffix.lower() == '.pdf':
+        if not args.modele:
+            raise ValueError("--modele est requis quand la référence est un PDF vectoriel")
+        modele = TemplateManager().get(args.modele)
+        colonnes = list(modele.columns)
+        reference = lire_pdf_vectoriel(chemin_reference, colonnes, template=modele)
+    else:
+        raise ValueError(f"Référence non supportée : {chemin_reference.suffix}")
+
+    converti = lire_xlsx(chemin_sortie)
+    rapport = mesurer(reference, converti, colonnes)
+
+    print(formater_rapport(rapport, max_ecarts=args.max_ecarts))
+
+    chemin_csv = Path(args.csv) if args.csv else Path(Config.MESURE_CSV_PATH)
+    ecrire_mesure_csv(chemin_csv, chemin_sortie, rapport)
+
+    a_des_ecarts = bool(
+        rapport.ecarts_cellules or rapport.pages_ref_orphelines or rapport.ecarts_pieds,
+    )
+    return 1 if a_des_ecarts else 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

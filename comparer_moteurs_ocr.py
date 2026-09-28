@@ -2,9 +2,9 @@
 Comparaison Tesseract vs Claude Vision sur une image de bornier.
 
 Usage :
-    python comparer_ocr.py                          # premiere image trouvee
-    python comparer_ocr.py page_10.png              # image specifique
-    python comparer_ocr.py page_10.png --cle XXXXX  # avec cle API Claude
+    python comparer_moteurs_ocr.py                          # premiere image trouvee
+    python comparer_moteurs_ocr.py page_10.png              # image specifique
+    python comparer_moteurs_ocr.py page_10.png --cle XXXXX  # avec cle API Claude
 
 Sans cle API : affiche uniquement le resultat Tesseract.
 Avec cle API  : affiche les deux resultats cote a cote + score qualite.
@@ -48,7 +48,7 @@ def trouver_image(nom: str = None) -> Path:
 
     raise FileNotFoundError(
         "Aucune image trouvee. Donnez le chemin complet : "
-        "python comparer_ocr.py mon_image.png"
+        "python comparer_moteurs_ocr.py mon_image.png"
     )
 
 
@@ -198,7 +198,7 @@ def main():
     else:
         print("\n[2/2] Claude Vision : pas de cle API fournie.")
         print("      Pour comparer, lancez :")
-        print("      python comparer_ocr.py " + str(image_path.name) + " --cle VOTRE_CLE_ICI")
+        print("      python comparer_moteurs_ocr.py " + str(image_path.name) + " --cle VOTRE_CLE_ICI")
         print()
         print("      Test gratuit SANS cle : uploadez l'image sur claude.ai")
         print("      et demandez : 'Lis ce tableau, colonnes : " + " | ".join(tpl.columns) + "'")
