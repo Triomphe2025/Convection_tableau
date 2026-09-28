@@ -75,33 +75,42 @@ _EFFORTS = ('low', 'medium', 'high', 'xhigh', 'max')
 def _parametres_modele(model: str) -> dict:
     """Paramètres de réflexion et d'effort à passer pour ce modèle.
 
-    Lève ValueError, avec un message clair, pour une combinaison que l'API
-    refuserait par une erreur 400.
+    Décidés par Config.CLAUDE_CAPACITES_MODELES. Lève ValueError, avec un
+    message clair, pour un modèle absent de la table ou une combinaison que
+    l'API refuserait par une erreur 400.
     """
     from config import Config
-    if model.startswith('claude-haiku-4-5'):
-        return {}  # n'accepte pas output_config.effort
+    capacites = getattr(Config, 'CLAUDE_CAPACITES_MODELES', {}).get(model)
+    if capacites is None:
+        connus = ', '.join(getattr(Config, 'CLAUDE_CAPACITES_MODELES', {}))
+        raise ValueError(
+            f"Modèle {model!r} absent de CLAUDE_CAPACITES_MODELES (config.py) : "
+            f"ajoutez-le à la table ou choisissez parmi : {connus}."
+        )
+    parametres: dict = {}
     reflexion = getattr(Config, 'CLAUDE_THINKING', 'disabled')
-    effort = getattr(Config, 'CLAUDE_EFFORT', 'high')
-    if reflexion not in ('disabled', 'adaptive'):
-        raise ValueError(
-            f"CLAUDE_THINKING = {reflexion!r} non reconnu : utilisez \"disabled\" ou \"adaptive\"."
-        )
-    if effort not in _EFFORTS:
-        raise ValueError(
-            f"CLAUDE_EFFORT = {effort!r} non reconnu : valeurs possibles {', '.join(_EFFORTS)}."
-        )
-    if reflexion == 'disabled' and effort in ('xhigh', 'max'):
-        raise ValueError(
-            f"CLAUDE_EFFORT = \"{effort}\" est refusé quand CLAUDE_THINKING = \"disabled\" "
-            "(l'API répondrait par une erreur 400). Mettez CLAUDE_EFFORT à \"high\" ou "
-            "moins, ou CLAUDE_THINKING à \"adaptive\"."
-        )
-    if reflexion == 'disabled' and model.startswith('claude-fable'):
-        raise ValueError(
-            f"{model} garde toujours la réflexion active : mettez CLAUDE_THINKING à \"adaptive\"."
-        )
-    return {'thinking': {'type': reflexion}, 'output_config': {'effort': effort}}
+    effort = getattr(Config, 'CLAUDE_EFFORT', 'medium')
+    if capacites.get('effort'):
+        if effort not in _EFFORTS:
+            raise ValueError(
+                f"CLAUDE_EFFORT = {effort!r} non reconnu : "
+                f"valeurs possibles {', '.join(_EFFORTS)}."
+            )
+        parametres['output_config'] = {'effort': effort}
+    if capacites.get('thinking'):
+        if reflexion not in ('disabled', 'adaptive'):
+            raise ValueError(
+                f"CLAUDE_THINKING = {reflexion!r} non reconnu : "
+                "utilisez \"disabled\" ou \"adaptive\"."
+            )
+        if reflexion == 'disabled' and effort in ('xhigh', 'max'):
+            raise ValueError(
+                f"CLAUDE_EFFORT = \"{effort}\" est refusé quand CLAUDE_THINKING = \"disabled\" "
+                "(l'API répondrait par une erreur 400). Mettez CLAUDE_EFFORT à \"high\" ou "
+                "moins, ou CLAUDE_THINKING à \"adaptive\"."
+            )
+        parametres['thinking'] = {'type': reflexion}
+    return parametres
 
 
 def _texte_reponse(response) -> str:
@@ -513,15 +522,28 @@ class ClaudeVisionExtractor:
             f"{usage['input_tokens']} tokens en entrée, {usage['output_tokens']} en sortie"
         )
         if response.stop_reason == 'refusal':
+            details = getattr(response, 'stop_details', None)
+            categorie = getattr(details, 'category', None) or 'non précisée'
+            explication = getattr(details, 'explanation', None) or ''
+            logger.warning(
+                f"Claude a refusé {image_path.name} — catégorie : {categorie}"
+                + (f" ({explication})" if explication else '')
+            )
             _write_api_log({
-                'ts':      datetime.datetime.now().isoformat(timespec='seconds'),
-                'image':   image_path.name,
-                'model':   modele_servi,
-                'usage':   usage,
-                'error':   'refus du modèle',
-                'success': False,
+                'ts':        datetime.datetime.now().isoformat(timespec='seconds'),
+                'image':     image_path.name,
+                'model':     modele_servi,
+                'usage':     usage,
+                'error':     'refus du modèle',
+                'categorie': categorie,
+                'explication': explication,
+                'success':   False,
             })
-            return {'success': False, 'error': f"Claude a refusé la page {image_path.name}"}
+            return {
+                'success': False,
+                'error': f"Claude a refusé la page {image_path.name} (catégorie : {categorie})",
+                'api_usage': dict(usage, model=modele_servi),
+            }
         if response.stop_reason == 'max_tokens':
             logger.warning(
                 f"Réponse tronquée (limite CLAUDE_MAX_TOKENS atteinte) : {image_path.name}"

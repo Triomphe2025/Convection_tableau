@@ -40,8 +40,9 @@ Le **Doc. 2** (optionnel) est un fichier Word contenant des tableaux structurés
 - Meilleure précision sur tableaux complexes ou mal scannés
 - Nécessite une clé API Anthropic (champ dans l'interface)
 - Chaque image = 1 appel API (coût en tokens) ; les pages PDF à texte vectoriel sont lues sans appel
-- Modèle par défaut : `claude-opus-5` (`CLAUDE_OCR_MODEL`), réflexion et effort réglables
-  (`CLAUDE_THINKING`, `CLAUDE_EFFORT`) ; modèle et tokens consommés affichés par page
+- Modèle par défaut : `claude-opus-5-5` (`CLAUDE_OCR_MODEL`), effort réglable (`CLAUDE_EFFORT`,
+  `medium` par défaut) ; ce que chaque modèle accepte est dans `CLAUDE_CAPACITES_MODELES` ;
+  modèle et tokens consommés affichés par page
 - Journal des appels sauvegardé : `*_claude.jsonl` (permet de rejouer sans repayer)
 
 ### Docling IBM (IA locale)
@@ -192,7 +193,7 @@ Toujours tester l'exe sur une machine sans Python installé avant livraison.
 
 ```powershell
 env\Scripts\python.exe -m pytest tests\ -v
-# 638 tests passent, 0 échec (+ 1 échec attendu documenté, + 1 test lent facultatif)
+# 646 tests passent, 0 échec (+ 1 échec attendu documenté, + 1 test lent facultatif)
 ```
 
 ---

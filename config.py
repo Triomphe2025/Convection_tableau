@@ -341,22 +341,38 @@ class Config:
     # Obtenir sur : https://console.anthropic.com
     CLAUDE_API_KEY = ""
 
-    # Modèle Claude pour l'OCR Vision (modes "claude" et "hybrid") :
-    #   "claude-haiku-4-5-20251001" — rapide, économique ; n'accepte ni
-    #                                 CLAUDE_THINKING ni CLAUDE_EFFORT (non envoyés)
+    # Modèle Claude pour l'OCR Vision (modes "claude" et "hybrid"). Il doit
+    # figurer dans CLAUDE_CAPACITES_MODELES ci-dessous, sinon la conversion est
+    # refusée avant tout appel.
+    #   "claude-haiku-4-5-20251001" — rapide, économique
     #   "claude-sonnet-5"           — précis, coût intermédiaire
-    #   "claude-opus-5"             — le plus fidèle hors Fable (défaut)
-    #   "claude-fable-5-1"          — le plus capable ; réflexion toujours active :
-    #                                 exige CLAUDE_THINKING = "adaptive"
-    CLAUDE_OCR_MODEL = "claude-opus-5"
+    #   "claude-opus-5"             — 5 $ / 25 $ par million de tokens
+    #   "claude-opus-5-5"           — recommandé (défaut), 4 $ / 20 $ ; réflexion toujours active
+    #   "claude-fable-5-1"          — le plus capable ; réflexion toujours active
+    CLAUDE_OCR_MODEL = "claude-opus-5-5"
 
-    # Réflexion avant la réponse : "disabled" (réponse directe) ou "adaptive".
-    # Désactivée, l'effort ne peut pas dépasser "high" : "xhigh" et "max" sont
-    # refusés avant l'appel (l'API répondrait par une erreur 400).
+    # Ce que chaque modèle accepte :
+    #   "thinking" : True  → le champ thinking est envoyé selon CLAUDE_THINKING ;
+    #                False → champ omis (Haiku n'a pas de réflexion réglable ;
+    #                        Opus 5.5 et Fable 5.1 réfléchissent toujours et
+    #                        renvoient une erreur 400 si on tente de la désactiver)
+    #   "effort"   : True  → output_config.effort envoyé (Haiku 4.5 le refuse).
+    CLAUDE_CAPACITES_MODELES = {
+        "claude-haiku-4-5-20251001": {"thinking": False, "effort": False},
+        "claude-sonnet-5":           {"thinking": True,  "effort": True},
+        "claude-opus-5":             {"thinking": True,  "effort": True},
+        "claude-opus-5-5":           {"thinking": False, "effort": True},
+        "claude-fable-5-1":          {"thinking": False, "effort": True},
+    }
+
+    # Réflexion avant la réponse, pour les modèles où elle se règle ("thinking":
+    # True) : "disabled" (réponse directe) ou "adaptive". Désactivée, l'effort
+    # ne peut pas dépasser "high" : "xhigh" et "max" sont refusés avant l'appel
+    # (l'API répondrait par une erreur 400). Ignoré par Opus 5.5 et Fable 5.1.
     CLAUDE_THINKING = "disabled"
 
     # Effort : "low" | "medium" | "high" | "xhigh" | "max".
-    CLAUDE_EFFORT = "high"
+    CLAUDE_EFFORT = "medium"
 
     # Limite de tokens de la réponse (la réflexion, si active, compte dedans).
     CLAUDE_MAX_TOKENS = 16000

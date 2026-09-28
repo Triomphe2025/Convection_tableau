@@ -26,9 +26,10 @@ Config.TESSERACT_PATH   # référencer uniquement
 | `OCR_MODE` | `tesseract` | Mode OCR par défaut |
 | `CLAUDE_API_KEY` | `""` | Clé API Anthropic |
 | `CLAUDE_AGENT_SESSION_ID` | `""` | ID session agent (le modèle de l'agent se règle côté Anthropic) |
-| `CLAUDE_OCR_MODEL` | `claude-opus-5` | Modèle des modes claude et hybrid (`claude-haiku-4-5-20251001`, `claude-sonnet-5`, `claude-opus-5`, `claude-fable-5-1`) |
-| `CLAUDE_THINKING` | `disabled` | Réflexion : `disabled` ou `adaptive` (Fable 5.1 exige `adaptive`) |
-| `CLAUDE_EFFORT` | `high` | `low`…`max` ; `xhigh`/`max` refusés si la réflexion est désactivée |
+| `CLAUDE_OCR_MODEL` | `claude-opus-5-5` | Modèle des modes claude et hybrid ; doit figurer dans `CLAUDE_CAPACITES_MODELES` |
+| `CLAUDE_CAPACITES_MODELES` | table | Par modèle : `thinking` (champ envoyé selon `CLAUDE_THINKING`, ou omis) et `effort` (envoyé ou non). Haiku 4.5 : ni l'un ni l'autre ; Opus 5, Sonnet 5 : les deux ; Opus 5.5, Fable 5.1 : thinking omis (réflexion toujours active), effort envoyé |
+| `CLAUDE_THINKING` | `disabled` | Réflexion des modèles où elle se règle : `disabled` ou `adaptive` |
+| `CLAUDE_EFFORT` | `medium` | `low`…`max` ; `xhigh`/`max` refusés si la réflexion est envoyée désactivée |
 | `CLAUDE_MAX_TOKENS` | `16000` | Limite de la réponse, réflexion comprise |
 | `CLAUDE_IMAGE_MAX_PX` | `2576` | Grand côté maximal des images envoyées à Claude (PNG) |
 

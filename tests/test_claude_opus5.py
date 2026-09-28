@@ -1,5 +1,5 @@
 """
-Tests du passage à Claude Opus 5 (claude_ocr.py) : paramètres envoyés, lecture
+Tests du passage à Claude Opus 5 / 5.5 (claude_ocr.py) : paramètres envoyés, lecture
 d'une réponse commençant par un bloc de réflexion, refus d'un effort incompatible,
 préparation des images. Aucun appel réseau : le client anthropic est simulé.
 
@@ -113,9 +113,38 @@ class TestParametresModele(_ConfigClaude):
     def test_haiku_sans_reflexion_ni_effort(self):
         self.assertEqual(co._parametres_modele('claude-haiku-4-5-20251001'), {})
 
-    def test_fable_exige_la_reflexion(self):
-        with self.assertRaises(ValueError):
-            co._parametres_modele('claude-fable-5-1')
+    def test_opus55_n_envoie_jamais_le_champ_thinking(self):
+        for reflexion in ('disabled', 'adaptive'):
+            Config.CLAUDE_THINKING = reflexion
+            self.assertEqual(
+                co._parametres_modele('claude-opus-5-5'), {'output_config': {'effort': 'high'}},
+            )
+
+    def test_opus55_effort_max_accepte_malgre_thinking_disabled(self):
+        # Le champ thinking est omis : la règle « pas de xhigh/max sans réflexion »
+        # ne concerne que les modèles où la réflexion se désactive.
+        Config.CLAUDE_EFFORT = 'max'
+        self.assertEqual(
+            co._parametres_modele('claude-opus-5-5'), {'output_config': {'effort': 'max'}},
+        )
+
+    def test_fable_omet_le_champ_thinking(self):
+        self.assertNotIn('thinking', co._parametres_modele('claude-fable-5-1'))
+
+    def test_sonnet5_suit_claude_thinking(self):
+        Config.CLAUDE_THINKING = 'adaptive'
+        parametres = co._parametres_modele('claude-sonnet-5')
+        self.assertEqual(parametres['thinking'], {'type': 'adaptive'})
+
+    def test_modele_inconnu_refuse(self):
+        with self.assertRaises(ValueError) as ctx:
+            co._parametres_modele('claude-opus-9')
+        self.assertIn('CLAUDE_CAPACITES_MODELES', str(ctx.exception))
+
+    def test_config_par_defaut_opus55_effort_medium(self):
+        self.assertEqual(self._sauve['CLAUDE_OCR_MODEL'], 'claude-opus-5-5')
+        self.assertEqual(self._sauve['CLAUDE_EFFORT'], 'medium')
+        self.assertIn(self._sauve['CLAUDE_OCR_MODEL'], Config.CLAUDE_CAPACITES_MODELES)
 
     def test_valeurs_inconnues_refusees(self):
         Config.CLAUDE_EFFORT = 'maximum'
@@ -227,11 +256,36 @@ class TestExtractOpus5(_ConfigClaude):
         self.assertIn('CLAUDE_THINKING', r['error'])
         self.assertEqual(FauxClient.appels, [])
 
-    def test_refus_du_modele(self):
+    def test_refus_du_modele_categorie_journalisee(self):
         FauxClient.reponse = _reponse([], stop_reason='refusal')
+        FauxClient.reponse.stop_details = SimpleNamespace(
+            type='refusal', category='cyber', explanation='motif de test')
+        with (patch('anthropic.Anthropic', FauxClient),
+              patch.object(co, '_write_api_log') as journal):
+            r = self.ex.extract(self.image)
+        self.assertFalse(r['success'])
+        self.assertIn('catégorie : cyber', r['error'])
+        self.assertEqual(journal.call_args[0][0]['categorie'], 'cyber')
+
+    def test_refus_sans_categorie(self):
+        FauxClient.reponse = _reponse([], stop_reason='refusal')
+        FauxClient.reponse.stop_details = None
+        r = self._extraire()
+        self.assertIn('non précisée', r['error'])
+
+    def test_opus55_requete_sans_champ_thinking(self):
+        Config.CLAUDE_OCR_MODEL = 'claude-opus-5-5'
+        self._extraire()
+        appel = FauxClient.appels[0]
+        self.assertNotIn('thinking', appel)
+        self.assertEqual(appel['output_config'], {'effort': 'high'})
+
+    def test_modele_inconnu_refuse_sans_appel(self):
+        Config.CLAUDE_OCR_MODEL = 'claude-inconnu'
         r = self._extraire()
         self.assertFalse(r['success'])
-        self.assertIn('refusé', r['error'])
+        self.assertIn('CLAUDE_CAPACITES_MODELES', r['error'])
+        self.assertEqual(FauxClient.appels, [])
 
     def test_haiku_garde_l_appel_v17(self):
         Config.CLAUDE_OCR_MODEL = 'claude-haiku-4-5-20251001'
