@@ -244,3 +244,65 @@ tous deux exportés de Word, texte vectoriel.
   rien : c'est la lecture Tesseract de ces scans qu'il faudra mesurer et améliorer.
 - **Numéro de page « 122a »** lu « 122 » dans les métadonnées : `_extract_meta` ne retient que
   les chiffres de PAGE (comportement v1.7, non modifié).
+
+---
+
+## Étape 5 — Modèle Claude et campagne de mesure (2026-09-28)
+
+Livré : modes claude et hybrid sur Claude Opus 5 puis Opus 5.5 (table
+`CLAUDE_CAPACITES_MODELES`, champ thinking omis pour Opus 5.5 / Fable 5.1), refus journalisé
+avec sa catégorie, garde-fou de troncature (64 000 tokens à effort xhigh/max, réponse
+tronquée = page en erreur), SDK anthropic 1.8, `campagne_mesure.py`.
+
+**Décision : `claude-opus-5-5`, effort `medium`** — le réglage par défaut, inchangé.
+
+### Campagne du 2026-09-28 (commit 2d522c5)
+
+Extrait 223111PE011 (10 pages : 8 relues par Claude, 2 vectorielles lues en grille), mesuré
+contre la vérité terrain validée ; 656 cellules comparées.
+
+| Réglage | Passages | Cellules fausses (moy.) | Écart entre passages | Positions | Pieds faux* | Coût moyen / passage | Durée |
+|---------|----------|-------------------------|----------------------|-----------|-------------|----------------------|-------|
+| Haiku 4.5, sans effort | 2 | 442 | 4 | 0 | 21 / 19 | 0,042 $ | ~58 s |
+| Opus 5.5, medium | 2 | **2** | 0 | 0 | 8 / 9 | 0,301 $ | ~79 s |
+| Opus 5.5, high | 1 | **2** | — | 0 | 7 | 0,314 $ | 84 s |
+
+\* Remesurés après la séparation du complément de pied de page (commit 75985e2) ; le CSV de
+campagne garde les valeurs de l'outil au moment du passage (18, 9, 9).
+
+223400PE137 avec Opus 5.5 medium : **2 appels API** (les 2 gardes scannées, classées
+non-listing), **0 cellule fausse sur 9 460**, 0,053 $. Seule page sans correspondance : PAGE 36
+(1 ligne, `MIN_DATA_ROWS`).
+
+**Coût réel total : 1,05 $** (6 passages ; tokens renvoyés par l'API × prix de `config.py`).
+**Aucune page en erreur** : ni refus, ni réponse tronquée ; modèle servi conforme au modèle
+demandé sur toutes les pages.
+
+Constats :
+- Haiku décale les colonnes (TENANT coupé en « PH » + « QTEL2 09 » envoyé dans SIGNAL :
+  ~145 écarts chacun sur TENANT, SIGNAL, ABOUTISSANT), ajoute 4 à 8 lignes, fausse les pieds
+  (223111PE011 lu « PB011 », « WFHA104 », « TE203 »).
+- Opus 5.5 : high ne corrige rien par rapport à medium (+4 % de coût) ; les deux passages
+  medium sont identiques cellule pour cellule. Coût réel 0,30 $ / passage (estimé ~1,2 $) :
+  la réflexion reste courte (185 à 2 800 tokens de sortie par page).
+- Pieds faux restants d'Opus (medium 1) : 6 compléments perdus (pages 2, 3, 119, 122, 122a,
+  123), PAGE « 122a » lu « 122 », TYPE de 122a perdu. Le complément perdu varie d'un passage à
+  l'autre (page 52 au passage medium 2, page 122 retrouvée en high). À corriger à l'étape 7.
+- Pages 9 et 104 absentes de l'Excel dans tous les passages : lues par le modèle (page 9 :
+  2 lignes) mais écartées par `MIN_DATA_ROWS = 3` (page 104 : 0 ligne). Étape 6.
+
+### Cas de référence pour les étapes 8 et 9 — erreurs d'Opus à signaler
+
+Page 119, colonne SIGNAL, les 2 cellules fausses d'Opus 5.5 (medium et high) :
+
+| Ligne | Vérité | Opus 5.5 |
+|-------|--------|----------|
+| 5 M (PH QC 05) | OC FS 14 50 + OCFSCS | CC FS 14 50 + CCFSCS |
+| 6 BC (PH QC 06) | OC FS 14 50 | CC FS 14 50 |
+
+Vérifié à 400 DPI : la première lettre est un O fermé, identique au O de « OCC ZONE ». La vérité
+a raison, Opus se trompe (confusion O/C dans cette police). **Ces 2 cellules devront porter une
+alerte** aux étapes 8 (double lecture) et 9 (plus aucune substitution silencieuse).
+
+Passage Haiku du matin (`mesures/haiku_passage1/`) : non retenu — document complet (129 pages)
+interrompu après 20 pages, avant les commits Opus, sans tokens journalisés.
