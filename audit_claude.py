@@ -385,7 +385,8 @@ ANALYSE :"""
         max_tokens=2048,
         messages=[{"role": "user", "content": prompt}]
     )
-    return message.content[0].text
+    # Le premier bloc peut être un bloc de réflexion, sans texte.
+    return ''.join(b.text for b in message.content if b.type == 'text')
 
 
 # ──────────────────────────────────────────────────────────────────────────────
