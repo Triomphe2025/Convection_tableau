@@ -16,6 +16,10 @@ from typing import Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+# Le modèle de l'agent (et sa réflexion / son effort) se règle côté Anthropic, dans
+# la configuration de l'agent : CLAUDE_OCR_MODEL, CLAUDE_THINKING et CLAUDE_EFFORT
+# de config.py ne s'appliquent pas à ce mode.
+
 # Noms d'événements qui signalent la FIN du tour de l'agent.
 # Le SDK envoie l'un de ces types quand la réponse est complète.
 _TERMINAL_EVENT_TYPES = frozenset({

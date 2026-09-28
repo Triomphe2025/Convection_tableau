@@ -861,6 +861,12 @@ class Converter:
             blur = result.get('blur_pct', 0.0)
             blur_s = f"  flou {blur:.0f}%" if blur > 60 else ""
             self._log(f"    → {label}{blur_s}")
+            conso = result.get('api_usage')
+            if conso:
+                self._log(
+                    f"      {conso.get('model', '?')} : {conso.get('input_tokens', 0)} tokens "
+                    f"en entrée, {conso.get('output_tokens', 0)} en sortie"
+                )
 
             # Mode validation interactive — boucle de re-traitement par feedback
             if self._on_validation is not None and result.get('success'):

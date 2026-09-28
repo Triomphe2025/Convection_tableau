@@ -341,10 +341,29 @@ class Config:
     # Obtenir sur : https://console.anthropic.com
     CLAUDE_API_KEY = ""
 
-    # Modèle Claude pour l'OCR Vision :
-    #   "claude-haiku-4-5-20251001"  — rapide, économique (recommandé)
-    #   "claude-sonnet-4-6"          — plus précis, coût plus élevé
-    CLAUDE_OCR_MODEL = "claude-haiku-4-5-20251001"
+    # Modèle Claude pour l'OCR Vision (modes "claude" et "hybrid") :
+    #   "claude-haiku-4-5-20251001" — rapide, économique ; n'accepte ni
+    #                                 CLAUDE_THINKING ni CLAUDE_EFFORT (non envoyés)
+    #   "claude-sonnet-5"           — précis, coût intermédiaire
+    #   "claude-opus-5"             — le plus fidèle hors Fable (défaut)
+    #   "claude-fable-5-1"          — le plus capable ; réflexion toujours active :
+    #                                 exige CLAUDE_THINKING = "adaptive"
+    CLAUDE_OCR_MODEL = "claude-opus-5"
+
+    # Réflexion avant la réponse : "disabled" (réponse directe) ou "adaptive".
+    # Désactivée, l'effort ne peut pas dépasser "high" : "xhigh" et "max" sont
+    # refusés avant l'appel (l'API répondrait par une erreur 400).
+    CLAUDE_THINKING = "disabled"
+
+    # Effort : "low" | "medium" | "high" | "xhigh" | "max".
+    CLAUDE_EFFORT = "high"
+
+    # Limite de tokens de la réponse (la réflexion, si active, compte dedans).
+    CLAUDE_MAX_TOKENS = 16000
+
+    # Grand côté maximal (px) des images envoyées à Claude : au-delà, l'image
+    # est réduite avant l'envoi (limite de résolution des modèles actuels).
+    CLAUDE_IMAGE_MAX_PX = 2576
 
     # ========================================
     # 🤖 MODE OCR — Agent Managed Agents

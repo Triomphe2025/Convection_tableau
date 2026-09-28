@@ -48,6 +48,78 @@ def _encode_image(image_path: Path):
         return base64.standard_b64encode(f.read()).decode('utf-8'), media_type
 
 
+def _preparer_image_claude(image_path: Path, max_px: int):
+    """Image prête pour Claude : PNG, grand côté ≤ max_px. Retourne (base64, media_type).
+
+    Séparée de _encode_image, que partagent Ollama et l'agent : seuls les envois
+    à Claude sont réduits et convertis.
+    """
+    import io
+
+    from PIL import Image
+    with Image.open(image_path) as img:
+        if img.mode not in ('1', 'L', 'LA', 'P', 'RGB', 'RGBA'):
+            img = img.convert('RGB')
+        if max(img.size) > max_px:
+            rapport = max_px / max(img.size)
+            taille = (max(1, round(img.width * rapport)), max(1, round(img.height * rapport)))
+            img = img.resize(taille, Image.LANCZOS)
+        tampon = io.BytesIO()
+        img.save(tampon, format='PNG')
+    return base64.standard_b64encode(tampon.getvalue()).decode('utf-8'), 'image/png'
+
+
+_EFFORTS = ('low', 'medium', 'high', 'xhigh', 'max')
+
+
+def _parametres_modele(model: str) -> dict:
+    """Paramètres de réflexion et d'effort à passer pour ce modèle.
+
+    Lève ValueError, avec un message clair, pour une combinaison que l'API
+    refuserait par une erreur 400.
+    """
+    from config import Config
+    if model.startswith('claude-haiku-4-5'):
+        return {}  # n'accepte pas output_config.effort
+    reflexion = getattr(Config, 'CLAUDE_THINKING', 'disabled')
+    effort = getattr(Config, 'CLAUDE_EFFORT', 'high')
+    if reflexion not in ('disabled', 'adaptive'):
+        raise ValueError(
+            f"CLAUDE_THINKING = {reflexion!r} non reconnu : utilisez \"disabled\" ou \"adaptive\"."
+        )
+    if effort not in _EFFORTS:
+        raise ValueError(
+            f"CLAUDE_EFFORT = {effort!r} non reconnu : valeurs possibles {', '.join(_EFFORTS)}."
+        )
+    if reflexion == 'disabled' and effort in ('xhigh', 'max'):
+        raise ValueError(
+            f"CLAUDE_EFFORT = \"{effort}\" est refusé quand CLAUDE_THINKING = \"disabled\" "
+            "(l'API répondrait par une erreur 400). Mettez CLAUDE_EFFORT à \"high\" ou "
+            "moins, ou CLAUDE_THINKING à \"adaptive\"."
+        )
+    if reflexion == 'disabled' and model.startswith('claude-fable'):
+        raise ValueError(
+            f"{model} garde toujours la réflexion active : mettez CLAUDE_THINKING à \"adaptive\"."
+        )
+    return {'thinking': {'type': reflexion}, 'output_config': {'effort': effort}}
+
+
+def _texte_reponse(response) -> str:
+    """Concatène les blocs texte : le premier bloc peut être un bloc de réflexion."""
+    return ''.join(b.text for b in response.content if b.type == 'text')
+
+
+def _consommation(response) -> dict:
+    """Tokens consommés par un appel, pour le journal."""
+    usage = response.usage
+    return {
+        'input_tokens': getattr(usage, 'input_tokens', 0) or 0,
+        'output_tokens': getattr(usage, 'output_tokens', 0) or 0,
+        'cache_read_input_tokens': getattr(usage, 'cache_read_input_tokens', 0) or 0,
+        'cache_creation_input_tokens': getattr(usage, 'cache_creation_input_tokens', 0) or 0,
+    }
+
+
 def _build_prompt(template) -> str:
     """
     Construit le prompt pipe-séparé pour tous les templates.
@@ -332,12 +404,18 @@ class ClaudeVisionExtractor:
                 ),
             }
 
+        model = getattr(Config, 'CLAUDE_OCR_MODEL', 'claude-opus-5')
         try:
-            image_data, media_type = _encode_image(image_path)
+            parametres = _parametres_modele(model)
+        except ValueError as e:
+            return {'success': False, 'error': str(e)}
+
+        try:
+            image_data, media_type = _preparer_image_claude(
+                image_path, getattr(Config, 'CLAUDE_IMAGE_MAX_PX', 2576),
+            )
         except Exception as e:
             return {'success': False, 'error': f"Lecture image impossible : {e}"}
-
-        model = getattr(Config, 'CLAUDE_OCR_MODEL', 'claude-haiku-4-5-20251001')
 
         if context_data:
             # Mode hybride v4 : Ollama a déjà classé les colonnes.
@@ -397,9 +475,11 @@ class ClaudeVisionExtractor:
 
         try:
             client = anthropic.Anthropic(api_key=api_key)
+            # Ni temperature, ni top_p, ni top_k : refusés (erreur 400) par Opus 5.
             response = client.messages.create(
                 model=model,
-                max_tokens=4096,
+                max_tokens=getattr(Config, 'CLAUDE_MAX_TOKENS', 16000),
+                **parametres,
                 messages=[{
                     'role': 'user',
                     'content': [
@@ -425,7 +505,27 @@ class ClaudeVisionExtractor:
             })
             return {'success': False, 'error': f"Appel API Claude échoué : {e}"}
 
-        raw = response.content[0].text
+        raw = _texte_reponse(response)
+        usage = _consommation(response)
+        modele_servi = getattr(response, 'model', model)
+        logger.info(
+            f"Claude {modele_servi} — {image_path.name} : "
+            f"{usage['input_tokens']} tokens en entrée, {usage['output_tokens']} en sortie"
+        )
+        if response.stop_reason == 'refusal':
+            _write_api_log({
+                'ts':      datetime.datetime.now().isoformat(timespec='seconds'),
+                'image':   image_path.name,
+                'model':   modele_servi,
+                'usage':   usage,
+                'error':   'refus du modèle',
+                'success': False,
+            })
+            return {'success': False, 'error': f"Claude a refusé la page {image_path.name}"}
+        if response.stop_reason == 'max_tokens':
+            logger.warning(
+                f"Réponse tronquée (limite CLAUDE_MAX_TOKENS atteinte) : {image_path.name}"
+            )
         # Parseur pipe-séparé unique — insertion positionnelle pour tous les templates
         try:
             column_mapping = self._resoudre_mapping_segments(raw, image_path)
@@ -436,7 +536,8 @@ class ClaudeVisionExtractor:
             _write_api_log({
                 'ts':      datetime.datetime.now().isoformat(timespec='seconds'),
                 'image':   image_path.name,
-                'model':   model,
+                'model':   modele_servi,
+                'usage':   usage,
                 'error':   str(e),
                 'success': False,
             })
@@ -450,7 +551,8 @@ class ClaudeVisionExtractor:
             _write_api_log({
                 'ts':       datetime.datetime.now().isoformat(timespec='seconds'),
                 'image':    image_path.name,
-                'model':    model,
+                'model':    modele_servi,
+                'usage':    usage,
                 'raw':      raw,
                 'rows':     0,
                 'metadata': metadata,
@@ -462,16 +564,18 @@ class ClaudeVisionExtractor:
                 'error':   'Page ignorée (page de garde / modifications / sommaire)',
                 'image_path': str(image_path),
                 'detection_method': 'claude-vision',
+                'api_usage': dict(usage, model=modele_servi),
             }
 
         logger.info(
             f"✓ Claude Vision : {len(rows)} lignes depuis {image_path.name} "
-            f"(modèle {model})"
+            f"(modèle {modele_servi})"
         )
         _write_api_log({
             'ts':        datetime.datetime.now().isoformat(timespec='seconds'),
             'image':     image_path.name,
-            'model':     model,
+            'model':     modele_servi,
+            'usage':     usage,
             'raw':       raw,
             'rows':      len(rows),
             'rows_data': rows,      # données déjà parsées — utilisées par LogReplayer
@@ -486,6 +590,7 @@ class ClaudeVisionExtractor:
             'image_path':       str(image_path),
             'blur_pct':         0.0,
             'detection_method': 'claude-vision',
+            'api_usage':        dict(usage, model=modele_servi),
         }
 
 

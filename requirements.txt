@@ -43,8 +43,9 @@ ezdxf>=1.0.0
 # ── Moteurs OCR alternatifs (optionnels) ──────────────────────────────────────
 
 # Claude Vision API — activer avec OCR_MODE = "claude" dans config.py
-# Nécessite une clé API sur console.anthropic.com (~0.001 €/image avec Haiku)
-anthropic>=0.40.0
+# Nécessite une clé API sur console.anthropic.com. Version 1.x : output_config
+# (effort) et thinking requis par claude-opus-5 ; client HTTP httpx2.
+anthropic>=1.8,<2
 
 # Ollama Vision local — activer avec OCR_MODE = "ollama" dans config.py
 # Gratuit, hors ligne — nécessite Ollama installé (https://ollama.com)

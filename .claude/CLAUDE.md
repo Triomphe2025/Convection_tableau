@@ -387,6 +387,7 @@ Raccourci → `/build-exe`.
 | v1.7 | 2026-09 | Mesure de précision (outil de QA) : `python mesurer_precision.py <sortie.xlsx> <reference>` — compare à un PDF vectoriel ou un Excel de vérité terrain, alignement `difflib` + Needleman-Wunsch, pieds de page en paires LIBELLÉ:valeur libres, historique `mesures.csv` (`mesure_precision.py`, seuils `MESURE_*` dans `config.py`) |
 | v1.7 | 2026-09 | Routage PDF par page (modes vision) : texte vectoriel → lecture exacte de la couche texte en grille, sans appel API (`pdf_extractor.classer_page`/`extract_page_grille`) ; couche OCR invisible et scan → pipeline OCR ; `PDF_ROUTAGE_VECTORIEL` dans `config.py` (False = v1.7). 223400PE137.pdf : 0 appel API au lieu de 53 |
 | v1.7 | 2026-09 | Routage PDF étendu à tous les modes (tesseract/docling compris) : couche OCR invisible (Paper Capture) ignorée → repli image ; images cumulées ≥ `PDF_SEUIL_IMAGE` (10 %) → pipeline scan, sinon page ignorée avec motif journalisé ; lignes de section « NOM DU CABLE » reconnues dans la grille. 223111PE011 complet : 25 pages vectorielles / 104 couche invisible |
+| v1.7 | 2026-09 | Modes claude et hybrid sur `claude-opus-5` : réflexion (`CLAUDE_THINKING`) et effort (`CLAUDE_EFFORT`) configurables, `max_tokens` 16000, lecture des seuls blocs texte (le 1er bloc peut être de la réflexion), images en PNG ≤ 2576 px, modèle et tokens journalisés par page ; SDK `anthropic` 1.8 |
 
 ---
 

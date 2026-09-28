@@ -25,7 +25,12 @@ Config.TESSERACT_PATH   # référencer uniquement
 | `IMAGES_FOLDER_NAME` | `VD23111 PE 162` | Nom du dossier de sortie des images |
 | `OCR_MODE` | `tesseract` | Mode OCR par défaut |
 | `CLAUDE_API_KEY` | `""` | Clé API Anthropic |
-| `CLAUDE_AGENT_SESSION_ID` | `""` | ID session agent |
+| `CLAUDE_AGENT_SESSION_ID` | `""` | ID session agent (le modèle de l'agent se règle côté Anthropic) |
+| `CLAUDE_OCR_MODEL` | `claude-opus-5` | Modèle des modes claude et hybrid (`claude-haiku-4-5-20251001`, `claude-sonnet-5`, `claude-opus-5`, `claude-fable-5-1`) |
+| `CLAUDE_THINKING` | `disabled` | Réflexion : `disabled` ou `adaptive` (Fable 5.1 exige `adaptive`) |
+| `CLAUDE_EFFORT` | `high` | `low`…`max` ; `xhigh`/`max` refusés si la réflexion est désactivée |
+| `CLAUDE_MAX_TOKENS` | `16000` | Limite de la réponse, réflexion comprise |
+| `CLAUDE_IMAGE_MAX_PX` | `2576` | Grand côté maximal des images envoyées à Claude (PNG) |
 
 ## Vérification de conversion (section « VÉRIFICATION DE CONVERSION »)
 
