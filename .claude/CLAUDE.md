@@ -390,6 +390,7 @@ Raccourci → `/build-exe`.
 | v1.7 | 2026-09 | Modes claude et hybrid sur `claude-opus-5` : réflexion (`CLAUDE_THINKING`) et effort (`CLAUDE_EFFORT`) configurables, `max_tokens` 16000, lecture des seuls blocs texte (le 1er bloc peut être de la réflexion), images en PNG ≤ 2576 px, modèle et tokens journalisés par page ; SDK `anthropic` 1.8 |
 | v1.7 | 2026-09 | Modèle par défaut `claude-opus-5-5`, effort `medium` ; table `CLAUDE_CAPACITES_MODELES` (champ thinking envoyé ou omis, effort envoyé ou non, par modèle ; modèle absent → refus avant l'appel) ; refus du modèle journalisé avec sa catégorie |
 | v1.7 | 2026-09 | Grille PDF : mots placés d'après leur propre x au pas de la page (espace isolé dans un span à part retrouvé, police réduite alignée) — défaut hérité de outils_reference/grille.py ; pages à cadre inchangées |
+| v1.7 | 2026-09 | `campagne_mesure.py` : campagne de mesure des modèles Claude (surcharge en mémoire, sortie dans `mesures/`, historique `mesures/campagne.csv`, coût estimé par `CLAUDE_PRIX_MODELES`, plafond `CAMPAGNE_BUDGET_MAX_USD`) ; garde-fou de troncature (max_tokens 64000 à effort xhigh/max, réponse tronquée = page en erreur) |
 
 ---
 

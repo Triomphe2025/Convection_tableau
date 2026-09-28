@@ -31,6 +31,8 @@ Config.TESSERACT_PATH   # référencer uniquement
 | `CLAUDE_THINKING` | `disabled` | Réflexion des modèles où elle se règle : `disabled` ou `adaptive` |
 | `CLAUDE_EFFORT` | `medium` | `low`…`max` ; `xhigh`/`max` refusés si la réflexion est envoyée désactivée |
 | `CLAUDE_MAX_TOKENS` | `16000` | Limite de la réponse, réflexion comprise |
+| `CLAUDE_PRIX_MODELES` | table | Prix $ par million de tokens (entrée, sortie) par modèle, pour `campagne_mesure.py` |
+| `CAMPAGNE_BUDGET_MAX_USD` | `10` | Plafond d'une campagne : arrêt avant un passage si le coût cumulé l'atteint |
 | `CLAUDE_MAX_TOKENS_EFFORT_ELEVE` | `64000` | Limite à effort `xhigh`/`max` (appel en streaming) ; une réponse tronquée met toujours la page en erreur |
 | `CLAUDE_IMAGE_MAX_PX` | `2576` | Grand côté maximal des images envoyées à Claude (PNG) |
 

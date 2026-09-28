@@ -175,6 +175,19 @@ version Git, chiffres) à chaque exécution.
 
 Les seuils se règlent dans `config.py` (section « MESURE DE PRÉCISION »).
 
+### Campagne de mesure des modèles Claude (appelle l'API, coût réel)
+
+```bash
+export ANTHROPIC_API_KEY=...   # jamais écrite dans un fichier
+env/Scripts/python.exe campagne_mesure.py --modele claude-opus-5-5 --effort medium --passages 2
+```
+
+Chaque passage convertit l'extrait 223111PE011 (par défaut) avec ce modèle et cet effort
+(`--effort aucun` : effort non envoyé), sans modifier `config.py`, range la sortie dans
+`mesures/<modele>_<effort>_<n>/`, la mesure contre la vérité et ajoute une ligne à
+`mesures/campagne.csv` (cellules fausses par catégorie, tokens, coût estimé, durée). La
+campagne s'arrête avant un passage si le coût cumulé atteint `CAMPAGNE_BUDGET_MAX_USD`.
+
 ---
 
 ## Compiler en exécutable (.exe)
@@ -193,7 +206,7 @@ Toujours tester l'exe sur une machine sans Python installé avant livraison.
 
 ```powershell
 env\Scripts\python.exe -m pytest tests\ -v
-# 670 tests passent, 0 échec (+ 1 échec attendu documenté, + 1 test lent facultatif)
+# 686 tests passent, 0 échec (+ 1 échec attendu documenté, + 1 test lent facultatif)
 ```
 
 ---

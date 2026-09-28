@@ -383,6 +383,21 @@ class Config:
     # limite met toujours la page en erreur, jamais acceptée en silence.
     CLAUDE_MAX_TOKENS_EFFORT_ELEVE = 64000
 
+    # Prix en dollars par million de tokens (entrée, sortie), pour estimer le coût
+    # d'une campagne de mesure (campagne_mesure.py). Les tokens de réflexion sont
+    # facturés comme des tokens de sortie.
+    CLAUDE_PRIX_MODELES = {
+        "claude-haiku-4-5-20251001": (1.0, 5.0),
+        "claude-sonnet-5":           (2.0, 10.0),
+        "claude-opus-5":             (5.0, 25.0),
+        "claude-opus-5-5":           (4.0, 20.0),
+        "claude-fable-5-1":          (10.0, 50.0),
+    }
+
+    # Plafond de dépense d'une campagne de mesure : la campagne s'arrête avant
+    # un passage si le coût cumulé l'a atteint.
+    CAMPAGNE_BUDGET_MAX_USD = 10.0
+
     # Grand côté maximal (px) des images envoyées à Claude : au-delà, l'image
     # est réduite avant l'envoi (limite de résolution des modèles actuels).
     CLAUDE_IMAGE_MAX_PX = 2576
