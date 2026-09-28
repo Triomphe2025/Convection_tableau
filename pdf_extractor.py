@@ -117,52 +117,89 @@ def motif_page_ignoree(diagnostic: Dict) -> str:
 def grille_page(page) -> List[str]:
     """Reconstruit une page de texte vectoriel en lignes à positions exactes.
 
-    Port de outils_reference/grille.py : le pas (largeur d'un caractère) est
-    mesuré sur les origines des caractères, colonne = round((x - x0) / pas),
-    chaque span est posé à sa colonne de départ. Écart assumé : les spans
-    sont regroupés en lignes avec une tolérance en y (Config.PDF_GRILLE_
-    TOLERANCE_Y) plutôt que par round(y) — une cellule posée 0,7 pt plus haut
-    que sa ligne (223400PE137 page 38) formait sinon une ligne à elle seule.
+    Chaque MOT est placé d'après sa propre coordonnée x, avec le pas (largeur
+    d'un caractère) mesuré sur toute la page — et non plus en comptant les
+    caractères d'un span depuis son début, comme outils_reference/grille.py,
+    ce qui faisait deux erreurs sur 223400PE137 :
+    - un espace isolé dans son propre span était absorbé (« VERSPCC » au lieu
+      de « VERS PCC », lignes 1769N, 1829N, 1843N) ;
+    - un span en police plus petite (10,08 au lieu de 11,04, « D_T 02A »)
+      décalait d'une colonne les mots qui le suivent.
+    Placement : le 1er mot d'un span à colonne = round((x - x0) / pas), valeur
+    identique d'une ligne à l'autre pour un même x ; les mots suivants du span
+    à partir de ce début, avec le même pas. Placer chaque mot en absolu fait
+    basculer d'une colonne les x situés pile entre deux colonnes (les champs
+    ne sont pas sur une grille commune : ABOUTISSANT à 34,50 colonnes du
+    TENANT), ce qui collait « G21DU » et désalignait « D_S 01B ». Un vide d'au
+    moins un demi-caractère entre deux spans garde au moins un espace.
+    Les mots sont regroupés en lignes avec une tolérance en y
+    (Config.PDF_GRILLE_TOLERANCE_Y) plutôt que par round(y) : un TENANT posé
+    0,7 pt plus haut que sa ligne formait sinon une ligne à lui seul.
     """
     from collections import Counter
     from config import Config
 
-    spans = []
+    # Un mot : (y du span, x du 1er caractère, x du dernier, texte, n° de span,
+    # x de début du span).
+    mots: List[Tuple[float, float, float, str, int, float]] = []
+    ecarts: Counter = Counter()
+    largeurs: Counter = Counter()
+    num_span = 0
     for bloc in page.get_text('rawdict')['blocks']:
         for ligne in bloc.get('lines', []):
             for span in ligne['spans']:
                 caracteres = span['chars']
-                texte = ''.join(c['c'] for c in caracteres)
-                if not texte.strip('_ '):
+                if not caracteres:
                     continue
+                num_span += 1
                 xs = [c['origin'][0] for c in caracteres]
-                if len(xs) > 1:
-                    pas = Counter(round(b - a, 2) for a, b in zip(xs, xs[1:])).most_common(1)[0][0]
-                else:
-                    pas = round(caracteres[0]['bbox'][2] - caracteres[0]['bbox'][0], 2)
-                spans.append((span['origin'][1], xs[0], pas, texte))
-    if not spans:
+                ecarts.update(round(b - a, 2) for a, b in zip(xs, xs[1:]))
+                largeurs.update(round(c['bbox'][2] - c['bbox'][0], 2) for c in caracteres)
+                y = span['origin'][1]
+                courant, x_mot, x_dernier = '', None, None
+                for c in caracteres + [{'c': ' ', 'origin': (0, 0)}]:
+                    if c['c'].isspace():
+                        # Un mot fait uniquement de « _ » est un trait de cadre.
+                        if courant and courant.strip('_'):
+                            mots.append((y, x_mot, x_dernier, courant, num_span, xs[0]))
+                        courant, x_mot = '', None
+                    else:
+                        if not courant:
+                            x_mot = c['origin'][0]
+                        courant += c['c']
+                        x_dernier = c['origin'][0]
+    if not mots:
         return []
 
-    pas_page = Counter(s[2] for s in spans if s[2] > 0).most_common(1)[0][0]
-    x0 = min(s[1] for s in spans)
+    positifs = [(pas, n) for pas, n in ecarts.most_common() if pas > 0]
+    # Repli si la page n'a que des mots d'un caractère : largeur d'un caractère.
+    pas_page = positifs[0][0] if positifs else largeurs.most_common(1)[0][0]
+    x0 = min(m[1] for m in mots)
 
-    groupes: List[List[Tuple[float, str]]] = []
+    groupes: List[List[Tuple[float, float, str, int, float]]] = []
     y_groupe = None
-    for y, x, _, texte in sorted(spans):
+    for y, x, x_der, texte, span, x_span in sorted(mots, key=lambda m: (m[0], m[1])):
         if y_groupe is None or y - y_groupe > Config.PDF_GRILLE_TOLERANCE_Y:
             groupes.append([])
             y_groupe = y
-        groupes[-1].append((x, texte))
+        groupes[-1].append((x, x_der, texte, span, x_span))
 
     sortie = []
     for groupe in groupes:
         ligne: List[str] = []
-        for x, texte in sorted(groupe):
-            k = round((x - x0) / pas_page)
+        debut_span: Dict[int, int] = {}
+        fin_prec, x_der_prec = None, None
+        for x, x_der, texte, span, x_span in sorted(groupe):
+            if span not in debut_span:
+                debut_span[span] = round((x_span - x0) / pas_page)
+            k = debut_span[span] + round((x - x_span) / pas_page)
+            if fin_prec is not None:
+                vide = (x - (x_der_prec + pas_page)) / pas_page
+                k = max(k, fin_prec + (2 if vide >= 0.5 else 1))
             if len(ligne) < k:
                 ligne += [' '] * (k - len(ligne))
             ligne[k:k + len(texte)] = list(texte)
+            fin_prec, x_der_prec = k + len(texte) - 1, x_der
         sortie.append(''.join(ligne).rstrip())
     return sortie
 

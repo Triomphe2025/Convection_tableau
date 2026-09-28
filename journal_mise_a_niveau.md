@@ -190,6 +190,36 @@ Contrôles mesurés :
 Le test « 10 pages sur 10 » demandé à l'étape 3 est écrit en « 9 pages sur 10, la page 104
 n'ayant pas de ligne » (`test_extrait_toutes_les_pages_a_tableau_produisent_des_lignes`).
 
+### Grille : défaut hérité de outils_reference/grille.py — corrigé (2026-09-28)
+
+Signalé en construisant la vérité TP2 v3 ; présent aussi dans `pdf_extractor.grille_page`.
+`grille.py` posait chaque span à sa colonne de départ puis comptait ses caractères :
+- un espace isolé dans son propre span était absorbé : « VERSPCC », « DUPCC »,
+  « COURSCYCL » (lignes 1769N, 1829N, 1843N) ;
+- un span en police 10,08 au lieu de 11,04 (« D_T 02A », « D_T 01B », « D_S 01B ») gardait
+  ses 8 espaces alors que son 2e champ est visuellement en colonne 10.
+
+Correction : chaque mot placé d'après sa propre x, pas mesuré sur la page. Le placement
+tout-absolu demandé (colonne = round((x - x0) / pas) pour chaque mot) créait deux
+régressions mesurées, faute de grille commune aux champs (ABOUTISSANT à 34,50 colonnes du
+TENANT, JAR à 24,51) : « PHONIE RAME G21DU PCC » (espace perdu) et « D_S 01B » désaligné
+d'une colonne. Retenu : 1er mot d'un span en absolu, mots suivants du span à partir du début
+du span avec le pas de la page, et au moins un espace entre deux spans séparés d'un
+demi-caractère ou plus.
+
+| Contrôle | Résultat |
+|----------|----------|
+| 45 pages à cadre de 223400PE137 (8 796 cellules de données) | aucune cellule changée |
+| 6A23111PE102 final (13 pages) | aucune cellule changée |
+| Pages TP2 (32, 33, 49) | 6 lignes changées, toutes voulues : 3 espaces retrouvés, « D_T 02A », « D_T 01B », « D_S 01B » au pas de la page |
+| 223400PE137 contre le PDF | 9 460 / 9 460 cellules, 0 position fausse (PAGE 36 écartée par `MIN_DATA_ROWS`) |
+
+**En attente** : la vérité TP2 v3 n'est pas sur le disque (le fichier présent est l'ancien :
+« VERSPCC », 1845N et 1847N absents). Contre lui, 9 écarts, tous dus à ces défauts. Limite de
+l'outil de mesure : il réduit les espaces multiples dans une cellule avant de comparer ; un
+écart d'espacement intérieur (« D_T       02A » contre « D_T        02A ») n'y est pas visible,
+seuls les tests de la grille le vérifient.
+
 ### Reste ouvert
 
 - **Qualité du repli image Tesseract** sur les pages Paper Capture : lignes lues en réel,

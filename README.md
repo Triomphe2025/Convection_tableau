@@ -193,7 +193,7 @@ Toujours tester l'exe sur une machine sans Python installé avant livraison.
 
 ```powershell
 env\Scripts\python.exe -m pytest tests\ -v
-# 646 tests passent, 0 échec (+ 1 échec attendu documenté, + 1 test lent facultatif)
+# 653 tests passent, 0 échec (+ 1 échec attendu documenté, + 1 test lent facultatif)
 ```
 
 ---

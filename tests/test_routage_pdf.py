@@ -219,6 +219,33 @@ class TestGrillePage(unittest.TestCase):
         self.assertEqual(pe.grille_page(doc.new_page()), [])
         doc.close()
 
+    def test_espace_dans_un_span_a_part_conserve(self):
+        # Cas réel 1769N : le span « …VERS » commence à une demi-colonne près
+        # (3,53 colonnes) et « PCC », posé à sa propre x, tombe à 8,49 : compter
+        # les caractères depuis le début du span collait « VERSPCC ».
+        doc = fitz.open()
+        page = doc.new_page(width=400, height=200)
+        pas = fitz.get_text_length('A', fontname='cour', fontsize=10)
+        page.insert_text((72, 88), 'X', fontname='cour', fontsize=10)   # fixe x0
+        page.insert_text((72 + 3.53 * pas, 100), 'VERS', fontname='cour', fontsize=10)
+        page.insert_text((72 + 8.49 * pas, 100), 'PCC', fontname='cour', fontsize=10)
+        self.assertEqual(pe.grille_page(page)[1].strip(), 'VERS PCC')
+        doc.close()
+
+    def test_span_en_petite_police_place_au_pas_de_la_page(self):
+        # Police 10 majoritaire (comme 11,04 sur PE137) ; un span en police 9 :
+        # « 02A » doit tomber sous la colonne 10 des lignes de référence, pas
+        # après 11 caractères comptés dans sa propre police.
+        doc = fitz.open()
+        page = doc.new_page(width=400, height=200)
+        for k in range(4):
+            page.insert_text((72, 60 + 12 * k), 'PJ        29', fontname='cour', fontsize=10)
+        page.insert_text((72, 112), 'D_T        02A', fontname='cour', fontsize=9)
+        lignes = pe.grille_page(page)
+        self.assertEqual(lignes[0].index('29'), 10)
+        self.assertEqual(lignes[-1].index('02A'), 10)
+        doc.close()
+
 
 class TestPositionsEntete(unittest.TestCase):
 
@@ -289,7 +316,23 @@ class TestExtractPageGrille(unittest.TestCase):
 
     def test_page_tp2_cellule_decalee_recollee_a_sa_ligne(self):
         cellules = [row['cells'] for row in self._lire(38)['rows']]
-        self.assertIn(['D_T        01B', '1847N', 'ER        06', 'TS MACH LAV COUP HT'], cellules)
+        # « D_T 01B » est en police 10,08 : « 01B » est visuellement en colonne 10.
+        self.assertIn(['D_T       01B', '1847N', 'ER        06', 'TS MACH LAV COUP HT'], cellules)
+
+    def test_page_tp2_espaces_entre_spans_conserves(self):
+        cellules_37 = [row['cells'] for row in self._lire(37)['rows']]
+        cellules_38 = [row['cells'] for row in self._lire(38)['rows']]
+        self.assertIn('PHONIE RAME RAC VERS PCC', [c[3] for c in cellules_37])
+        self.assertIn('PHONIE RAME G21 DU PCC', [c[3] for c in cellules_37])
+        self.assertIn('TM/TC RAME G22 DU PCC', [c[3] for c in cellules_38])
+        self.assertIn('TS MACH LAV EN COURS CYCL', [c[3] for c in cellules_38])
+
+    def test_page_tp2_petite_police_alignee_sur_les_lignes_voisines(self):
+        cellules = [row['cells'] for row in self._lire(38)['rows']]
+        self.assertIn(['D_T       02A', '1845N', 'ER        13', 'TS MACH LAV COUP HT'], cellules)
+        self.assertIn(
+            ['PH        07', '1846N', 'D_S       01B', 'COMMUN +24V MACH A LAVER'], cellules,
+        )
 
     def test_page_tp2_pet_malgre_les_espaces(self):
         self.assertEqual(self._lire(37)['metadata'].get('PET'), 'GRAND-BUT')
