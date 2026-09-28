@@ -26,6 +26,7 @@ import unittest
 from pathlib import Path
 
 import fitz
+import pytest
 
 from claude_ocr import LogReplayer
 from config import Config
@@ -97,14 +98,15 @@ class TestCasReelScanContreJournalClaude(unittest.TestCase):
         self.assertLessEqual(len(self.rapport.a_verifier), 65)
         self.assertGreaterEqual(self.rapport.concordance, 0.90)
 
-    @unittest.expectedFailure
+    @pytest.mark.xfail(
+        reason="cibles non atteintes, a corriger au debut de l'etape 8", strict=True,
+    )
     def test_criteres_du_cahier_des_charges(self):
         """Cibles : au plus 20 alertes, concordance >= 98 %. Non atteintes à ce jour.
 
-        Le bruit restant vient du scan relu par Tesseract (mots omis, lignes de
-        pied de page lues comme données) et de vrais défauts de la conversion
-        (lettre de couleur collée dans SIGNAL). Quand la cible sera atteinte,
-        ce test « réussira » et fera échouer la suite : retirer alors le décorateur.
+        Cibles maintenues : outils_reference/pdf_table_compare.py les atteint sur le
+        même couple de fichiers (98,89 %, 17 cellules). Quand elles seront atteintes,
+        strict=True fera échouer la suite : retirer alors le marquage.
         """
         self.assertLessEqual(len(self.rapport.a_verifier), 20)
         self.assertGreaterEqual(self.rapport.concordance, 0.98)
