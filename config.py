@@ -377,6 +377,12 @@ class Config:
     # Limite de tokens de la réponse (la réflexion, si active, compte dedans).
     CLAUDE_MAX_TOKENS = 16000
 
+    # Limite portée à cette valeur quand CLAUDE_EFFORT vaut "xhigh" ou "max"
+    # (recommandation Anthropic : ≥ 64000) ; l'appel passe alors en streaming,
+    # que le SDK exige au-delà de ~21 000 tokens. Une réponse coupée par la
+    # limite met toujours la page en erreur, jamais acceptée en silence.
+    CLAUDE_MAX_TOKENS_EFFORT_ELEVE = 64000
+
     # Grand côté maximal (px) des images envoyées à Claude : au-delà, l'image
     # est réduite avant l'envoi (limite de résolution des modèles actuels).
     CLAUDE_IMAGE_MAX_PX = 2576

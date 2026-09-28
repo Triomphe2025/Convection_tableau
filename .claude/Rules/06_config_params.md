@@ -31,6 +31,7 @@ Config.TESSERACT_PATH   # référencer uniquement
 | `CLAUDE_THINKING` | `disabled` | Réflexion des modèles où elle se règle : `disabled` ou `adaptive` |
 | `CLAUDE_EFFORT` | `medium` | `low`…`max` ; `xhigh`/`max` refusés si la réflexion est envoyée désactivée |
 | `CLAUDE_MAX_TOKENS` | `16000` | Limite de la réponse, réflexion comprise |
+| `CLAUDE_MAX_TOKENS_EFFORT_ELEVE` | `64000` | Limite à effort `xhigh`/`max` (appel en streaming) ; une réponse tronquée met toujours la page en erreur |
 | `CLAUDE_IMAGE_MAX_PX` | `2576` | Grand côté maximal des images envoyées à Claude (PNG) |
 
 ## Vérification de conversion (section « VÉRIFICATION DE CONVERSION »)

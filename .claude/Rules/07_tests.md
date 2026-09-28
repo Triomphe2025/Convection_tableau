@@ -73,7 +73,7 @@ tests/
   test_claude_opus5.py               → claude_ocr sur Opus 5 / 5.5 : table de capacités, paramètres envoyés, refus avec catégorie, bloc de réflexion, effort refusé, images PNG ≤ 2576 px
 ```
 
-**663 tests passent** (`pytest tests\`, relevé le 2026-09-28), plus 1 échec attendu documenté
+**670 tests passent** (`pytest tests\`, relevé le 2026-09-28), plus 1 échec attendu documenté
 (`test_criteres_du_cahier_des_charges` du vérificateur, cibles chiffrées non atteintes) et 1 test lent facultatif
 (`VERIF_TEST_LENT=1`, relecture Tesseract de 15 pages). Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.

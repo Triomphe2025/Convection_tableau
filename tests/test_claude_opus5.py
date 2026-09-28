@@ -49,7 +49,8 @@ class _ConfigClaude(unittest.TestCase):
 
     def setUp(self):
         noms = ('CLAUDE_OCR_MODEL', 'CLAUDE_THINKING', 'CLAUDE_EFFORT',
-                'CLAUDE_API_KEY', 'CLAUDE_MAX_TOKENS', 'CLAUDE_IMAGE_MAX_PX')
+                'CLAUDE_API_KEY', 'CLAUDE_MAX_TOKENS', 'CLAUDE_IMAGE_MAX_PX',
+                'CLAUDE_MAX_TOKENS_EFFORT_ELEVE')
         self._sauve = {n: getattr(Config, n) for n in noms}
         Config.CLAUDE_OCR_MODEL = 'claude-opus-5'
         Config.CLAUDE_THINKING = 'disabled'
@@ -57,6 +58,7 @@ class _ConfigClaude(unittest.TestCase):
         Config.CLAUDE_API_KEY = 'cle-de-test'
         Config.CLAUDE_MAX_TOKENS = 16000
         Config.CLAUDE_IMAGE_MAX_PX = 2576
+        Config.CLAUDE_MAX_TOKENS_EFFORT_ELEVE = 64000
 
     def tearDown(self):
         for nom, valeur in self._sauve.items():
@@ -155,6 +157,19 @@ class TestParametresModele(_ConfigClaude):
             co._parametres_modele('claude-opus-5')
 
 
+class TestLimiteTokens(_ConfigClaude):
+
+    def test_effort_normal(self):
+        self.assertEqual(co._limite_tokens({'output_config': {'effort': 'high'}}), 16000)
+
+    def test_effort_eleve(self):
+        for effort in ('xhigh', 'max'):
+            self.assertEqual(co._limite_tokens({'output_config': {'effort': effort}}), 64000)
+
+    def test_sans_effort_haiku(self):
+        self.assertEqual(co._limite_tokens({}), 16000)
+
+
 class TestPreparerImageClaude(unittest.TestCase):
 
     def _decoder(self, donnees):
@@ -185,18 +200,34 @@ class TestPreparerImageClaude(unittest.TestCase):
             co._preparer_image_claude(Path('absent.png'), 2576)
 
 
+class _FauxFlux:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def get_final_message(self):
+        return FauxClient.reponse
+
+
 class FauxClient:
     """Remplace anthropic.Anthropic : enregistre la requête, renvoie une réponse fixée."""
 
     appels = []
+    flux = []
     reponse = None
 
     def __init__(self, api_key=None):
-        self.messages = SimpleNamespace(create=self._create)
+        self.messages = SimpleNamespace(create=self._create, stream=self._stream)
 
     def _create(self, **kwargs):
         FauxClient.appels.append(kwargs)
         return FauxClient.reponse
+
+    def _stream(self, **kwargs):
+        FauxClient.flux.append(kwargs)
+        return _FauxFlux()
 
 
 class TestExtractOpus5(_ConfigClaude):
@@ -204,6 +235,7 @@ class TestExtractOpus5(_ConfigClaude):
     def setUp(self):
         super().setUp()
         FauxClient.appels = []
+        FauxClient.flux = []
         FauxClient.reponse = _reponse([_bloc_reflexion(), _bloc_texte(REPONSE_PIPE)])
         self._tmp = tempfile.TemporaryDirectory()
         self.image = _image_temp(self._tmp.name, (4000, 3000))
@@ -279,6 +311,35 @@ class TestExtractOpus5(_ConfigClaude):
         appel = FauxClient.appels[0]
         self.assertNotIn('thinking', appel)
         self.assertEqual(appel['output_config'], {'effort': 'high'})
+
+    def test_reponse_tronquee_page_en_erreur(self):
+        FauxClient.reponse = _reponse(
+            [_bloc_texte(REPONSE_PIPE.split('META')[0])], stop_reason='max_tokens')
+        with (patch('anthropic.Anthropic', FauxClient),
+              patch.object(co, '_write_api_log') as journal):
+            r = self.ex.extract(self.image)
+        self.assertFalse(r['success'])
+        self.assertIn('tronquée', r['error'])
+        self.assertEqual(journal.call_args[0][0]['error'], 'reponse tronquee')
+
+    def test_effort_max_porte_max_tokens_a_64000_en_streaming(self):
+        Config.CLAUDE_OCR_MODEL, Config.CLAUDE_EFFORT = 'claude-opus-5-5', 'max'
+        r = self._extraire()
+        self.assertTrue(r['success'], r.get('error'))
+        self.assertEqual(FauxClient.appels, [])
+        self.assertEqual(FauxClient.flux[0]['max_tokens'], 64000)
+        self.assertEqual(FauxClient.flux[0]['output_config'], {'effort': 'max'})
+
+    def test_effort_xhigh_porte_aussi_a_64000(self):
+        Config.CLAUDE_OCR_MODEL, Config.CLAUDE_EFFORT = 'claude-opus-5-5', 'xhigh'
+        self._extraire()
+        self.assertEqual(FauxClient.flux[0]['max_tokens'], 64000)
+
+    def test_effort_medium_garde_16000_sans_streaming(self):
+        Config.CLAUDE_OCR_MODEL, Config.CLAUDE_EFFORT = 'claude-opus-5-5', 'medium'
+        self._extraire()
+        self.assertEqual(FauxClient.flux, [])
+        self.assertEqual(FauxClient.appels[0]['max_tokens'], 16000)
 
     def test_modele_inconnu_refuse_sans_appel(self):
         Config.CLAUDE_OCR_MODEL = 'claude-inconnu'

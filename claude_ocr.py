@@ -113,6 +113,15 @@ def _parametres_modele(model: str) -> dict:
     return parametres
 
 
+def _limite_tokens(parametres: dict) -> int:
+    """max_tokens de la requête : relevé à effort xhigh / max (réponse plus longue)."""
+    from config import Config
+    effort = parametres.get('output_config', {}).get('effort')
+    if effort in ('xhigh', 'max'):
+        return getattr(Config, 'CLAUDE_MAX_TOKENS_EFFORT_ELEVE', 64000)
+    return getattr(Config, 'CLAUDE_MAX_TOKENS', 16000)
+
+
 def _texte_reponse(response) -> str:
     """Concatène les blocs texte : le premier bloc peut être un bloc de réflexion."""
     return ''.join(b.text for b in response.content if b.type == 'text')
@@ -482,28 +491,36 @@ class ClaudeVisionExtractor:
         else:
             prompt = _build_prompt(self._tpl)
 
+        max_tokens = _limite_tokens(parametres)
+        requete = dict(
+            model=model,
+            max_tokens=max_tokens,
+            **parametres,
+            messages=[{
+                'role': 'user',
+                'content': [
+                    {
+                        'type': 'image',
+                        'source': {
+                            'type':       'base64',
+                            'media_type': media_type,
+                            'data':       image_data,
+                        },
+                    },
+                    {'type': 'text', 'text': prompt},
+                ],
+            }],
+        )
         try:
             client = anthropic.Anthropic(api_key=api_key)
             # Ni temperature, ni top_p, ni top_k : refusés (erreur 400) par Opus 5.
-            response = client.messages.create(
-                model=model,
-                max_tokens=getattr(Config, 'CLAUDE_MAX_TOKENS', 16000),
-                **parametres,
-                messages=[{
-                    'role': 'user',
-                    'content': [
-                        {
-                            'type': 'image',
-                            'source': {
-                                'type':       'base64',
-                                'media_type': media_type,
-                                'data':       image_data,
-                            },
-                        },
-                        {'type': 'text', 'text': prompt},
-                    ],
-                }],
-            )
+            if max_tokens > getattr(Config, 'CLAUDE_MAX_TOKENS', 16000):
+                # Le SDK refuse sans streaming une requête estimée à plus de 10 min
+                # (au-delà de ~21 000 tokens) ; le message final est le même objet.
+                with client.messages.stream(**requete) as flux:
+                    response = flux.get_final_message()
+            else:
+                response = client.messages.create(**requete)
         except Exception as e:
             _write_api_log({
                 'ts':      datetime.datetime.now().isoformat(timespec='seconds'),
@@ -545,9 +562,28 @@ class ClaudeVisionExtractor:
                 'api_usage': dict(usage, model=modele_servi),
             }
         if response.stop_reason == 'max_tokens':
-            logger.warning(
-                f"Réponse tronquée (limite CLAUDE_MAX_TOKENS atteinte) : {image_path.name}"
+            # Les dernières lignes de la page manqueraient sans que rien ne le signale.
+            logger.error(
+                f"Réponse tronquée (limite de {max_tokens} tokens atteinte) : {image_path.name}"
             )
+            _write_api_log({
+                'ts':         datetime.datetime.now().isoformat(timespec='seconds'),
+                'image':      image_path.name,
+                'model':      modele_servi,
+                'usage':      usage,
+                'max_tokens': max_tokens,
+                'raw':        raw,
+                'error':      'reponse tronquee',
+                'success':    False,
+            })
+            return {
+                'success': False,
+                'error': (
+                    f"Réponse tronquée pour {image_path.name} : limite de {max_tokens} "
+                    "tokens atteinte, page non convertie"
+                ),
+                'api_usage': dict(usage, model=modele_servi),
+            }
         # Parseur pipe-séparé unique — insertion positionnelle pour tous les templates
         try:
             column_mapping = self._resoudre_mapping_segments(raw, image_path)
