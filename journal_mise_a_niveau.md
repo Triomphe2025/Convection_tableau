@@ -214,11 +214,28 @@ demi-caractère ou plus.
 | Pages TP2 (32, 33, 49) | 6 lignes changées, toutes voulues : 3 espaces retrouvés, « D_T 02A », « D_T 01B », « D_S 01B » au pas de la page |
 | 223400PE137 contre le PDF | 9 460 / 9 460 cellules, 0 position fausse (PAGE 36 écartée par `MIN_DATA_ROWS`) |
 
-**En attente** : la vérité TP2 v3 n'est pas sur le disque (le fichier présent est l'ancien :
-« VERSPCC », 1845N et 1847N absents). Contre lui, 9 écarts, tous dus à ces défauts. Limite de
-l'outil de mesure : il réduit les espaces multiples dans une cellule avant de comparer ; un
-écart d'espacement intérieur (« D_T       02A » contre « D_T        02A ») n'y est pas visible,
-seuls les tests de la grille le vérifient.
+**Vérité TP2 v3 (2026-09-28)** — `tests/fixtures/223400PE137_TP2_verite.xlsx`, méthode
+indépendante (chaque mot à sa x réelle, bornes de colonnes en points). Vérifié : 167 lignes
+(55 + 56 + 56), 2e champ du TENANT en colonne 10 sur les 167, 7 espaces dans « D_T 02A »,
+« D_T 01B », « D_S 01B ».
+
+Positions : une vérité xlsx fait désormais foi aussi pour les positions — ses lignes sont
+`exact`, les colonnes de début des sous-champs sont comparées (comme contre un PDF).
+
+| Mesure 223400PE137, pages TP2, contre la vérité v3 | Résultat |
+|----------------------------------------------------|----------|
+| Cellules | **668 / 668** identiques |
+| Positions fausses | **0** |
+| Pieds de page faux | 0 |
+| Lignes orphelines | 0 |
+
+Test doré `tests/test_mesurer_precision_tp2_golden.py` (grille → Excel → relecture → mesure,
+sans OCR) : il échoue si « D_T       02A » devient « D_T        02A » (écart de position
+TENANT (0, 10) → (0, 11)). Sur 223111PE011, la comparaison des positions n'ajoute aucun écart.
+
+Fixtures : `223400PE135.pdf` et `223400PE136.pdf` étaient inversés ; noms échangés. PE135 :
+189 pages (FIL / TENANT / ABOUTISSANT) ; PE136 : 389 pages (BORNE / COULEUR / JARRETIERES) ;
+tous deux exportés de Word, texte vectoriel.
 
 ### Reste ouvert
 

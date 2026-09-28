@@ -159,6 +159,15 @@ class TestLireVeriteExcel(unittest.TestCase):
         self.assertEqual(pages[0]['pied_texte'], [])
         chemin.unlink()
 
+    def test_espaces_conserves_et_positions_comparees(self):
+        ligne = [1, '1', 1, 'D_T       02A', '1845N', 'ER        13', 'X', None, 'X']
+        chemin = self._fabriquer([ligne])
+        pages, _ = mpr.lire_verite_excel(chemin)
+        ligne = pages[0]['rows'][0]
+        self.assertEqual(ligne['cells'][0], 'D_T       02A')
+        self.assertTrue(ligne['exact'])
+        chemin.unlink()
+
     def test_lignes_sans_page_extrait_ignorees(self):
         chemin = self._fabriquer([[None, '', '', '', '', '', '', None, '']])
         pages, _ = mpr.lire_verite_excel(chemin)

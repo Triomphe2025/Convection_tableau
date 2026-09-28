@@ -125,24 +125,32 @@ def lire_verite_excel(chemin: Path) -> Tuple[List[dict], List[str]]:
             continue
         extrait = int(valeurs[0])
         cellules = ['' if v is None else str(v) for v in valeurs[debut:fin]]
-        lignes_par_page.setdefault(extrait, []).append(
-            {'type': 'data', 'cells': cellules, 'confidence': [100] * len(cellules)},
-        )
+        # Les espaces de la vérité sont gardés tels quels et `exact` active la
+        # comparaison des colonnes de début des sous-champs : les positions de
+        # l'original font partie du résultat attendu (« D_T       02A »).
+        lignes_par_page.setdefault(extrait, []).append({
+            'type': 'data', 'cells': cellules, 'confidence': [100] * len(cellules),
+            'exact': True,
+        })
 
     pieds_par_page: dict = {}
     if 'Verite_pieds' in wb.sheetnames:
         ws_pied = wb['Verite_pieds']
         entetes_p = [str(c.value or '') for c in next(ws_pied.iter_rows(min_row=1, max_row=1))]
+        # La page est repérée par la 1re colonne, quel que soit son nom (« Page
+        # extrait », « Page PDF »…), comme dans Verite_tableaux. Les colonnes
+        # d'identification, d'annotation et la « ligne brute » (recopie pour
+        # contrôle humain) ne sont pas des libellés de pied.
+        cle_page = entetes_p[0]
         libelles = [
-            e for e in entetes_p
-            if e not in ('Page extrait', 'Page document')
-            and not re.search(r'verifier|valide', e, re.I)
+            e for e in entetes_p[1:]
+            if not re.search(r'^page\s+\w|brute|verifier|valide', e, re.I)
         ]
         for row in ws_pied.iter_rows(min_row=2):
             valeurs = {entetes_p[i]: row[i].value for i in range(len(entetes_p))}
-            if valeurs.get('Page extrait') is None:
+            if valeurs.get(cle_page) is None:
                 continue
-            extrait = int(valeurs['Page extrait'])
+            extrait = int(valeurs[cle_page])
             texte = '  '.join(
                 f"{lib.upper()} : {valeurs[lib]}"
                 for lib in libelles if valeurs.get(lib) not in (None, '')
