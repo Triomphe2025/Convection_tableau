@@ -213,6 +213,8 @@ def _build_prompt(template) -> str:
         f"Après TOUTES les lignes de données, ajoute une ligne :\n"
         f"META: {{{meta_json}}}\n"
         "avec les valeurs trouvées dans le pied de page.\n"
+        "PAGE : recopie le numéro exactement comme imprimé, lettre finale comprise"
+        " (ex : 122a, 44B) ; ne le déduis jamais des pages voisines.\n"
     )
 
 

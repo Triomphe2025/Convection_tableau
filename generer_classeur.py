@@ -179,6 +179,38 @@ def raison_page_ignoree(result: Dict, colonnes_modele, min_rows: int,
     return None
 
 
+_NUMERO_PAGE_RE = re.compile(r'(\d+)([A-Za-z]?)')
+
+
+def cle_numero_page(numero: str) -> Optional[Tuple[int, str]]:
+    """(122, 'a') pour « 122a » ; None si ce n'est pas un numéro de page lisible."""
+    m = _NUMERO_PAGE_RE.fullmatch(str(numero or '').strip())
+    if not m:
+        return None
+    return int(m.group(1)), m.group(2).lower()
+
+
+def alertes_sequence_pages(resultats: List[Dict]) -> List[str]:
+    """Alertes sur les numéros de page lus, dans l'ordre du document (jamais trié)."""
+    alertes = []
+    precedent = None
+    for r in resultats:
+        numero = str(r.get('metadata', {}).get('PAGE', '')).strip()
+        cle = cle_numero_page(numero)
+        if cle is None:
+            source = Path(r.get('image_path') or '?').name
+            alertes.append(f"numéro de page illisible ({numero or 'vide'}) : {source}")
+            continue
+        if precedent is not None:
+            if cle == precedent[0]:
+                alertes.append(f"page {numero} répétée (ordre du document conservé)")
+            elif cle < precedent[0]:
+                alertes.append(f"séquence non croissante : page {numero} après page "
+                               f"{precedent[1]} (ordre du document conservé)")
+        precedent = (cle, numero)
+    return alertes
+
+
 # ──────────────────────────────────────────────────────────────────────
 # Génération du classeur Excel combiné
 # ──────────────────────────────────────────────────────────────────────
@@ -223,28 +255,10 @@ def generer_excel(
             continue
         valides.append(r)
 
-    # ── Tri par numéro de page croissant (footer PAGE) ────────────────
-    def _page_sort_key(result: Dict) -> int:
-        page = result.get('metadata', {}).get('PAGE', '')
-        try:
-            return int(page)
-        except (ValueError, TypeError):
-            nums = re.findall(r'\d+', Path(
-                result.get('image_path', 'bornier_9999')
-            ).stem)
-            return int(nums[0]) if nums else 9999
-
-    valides.sort(key=_page_sort_key)
-
-    # Remplir PAGE manquante depuis le nom du fichier image quand l'OCR a raté
-    for result in valides:
-        meta = result.setdefault('metadata', {})
-        page = str(meta.get('PAGE', '')).strip()
-        if not page or not page.isdigit():
-            nums = re.findall(r'\d+', Path(
-                result.get('image_path', 'bornier_0')
-            ).stem)
-            meta['PAGE'] = nums[0] if nums else ''
+    # Ordre du document conservé, numéros tels que lus : un tri ou un numéro
+    # tiré du nom d'image masquerait une page manquante ou mal lue.
+    for alerte in alertes_sequence_pages(valides):
+        log(f"  ⚠ {alerte}")
 
     total = len(valides)
 
@@ -308,7 +322,8 @@ def generer_excel(
     # ── Feuille « tableaux word » (si des tableaux Word sont fournis) ──
     if word_results:
         valides_w = [r for r in word_results if r.get('success')]
-        valides_w.sort(key=_page_sort_key)
+        for alerte in alertes_sequence_pages(valides_w):
+            log(f"  ⚠ tableaux word : {alerte}")
 
         if valides_w:
             n_word = len(valides_w)

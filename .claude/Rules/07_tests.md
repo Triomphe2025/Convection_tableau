@@ -72,10 +72,11 @@ tests/
   test_routage_pdf.py                → Routage PDF par page, tous modes : classement, grille, sections, scan en bandes, pages ignorées
   test_campagne_mesure.py            → campagne_mesure.py avec un faux client : colonnes CSV, plafond, config.py intact, clé jamais écrite
   test_pages_ignorees.py             → Pages écartées du classeur (raison au journal), tableau vide CABLE : RESERVE conservé
+  test_numeros_page.py               → Numéros de page : suffixe lettre (122a, 44B), ordre du document conservé, alerte si non croissant
   test_claude_opus5.py               → claude_ocr sur Opus 5 / 5.5 : table de capacités, paramètres envoyés, refus avec catégorie, bloc de réflexion, effort refusé, images PNG ≤ 2576 px
 ```
 
-**709 tests passent** (`pytest tests\`, relevé le 2026-09-29), plus 1 échec attendu documenté
+**725 tests passent** (`pytest tests\`, relevé le 2026-09-29), plus 1 échec attendu documenté
 (`test_criteres_du_cahier_des_charges` du vérificateur, cibles chiffrées non atteintes) et 1 test lent facultatif
 (`VERIF_TEST_LENT=1`, relecture Tesseract de 15 pages). Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.

@@ -2135,7 +2135,7 @@ class BornierTableExtractor:
             )),
             # INDICE : accepte chiffre ou lettre O (confusion OCR fréquente)
             ('INDICE', r'INDICE\s*[:\s]+\s*([0-9O])'),
-            ('PAGE',   r'PAGE\s*[:\s]+\s*(\d+)'),
+            ('PAGE',   r'PAGE\s*[:\s]+\s*(\d+(?:[A-Z](?![A-Z]))?)'),
         ]
         for key, pat in patterns:
             m = re.search(pat, text)

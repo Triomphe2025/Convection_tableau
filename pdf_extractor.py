@@ -213,6 +213,9 @@ _PIED_GRILLE_RE = re.compile(
     re.IGNORECASE,
 )
 _SEPARATEUR_RE = re.compile(r'^[\s|\-_°=]*$')
+# Une lettre isolée après les chiffres est un suffixe (122a) ; suivie d'autres
+# lettres, c'est le mot suivant collé (« 92PET ») et elle n'est pas prise.
+_PAGE_RE = r'PAGE\s*[:\-]?\s*(\d+(?:[A-Z](?![A-Z]))?)'
 
 
 def _mot_cle(texte: str) -> str:
@@ -1059,7 +1062,8 @@ class PdfTableExtractor:
 
     def _extract_meta(self, footer_lines: List[List]) -> Dict:
         """Extrait BORNIER, PAGE, PET, INDICE, NO_PLAN depuis les lignes de pied."""
-        text = ' '.join(w[4] for line in footer_lines for w in line).upper()
+        brut = ' '.join(w[4] for line in footer_lines for w in line)
+        text = brut.upper()
         meta: Dict = {}
 
         m = re.search(
@@ -1082,7 +1086,9 @@ class PdfTableExtractor:
         if m:
             meta['INDICE'] = m.group(1).strip().replace('O', '0')
 
-        m = re.search(r'PAGE\s*[:\-]?\s*(\d+)', text)
+        # Lettre finale comprise (122a, 44B), casse d'origine : le numéro est
+        # recopié tel qu'imprimé, jamais recalculé ni renuméroté.
+        m = re.search(_PAGE_RE, brut, re.IGNORECASE)
         if m:
             meta['PAGE'] = m.group(1).strip()
 

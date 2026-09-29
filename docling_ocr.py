@@ -134,7 +134,7 @@ class DoclingExtractor:
         if m:
             meta['INDICE'] = m.group(1).strip().replace('O', '0')
 
-        m = re.search(r'PAGE\s*[:\-]?\s*(\d+)', joined)
+        m = re.search(r'PAGE\s*[:\-]?\s*(\d+(?:[A-Z](?![A-Z]))?)', joined)
         if m:
             meta['PAGE'] = m.group(1).strip()
 

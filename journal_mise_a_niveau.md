@@ -331,3 +331,25 @@ pour l'extrait 223111PE011, `…_medium_3` pour 223400PE137). Seul le code aprè
 - Chaque page écartée écrit « page ignorée : <numéro> <raison> » dans le journal de
   l'interface (5 pages de garde dans PE137, raisons : pas d'en-tête du modèle / pas un
   tableau de câblage). Aucune page de tableau écartée sur les deux documents.
+
+### Commit 2 — numéros de page à suffixe, jamais renumérotés ni retriés
+
+| Mesure | Avant | Après |
+|--------|-------|-------|
+| Extrait 223111PE011 : pieds faux | 8 | 7 (page 122a lue « 122a », plus « 122 ») |
+| Extrait : cellules fausses / pages | 2 / 10 pages | 2 / 10 pages |
+| 223400PE137 (vérité TP2 et PDF) | 0 écart, 48 pages | 0 écart, 48 pages |
+| Alertes de séquence | — | aucune (les deux documents sont croissants) |
+
+- Lecture du numéro : lettre isolée après les chiffres gardée (`122a`, `44B`) ; « 92PET »
+  reste 92. PDF (grille et couche texte) : casse d'origine. Docling et Tesseract
+  (`ocr_processor.py`, ligne autorisée le 2026-09-29) : le texte y est passé en majuscules
+  avant lecture, le suffixe sort donc en majuscule (`122A`) — limite connue.
+- `generer_excel` ne trie plus par PAGE et ne remplit plus un PAGE vide depuis le nom
+  d'image : ordre du document conservé, alerte au journal pour un recul, une répétition ou
+  un numéro illisible. Idem pour la feuille « tableaux word ».
+- Prompt Claude : « PAGE : recopie le numéro exactement comme imprimé, lettre finale
+  comprise ». **Non mesuré** : le rejeu renvoie les réponses déjà enregistrées ; à vérifier au
+  prochain passage réel (Opus lisait « 122 » pour 122a).
+- `tests/test_non_regression_xlsx.py` : entrée remise dans l'ordre 1-2-3 (elle testait le tri
+  par un ordre 3-1-2) ; instantané **non régénéré**, identique.

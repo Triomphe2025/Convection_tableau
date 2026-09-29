@@ -65,7 +65,9 @@ def resultats_synthetiques():
         _ligne('11', 'JAUNE', 'ALIM 48V', '0201B'),
         _ligne('12', 'GRIS', 'RESERVE', '0202B'),
     ])
-    return [b3, b1, b2]   # ordre volontairement mélangé : le tri par PAGE est testé
+    # Ordre du document : generer_excel ne trie plus par PAGE depuis l'étape 6
+    # (ordre conservé, alerte si non croissant — tests/test_numeros_page.py).
+    return [b1, b2, b3]
 
 
 def dump_classeur(path):
