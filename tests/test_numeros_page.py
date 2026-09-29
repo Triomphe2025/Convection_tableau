@@ -98,6 +98,18 @@ class TestGenererExcelOrdreEtNumeros(unittest.TestCase):
         self.assertLess(valeurs.index('TROIS'), valeurs.index('UN'))
         self.assertTrue(any('page 1 après page 3' in m for m in messages))
 
+    def test_pages_3_1_2_restent_en_3_1_2_avec_alerte_de_recul(self):
+        # Les trois borniers de l'instantané de test_non_regression_xlsx, dans
+        # l'ordre 3-1-2 que cet instantané utilisait avant l'étape 6 pour tester le tri.
+        from tests.test_non_regression_xlsx import resultats_synthetiques
+        b1, b2, b3 = resultats_synthetiques()
+        messages, valeurs = self._classeur([b3, b1, b2])
+        positions = [valeurs.index(v) for v in ('ALIM 24V', 'COMMUN TS GR3 105TS', 'TC IDPO1')]
+        self.assertEqual(positions, sorted(positions), "ordre 3-1-2 non conservé")
+        alertes = [m.strip() for m in messages if '⚠' in m]
+        self.assertEqual(alertes, ["⚠ séquence non croissante : page 1 après page 3 "
+                                   "(ordre du document conservé)"])
+
     def test_suffixe_conserve_dans_le_pied(self):
         _, valeurs = self._classeur([_res('122'), _res('122a')])
         self.assertTrue(any('122a' in v for v in valeurs))
