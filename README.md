@@ -101,7 +101,7 @@ get_dictionary().update_from_excel(Path('tous_les_borniers_corrige.xlsx'))
 | `OCR_LANGUAGE` | `fra` | Langue Tesseract |
 | `PAGE_SIZE` | `59` | Lignes par page A4 dans Excel |
 | `STATION_NAME` | `EPEULE` | PET de repli si OCR échoue |
-| `MIN_DATA_ROWS` | `3` | Lignes minimum pour valider un bornier |
+| `MIN_DATA_ROWS` | `1` | Lignes minimum pour valider un bornier (tableau vide conservé, page écartée journalisée) |
 | `OCR_MODE` | `tesseract` | Mode OCR par défaut |
 | `CLAUDE_API_KEY` | *(vide)* | Clé API Anthropic |
 | `USE_TATR` | `False` | IA Microsoft TATR (mode Python uniquement) |
@@ -206,7 +206,7 @@ Toujours tester l'exe sur une machine sans Python installé avant livraison.
 
 ```powershell
 env\Scripts\python.exe -m pytest tests\ -v
-# 692 tests passent, 0 échec (+ 1 échec attendu documenté, + 1 test lent facultatif)
+# 709 tests passent, 0 échec (+ 1 échec attendu documenté, + 1 test lent facultatif)
 ```
 
 ---

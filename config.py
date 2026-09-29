@@ -105,8 +105,14 @@ class Config:
     PAGE_SIZE = 59
 
     # Nombre minimal de lignes de données pour conserver un bornier.
-    # Les borniers avec moins de lignes (OCR raté) sont exclus du classeur.
-    MIN_DATA_ROWS = 3
+    # 1 et non 3 : les vrais tableaux de 1 ou 2 lignes existent (24 pages sur 127
+    # dans 223111PE011). Une page de tableau vide (CABLE : RESERVE) est toujours
+    # conservée ; toute page écartée est écrite dans le journal avec sa raison.
+    MIN_DATA_ROWS = 1
+
+    # Part minimale de cellules de données contenant un caractère alphanumérique ;
+    # en dessous, la page est écartée comme gribouillage (raison journalisée).
+    PAGE_DENSITE_MIN = 0.15
 
     # Nombre max de colonnes de template affectées automatiquement.
     # Au-delà, l'affectation automatique par frontières pixel devient peu

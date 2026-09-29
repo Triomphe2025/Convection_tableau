@@ -12,7 +12,7 @@ import re
 import sys
 import time
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
@@ -127,6 +127,59 @@ def extraire_tous(
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Filtrage des pages : chaque page écartée a une raison écrite au journal
+# ──────────────────────────────────────────────────────────────────────
+
+# Message commun des moteurs vision (claude, agent, ollama) pour une page
+# qu'ils classent hors tableau.
+_ERREUR_HORS_TABLEAU = 'Page ignorée (page de garde / modifications / sommaire)'
+
+
+def numero_page(result: Dict) -> str:
+    """Numéro de page lu dans le pied, sinon nom de l'image source."""
+    page = str(result.get('metadata', {}).get('PAGE', '')).strip()
+    if page:
+        return page
+    image = result.get('image_path')
+    if image:
+        return Path(image).name
+    return str(result.get('page_num', '?'))
+
+
+def raison_page_ignoree(result: Dict, colonnes_modele, min_rows: int,
+                        densite_min: float) -> Optional[str]:
+    """Raison d'écarter la page du classeur, ou None si elle est conservée."""
+    if not result.get('success'):
+        erreur = result.get('error')
+        if erreur == _ERREUR_HORS_TABLEAU:
+            return "pas un tableau de câblage (page de garde, modifications, sommaire)"
+        return erreur or "lecture impossible, aucune donnée rendue par le moteur"
+    attendues = {h.upper() for h in colonnes_modele}
+    lues = {h.upper() for h in result.get('headers', [])}
+    if attendues and not (lues & attendues):
+        return "en-tête sans colonne commune avec le modèle"
+    cellules = [
+        cell
+        for row in result.get('rows', [])
+        if row.get('type') == 'data'
+        for cell in row.get('cells', [])
+    ]
+    n_lignes = sum(1 for row in result.get('rows', []) if row.get('type') == 'data')
+    # Zéro ligne sous un en-tête reconnu = tableau vide (CABLE : RESERVE),
+    # conservé tel quel ; seul un tableau partiellement lu est suspect.
+    if n_lignes == 0:
+        return None
+    if n_lignes < min_rows:
+        return f"{n_lignes} ligne(s) de données, minimum {min_rows} (MIN_DATA_ROWS)"
+    lisibles = sum(1 for c in cellules if c and any(ch.isalnum() for ch in c))
+    part = lisibles / max(len(cellules), 1)
+    if part < densite_min:
+        return (f"{part:.0%} de cellules lisibles, minimum {densite_min:.0%} "
+                f"(PAGE_DENSITE_MIN)")
+    return None
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Génération du classeur Excel combiné
 # ──────────────────────────────────────────────────────────────────────
 
@@ -134,7 +187,8 @@ def generer_excel(
     results: List[Dict],
     extractor: 'BornierTableExtractor',
     output_path: Path,
-    word_results: List[Dict] = None
+    word_results: List[Dict] = None,
+    on_log: Optional[Callable[[str], None]] = None,
 ) -> None:
     """
     Génère le classeur Excel avec deux feuilles distinctes :
@@ -146,45 +200,26 @@ def generer_excel(
     d'une page A4 à 48 lignes avec marges standard).  Un saut de page
     Excel est inséré après chaque bornier pour l'impression.
 
-    Les borniers dont le nombre de lignes de données est inférieur à
-    Config.MIN_DATA_ROWS sont ignorés (OCR raté).
+    Les pages écartées (lecture ratée, hors tableau, moins de
+    Config.MIN_DATA_ROWS lignes, illisibles) sont écrites dans on_log
+    (« page ignorée : <numéro> <raison> ») ; un tableau vide est conservé.
 
     Le dictionnaire de données (data_dictionary.json) est chargé
     automatiquement et utilisé pour corriger les valeurs OCR douteuses.
     """
+    log = on_log or print
     page_size = Config.PAGE_SIZE
-    min_rows = Config.MIN_DATA_ROWS
     station = Config.STATION_NAME
     dictionary = get_dictionary()
 
-    # ── Filtrage des résultats invalides ─────────────────────────────
     valides = []
     ignores = 0
-    expected_set = set(h.upper() for h in extractor._tpl.columns)
     for r in results:
-        if not r.get('success'):
-            continue
-        if extractor._count_data_rows(r) < min_rows:
+        raison = raison_page_ignoree(r, extractor._tpl.columns, Config.MIN_DATA_ROWS,
+                                     Config.PAGE_DENSITE_MIN)
+        if raison:
             ignores += 1
-            continue
-        # Au moins une colonne doit correspondre au template actif.
-        # Élimine les pages de garde, sommaires, images de texte libre.
-        headers_set = set(h.upper() for h in r.get('headers', []))
-        if expected_set and not (headers_set & expected_set):
-            ignores += 1
-            continue
-        # Densité minimale : ≥ 15 % des cellules de données doivent
-        # contenir au moins un caractère alphanumérique.
-        # Élimine les pages quasi-vides ou entièrement codées en gribouillage.
-        all_cells = [
-            cell
-            for row in r.get('rows', [])
-            if row.get('type') == 'data'
-            for cell in row.get('cells', [])
-        ]
-        non_empty = sum(1 for c in all_cells if c and any(ch.isalnum() for ch in c))
-        if non_empty / max(len(all_cells), 1) < 0.15:
-            ignores += 1
+            log(f"  page ignorée : {numero_page(r)} {raison}")
             continue
         valides.append(r)
 
@@ -214,11 +249,11 @@ def generer_excel(
     total = len(valides)
 
     if total == 0:
-        print("  Aucun résultat valide à exporter en Excel.")
+        log("  Aucun résultat valide à exporter en Excel.")
         return
 
     if ignores:
-        print(f"  {ignores} bornier(s) ignoré(s) (OCR insuffisant).")
+        log(f"  {ignores} page(s) ignorée(s), raisons ci-dessus.")
     print(f"  Génération Excel ({total} borniers, {page_size} lignes/page)…\n")
 
     wb = Workbook()

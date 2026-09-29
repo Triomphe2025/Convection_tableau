@@ -306,3 +306,28 @@ alerte** aux étapes 8 (double lecture) et 9 (plus aucune substitution silencieu
 
 Passage Haiku du matin (`mesures/haiku_passage1/`) : non retenu — document complet (129 pages)
 interrompu après 20 pages, avant les commits Opus, sans tokens journalisés.
+
+## Étape 6 — Pages, numéros, caractères illisibles (2026-09-29)
+
+Mesure avant/après chaque commit **sans appel API** : la conversion complète est relancée
+(routage, grille, génération Excel), le client Anthropic étant remplacé par un faux qui renvoie
+les réponses enregistrées dans les journaux de la campagne (`mesures/claude-opus-5-5_medium_1`
+pour l'extrait 223111PE011, `…_medium_3` pour 223400PE137). Seul le code après l'OCR change.
+
+### Commit 1 — MIN_DATA_ROWS = 1, pages écartées journalisées, tableau vide conservé
+
+| Mesure | Avant | Après |
+|--------|-------|-------|
+| Extrait 223111PE011 : pages appariées / 10 | 8 (9 et 104 absentes) | 10 |
+| Extrait : cellules fausses | 2 / 656 | 2 / 664 (les mêmes, page 119) |
+| Extrait : pieds faux | 8 | 8 |
+| 223400PE137 contre son PDF : pages appariées | 47 (1 absente) | 48 |
+| 223400PE137 : cellules fausses | 0 / 9 460 | 0 / 9 464 |
+| 223400PE137 contre la vérité TP2 | 0 écart | 0 écart |
+
+- Page 9 (2 lignes) écartée par `MIN_DATA_ROWS = 3` : retrouvée.
+- Page 104 (CABLE : RESERVE, 0 ligne) : la grille rendait `success=False` faute de ligne ;
+  un en-tête reconnu suffit désormais à en faire un tableau, conservé vide.
+- Chaque page écartée écrit « page ignorée : <numéro> <raison> » dans le journal de
+  l'interface (5 pages de garde dans PE137, raisons : pas d'en-tête du modèle / pas un
+  tableau de câblage). Aucune page de tableau écartée sur les deux documents.

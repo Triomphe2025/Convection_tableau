@@ -555,6 +555,7 @@ class PdfTableExtractor:
         if idx_entete is None:
             result = self._fail(page_num)
             result['detection_method'] = 'pdf-grille'
+            result['error'] = "pas d'en-tête du modèle (page de garde, modifications…)"
             return result
 
         # Lignes de section (« NOM DU CABLE : GAT/CA 01 ») testées AVANT le pied :
@@ -606,8 +607,10 @@ class PdfTableExtractor:
         # Espaces réduits pour le pied seulement : _extract_meta borne à 30
         # caractères l'écart entre « PET : GRAND-BUT » et « JARRETIERAGE ».
         meta = self._extract_meta([[(0, 0, 0, 0, ' '.join(lg.split()))] for lg in pied])
+        # En-tête reconnu = tableau, même sans ligne (CABLE : RESERVE) : la page
+        # vide est conservée telle quelle dans le classeur.
         return {
-            'success': bool(rows),
+            'success': True,
             'page_num': page_num + 1,
             'image_path': f'page_{page_num + 1}',
             'headers': colonnes,

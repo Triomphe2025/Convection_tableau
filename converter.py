@@ -308,6 +308,7 @@ class Converter:
             generer_excel(
                 ocr_results, extractor, excel_path,
                 word_results=word_results if word_results else None,
+                on_log=self._log,
             )
             self._log(f"  → {excel_path.name} enregistré dans :")
             self._log(f"     {excel_path.parent}")
