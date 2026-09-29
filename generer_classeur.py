@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
 from openpyxl import Workbook
+from openpyxl.comments import Comment
+from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.page import PageMargins
 from openpyxl.worksheet.pagebreak import Break
@@ -179,6 +181,22 @@ def raison_page_ignoree(result: Dict, colonnes_modele, min_rows: int,
     return None
 
 
+def marquer_illisibles(ws, marqueur: str, couleur: str) -> int:
+    """Colore et commente les cellules contenant le marqueur ; renvoie leur nombre."""
+    n = 0
+    for ligne in ws.iter_rows():
+        for cellule in ligne:
+            if isinstance(cellule.value, str) and marqueur in cellule.value:
+                cellule.fill = PatternFill('solid', fgColor=couleur)
+                cellule.comment = Comment(
+                    f"Caractère illisible ({marqueur}) laissé par la lecture :"
+                    " vérifier sur le document d'origine.",
+                    'TriosSeconverter',
+                )
+                n += 1
+    return n
+
+
 _NUMERO_PAGE_RE = re.compile(r'(\d+)([A-Za-z]?)')
 
 
@@ -318,6 +336,10 @@ def generer_excel(
     ws.print_area = (
         f'A1:{get_column_letter(n_cols)}{current_row - 1}'
     )
+    n_illisibles = marquer_illisibles(ws, Config.MARQUEUR_ILLISIBLE, Config.COULEUR_ILLISIBLE)
+    if n_illisibles:
+        log(f"  ⚠ {n_illisibles} cellule(s) avec « {Config.MARQUEUR_ILLISIBLE} » (caractère "
+            f"illisible) colorée(s) dans l'Excel : à vérifier sur l'original.")
 
     # ── Feuille « tableaux word » (si des tableaux Word sont fournis) ──
     if word_results:

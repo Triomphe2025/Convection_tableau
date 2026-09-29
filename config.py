@@ -114,6 +114,12 @@ class Config:
     # en dessous, la page est écartée comme gribouillage (raison journalisée).
     PAGE_DENSITE_MIN = 0.15
 
+    # Marqueur qu'écrit Claude à la place d'un caractère illisible (prompt), gardé
+    # tel quel dans l'Excel et coloré : une valeur devinée passerait inaperçue.
+    MARQUEUR_ILLISIBLE = "??"
+    # Rouge clair, distinct du jaune « confiance OCR basse » (FFFF99).
+    COULEUR_ILLISIBLE = "FFC7CE"
+
     # Nombre max de colonnes de template affectées automatiquement.
     # Au-delà, l'affectation automatique par frontières pixel devient peu
     # fiable — un mapping manuel est demandé à l'utilisateur (si un callback

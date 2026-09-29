@@ -23,6 +23,8 @@ Config.TESSERACT_PATH   # référencer uniquement
 | `STATION_NAME` | `EPEULE` | Nom P.E.T. de repli si OCR échoue |
 | `MIN_DATA_ROWS` | `1` | Seuil minimal de lignes pour valider un bornier ; un tableau vide (0 ligne sous l'en-tête) est conservé |
 | `PAGE_DENSITE_MIN` | `0.15` | Part minimale de cellules lisibles ; en dessous la page est écartée (gribouillage) |
+| `MARQUEUR_ILLISIBLE` | `??` | Écrit par Claude à la place d'un caractère illisible (prompt) ; gardé dans l'Excel |
+| `COULEUR_ILLISIBLE` | `FFC7CE` | Fond des cellules contenant le marqueur (distinct du jaune « confiance basse ») |
 | `IMAGES_FOLDER_NAME` | `VD23111 PE 162` | Nom du dossier de sortie des images |
 | `OCR_MODE` | `tesseract` | Mode OCR par défaut |
 | `CLAUDE_API_KEY` | `""` | Clé API Anthropic |

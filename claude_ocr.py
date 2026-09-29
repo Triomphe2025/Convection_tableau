@@ -153,6 +153,8 @@ def _build_prompt(template) -> str:
     - après la dernière    → colonne N
     Aucune interprétation sémantique, aucune correction post-API.
     """
+    from config import Config
+    marqueur = getattr(Config, 'MARQUEUR_ILLISIBLE', '??')
     columns = template.columns
     n_cols = len(columns)
 
@@ -204,6 +206,8 @@ def _build_prompt(template) -> str:
         f"Pour chaque ligne de données visible, écris sur une seule ligne :\n"
         f"  {example_line}\n\n"
         "Règles :\n"
+        f"- Si un caractère est illisible, écris {marqueur} à sa place. Ne devine jamais,"
+        " ne corrige jamais un mot, recopie exactement.\n"
         "- Une ligne visuelle = une ligne de sortie\n"
         "- Cellule vide = rien entre les pipes (ex : \"val1 | | val3 | val4\")\n"
         "- Si une cellule contient plusieurs sous-parties visuelles,"

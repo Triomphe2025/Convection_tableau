@@ -391,6 +391,9 @@ Raccourci → `/build-exe`.
 | v1.7 | 2026-09 | Modèle par défaut `claude-opus-5-5`, effort `medium` ; table `CLAUDE_CAPACITES_MODELES` (champ thinking envoyé ou omis, effort envoyé ou non, par modèle ; modèle absent → refus avant l'appel) ; refus du modèle journalisé avec sa catégorie |
 | v1.7 | 2026-09 | Grille PDF : mots placés d'après leur propre x au pas de la page (espace isolé dans un span à part retrouvé, police réduite alignée) — défaut hérité de outils_reference/grille.py ; pages à cadre inchangées |
 | v1.7 | 2026-09 | `campagne_mesure.py` : campagne de mesure des modèles Claude (surcharge en mémoire, sortie dans `mesures/`, historique `mesures/campagne.csv`, coût estimé par `CLAUDE_PRIX_MODELES`, plafond `CAMPAGNE_BUDGET_MAX_USD`) ; garde-fou de troncature (max_tokens 64000 à effort xhigh/max, réponse tronquée = page en erreur) |
+| v1.7 | 2026-09 | Étape 6 : `MIN_DATA_ROWS` = 1 ; chaque page écartée écrite au journal (« page ignorée : <numéro> <raison> ») ; tableau vide (CABLE : RESERVE) conservé |
+| v1.7 | 2026-09 | Étape 6 : numéros de page à suffixe (122a, 44B), ni renumérotés ni retriés — ordre du document conservé, alerte si la séquence n'est pas croissante |
+| v1.7 | 2026-09 | Étape 6 : caractère illisible → Claude écrit « ?? » (jamais deviné ni corrigé), gardé dans l'Excel et coloré (`MARQUEUR_ILLISIBLE`, `COULEUR_ILLISIBLE`) |
 
 ---
 

@@ -353,3 +353,16 @@ pour l'extrait 223111PE011, `…_medium_3` pour 223400PE137). Seul le code aprè
   prochain passage réel (Opus lisait « 122 » pour 122a).
 - `tests/test_non_regression_xlsx.py` : entrée remise dans l'ordre 1-2-3 (elle testait le tri
   par un ordre 3-1-2) ; instantané **non régénéré**, identique.
+
+### Commit 3 — « ?? » pour un caractère illisible, gardé et coloré
+
+- Prompt Claude (règles) : « Si un caractère est illisible, écris ?? à sa place. Ne devine
+  jamais, ne corrige jamais un mot, recopie exactement. » (marqueur `MARQUEUR_ILLISIBLE`).
+- Le parseur et l'Excel gardent « ?? » tel quel (dictionnaire déjà sauté en mode Claude) ;
+  `generer_excel` colore chaque cellule qui le contient (`COULEUR_ILLISIBLE`, rouge clair,
+  commentaire « vérifier sur le document d'origine ») et compte ces cellules au journal.
+  `ocr_processor.py` non modifié : le marquage est fait après remplissage de la feuille.
+- Mesure (rejeu) : inchangée — extrait 2 cellules fausses / 664, 7 pieds faux, 10 pages ;
+  PE137 0 écart, 48 pages. Attendu : les réponses rejouées sont antérieures à la consigne.
+  **L'effet de la consigne (et de celle sur PAGE) reste à mesurer au prochain passage réel**,
+  en particulier sur le cas de référence page 119 (« OC » lu « CC »).
