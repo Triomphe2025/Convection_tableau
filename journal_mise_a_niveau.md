@@ -366,3 +366,34 @@ pour l'extrait 223111PE011, `…_medium_3` pour 223400PE137). Seul le code aprè
   PE137 0 écart, 48 pages. Attendu : les réponses rejouées sont antérieures à la consigne.
   **L'effet de la consigne (et de celle sur PAGE) reste à mesurer au prochain passage réel**,
   en particulier sur le cas de référence page 119 (« OC » lu « CC »).
+
+### Décisions et constats de fin d'étape 6 (2026-09-29)
+
+- **Limite connue, non corrigée (décision du 2026-09-29)** : en modes Tesseract et Docling,
+  le suffixe de page sort en majuscule (« 122a » → « 122A ») car le pied est passé en
+  majuscules avant lecture. Ces modes ne servent pas en production.
+- **Reporté à l'étape 7** : nom de bornier inventé depuis le nom de fichier (« BORNIER :
+  bornier_57 », repli `meta.get('BORNIER') or img_stem` dans `generer_excel`). Règle retenue :
+  un champ absent du pied reste vide avec une alerte, jamais une valeur tirée du nom de fichier.
+- Test du nouveau comportement d'ordre :
+  `tests/test_numeros_page.py::TestGenererExcelOrdreEtNumeros::test_pages_3_1_2_restent_en_3_1_2_avec_alerte_de_recul`
+  (commit 714c801) — vérifié par mutation.
+
+**Les 7 pieds faux restants de l'extrait (rejeu Opus medium 1) : 6 compléments + 1 TYPE**
+
+| Page | Libellé | Vérité | Sortie | Moteur |
+|------|---------|--------|--------|--------|
+| 2 | COMPLEMENT | REF CE 8707905 | vide | Claude (TYPE lu « 3PC200 ») |
+| 3 | COMPLEMENT | REF CE 8707905 | vide | Claude (TYPE lu « 3PC200 ») |
+| 119 | COMPLEMENT | CORDON TYPE 40 | vide | Claude (TYPE lu « 30P887 ») |
+| 122 | COMPLEMENT | 8/10 | vide | Claude (TYPE lu « 2P.279 ») |
+| 122a | TYPE | 7P.279 | **vide** | grille PDF |
+| 122a | COMPLEMENT | 6/10 | vide | grille PDF |
+| 123 | COMPLEMENT | 8/10 | vide | Claude (TYPE lu « 4PK13 ») |
+
+Page 122a (vectorielle, lue sans OCR) : la grille contient bien `TYPE : 7P.279      6/10`, mais
+`PdfTableExtractor._extract_meta` (champs de `footer_extract_fields`) a une classe de caractères
+sans « . » (`[A-Z0-9/][A-Z0-9\s\-/]`) — « 7P.279 » ne correspond pas, le TYPE est perdu en
+entier — et retire volontairement un « n/n » final, pris pour un compteur de pages, alors que
+c'est ici le complément. Défaut de lecture du pied PDF, pas de Claude. À traiter à l'étape 7
+avec les compléments.
