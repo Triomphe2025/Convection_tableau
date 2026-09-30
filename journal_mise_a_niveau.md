@@ -397,3 +397,36 @@ sans « . » (`[A-Z0-9/][A-Z0-9\s\-/]`) — « 7P.279 » ne correspond pas, le T
 entier — et retire volontairement un « n/n » final, pris pour un compteur de pages, alors que
 c'est ici le complément. Défaut de lecture du pied PDF, pas de Claude. À traiter à l'étape 7
 avec les compléments.
+
+### Étape 6 — passage réel (2026-09-30, commit 84cab76)
+
+Opus 5.5 medium sur l'extrait 223111PE011, dossier
+`mesures/223111PE011_extrait_10pages_claude-opus-5-5_medium_1`, 8 pages envoyées à Claude,
+0 page en erreur.
+
+| Mesure | Étape 5 (medium 1) | Rejeu étape 6 | Passage réel |
+|--------|--------------------|---------------|--------------|
+| Pages présentes | 8 / 10 | 10 / 10 | 10 / 10 |
+| Cellules fausses | 2 / 656 | 2 / 664 | 2 / 664 |
+| Pieds faux | 9 | 7 | 8 |
+| Lignes manquantes / en trop | 0 / 0 | 0 / 0 | 0 / 0 |
+| Coût | 0,301 $ | — | 0,304 $ |
+
+- Pages 9 et 104 présentes ; aucune page écartée, aucune alerte de séquence.
+- Cellules fausses : les 2 de la page 119 (« OC » lu « CC »), inchangées.
+- Aucun « ?? » dans les 8 réponses, donc aucune cellule colorée.
+- Prompt plus long : +112 tokens d'entrée par page (+0,003 $ par passage).
+- 8 pieds faux = 7 compléments perdus (pages 2, 3, 52, 119, 122, 122a, 123) + TYPE de 122a
+  perdu en entier (lecteur de pied PDF). L'écart de plus qu'au rejeu est le complément de la
+  page 52 (« CORDON TYPE 60 ») : lu au passage rejoué, pas cette fois — variation déjà notée à
+  l'étape 5, pas un effet du code. Étape 7.
+
+**Limite connue — consigne « lettre du numéro de page » non testable.** 122a est la seule
+page à suffixe de 223111PE011 (audit) et elle est vectorielle : lue dans le PDF sans Claude,
+elle sort bien « 122a ». Ni l'extrait ni le document complet ne peuvent donc montrer l'effet de
+la consigne. Filet de sécurité : si Claude lisait « 122 » pour une page 122a scannée, suivant
+la page 122, `alertes_sequence_pages` écrirait « page 122 répétée » dans le journal.
+
+**Consigne « ?? » conservée** (coût quasi nul). Elle ne protège pas contre une erreur commise
+avec assurance : page 119, Opus lit « CC » sans hésiter et n'écrit pas « ?? ». Détecter ces
+erreurs est le rôle des étapes 8 (double lecture) et 9 (plus aucune substitution silencieuse).
