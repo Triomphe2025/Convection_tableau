@@ -28,24 +28,33 @@ def _compact(texte: str) -> str:
     return _ESPACES_RE.sub('', texte or '').upper()
 
 
-def _est_logo(texte: str, libelle_gauche: str) -> bool:
-    """Bloc gauche du pied : libellé du modèle ou logo en lettres espacées (« M A T R A »)."""
+def _lettres_logo(texte: str, libelle_gauche: str, seule_lettre: bool = False) -> List[str]:
+    """Lettres du bloc gauche du pied si le texte en est un, sinon [].
+
+    Formes vues : libellé du modèle, mot seul en lettres (« MATRA », « SIEMENS »),
+    lettres espacées (« M A T R A »), et — avec seule_lettre — une lettre isolée,
+    morceau d'un logo vertical (scans de 223111PE011 : une lettre par ligne).
+    Un texte libre à garder en COMPLEMENT porte des chiffres (« REF CE 8707905 »).
+    """
     t = texte.strip()
-    if not t:
-        return False
-    if libelle_gauche and _compact(t) == _compact(libelle_gauche):
-        return True
     mots = t.split()
-    # Un mot seul en lettres (« MATRA », « SIEMENS ») est une marque ; un texte
-    # libre à garder en COMPLEMENT porte des chiffres (« REF CE 8707905 »).
+    if not t:
+        return []
+    if libelle_gauche and _compact(t) == _compact(libelle_gauche):
+        return list(_compact(t))
     if len(mots) == 1 and len(t) >= 3 and t.isalpha():
-        return True
-    return len(mots) >= 3 and all(len(m) == 1 and m.isalpha() for m in mots)
+        return list(t.upper())
+    if len(mots) >= 3 and all(len(m) == 1 and m.isalpha() for m in mots):
+        return [m.upper() for m in mots]
+    if seule_lettre and len(t) == 1 and t.isalpha():
+        return [t.upper()]
+    return []
 
 
-def nettoyer_lignes_pied(lignes: Iterable[str], libelle_gauche: str = '') -> List[str]:
-    """Lignes du pied sans cadre ni logo ; espaces intérieurs conservés tels quels."""
-    propres = []
+def _separer_logo(lignes: Iterable[str], libelle_gauche: str):
+    """(lignes du pied sans cadre ni logo, lettres du logo dans l'ordre de lecture)."""
+    propres: List[str] = []
+    lettres: List[str] = []
     for ligne in lignes:
         if not ligne or _SEPARATEUR_RE.match(ligne):
             continue
@@ -55,14 +64,37 @@ def nettoyer_lignes_pied(lignes: Iterable[str], libelle_gauche: str = '') -> Lis
         if texte.endswith('|'):
             texte = texte[:-1]
         cellules = texte.split('|')
-        while cellules and (not cellules[0].strip()
-                            or _est_logo(cellules[0], libelle_gauche)):
+        while cellules:
+            logo = _lettres_logo(cellules[0], libelle_gauche, seule_lettre=len(cellules) > 1)
+            if cellules[0].strip() and not logo:
+                break
+            lettres.extend(logo)
             cellules.pop(0)
         texte = '|'.join(cellules).strip()
+        # Logo vertical recopié sans cadre : « M   CABLE : ACC/PH01 ».
+        m = re.match(r'([A-Z])\s+(?=' + _LIBELLE_RE.pattern + ')', texte)
+        if m:
+            lettres.append(m.group(1))
+            texte = texte[m.end():]
         # Une fois cadre et logo retirés, « |  M A T R A  |-----| » n'est qu'un trait.
-        if texte and not _SEPARATEUR_RE.match(texte) and not _est_logo(texte, libelle_gauche):
+        if not texte or _SEPARATEUR_RE.match(texte):
+            continue
+        logo = _lettres_logo(texte, libelle_gauche, seule_lettre=True)
+        if logo:
+            lettres.extend(logo)
+        else:
             propres.append(texte)
-    return propres
+    return propres, lettres
+
+
+def nettoyer_lignes_pied(lignes: Iterable[str], libelle_gauche: str = '') -> List[str]:
+    """Lignes du pied sans cadre ni logo ; espaces intérieurs conservés tels quels."""
+    return _separer_logo(lignes, libelle_gauche)[0]
+
+
+def logo_pied(lignes: Iterable[str], libelle_gauche: str = '') -> str:
+    """Texte du bloc gauche lu dans le document, au format « M A T R A » ; '' s'il n'y en a pas."""
+    return ' '.join(_separer_logo(lignes, libelle_gauche)[1])
 
 
 def cle_libelle(libelle: str) -> str:

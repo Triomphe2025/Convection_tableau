@@ -378,3 +378,81 @@ class TestRenduPiedBrut(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+# ── Logo du bloc gauche : texte du document, jamais le libellé du modèle ──
+
+class TestLogoPied(unittest.TestCase):
+
+    def test_formes_du_logo(self):
+        from pied_page import logo_pied
+        cas = {
+            'lettres espacées': ['|  |  P.E.T. : GRAND-BUT  |', '|   M A T R A   |------|'],
+            'mot seul': ['PET :GRAND-BUT', 'MATRA', 'N° PLAN : 223400 PE 137'],
+            'vertical avec cadre': ['M | CABLE : ACC/PH01', 'A | TYPE : 2P.279', 'T |', 'R |',
+                                    'A | N° PLAN : 223111PE011'],
+            'vertical sans cadre': ['M   CABLE : ACC/PH01', 'A   TYPE : 2P.279', 'T', 'R',
+                                    'A   N° PLAN : 223111PE011'],
+        }
+        for nom, lignes in cas.items():
+            self.assertEqual(logo_pied(lignes, 'M  T  I'), 'M A T R A', nom)
+
+    def test_sans_logo_vide(self):
+        from pied_page import logo_pied
+        self.assertEqual(logo_pied(['CABLE : X', 'N° PLAN : P  PAGE : 3'], 'M  T  I'), '')
+
+    def test_lettres_du_logo_hors_complement(self):
+        lignes = ['M   CABLE : ACC/PH01', 'A   TYPE : 2P.279   8/10', 'T', 'R',
+                  'A   N° PLAN : 223111PE011   INDICE : R   PAGE : 1']
+        meta = analyser_pied(nettoyer_lignes_pied(lignes, 'SIEMENS'))
+        self.assertEqual(meta['COMPLEMENT'], '8/10')
+
+
+class TestLogoDansLExcel(unittest.TestCase):
+
+    def test_pe137_matra_sur_les_48_pages(self):
+        tpl = _tpl('REPARTITEUR')
+        lecteur = pe.PdfTableExtractor(tpl)
+        with fitz.open(str(PE137)) as doc:
+            resultats = [lecteur.extract_page_grille(doc[i], i) for i in range(len(doc))]
+        self.assertEqual(sum(1 for r in resultats if r['success']), 48)
+        with tempfile.TemporaryDirectory() as tmp:
+            sortie = Path(tmp) / 's.xlsx'
+            with contextlib.redirect_stdout(io.StringIO()):
+                generer_excel(resultats, lecteur, sortie, on_log=print)
+            ws = openpyxl.load_workbook(sortie).worksheets[0]
+            gauche = [ws.cell(row=c.row - 1, column=1).value for c in ws['B']
+                      if isinstance(c.value, str) and 'INDICE' in c.value]
+        self.assertEqual(gauche, ['M A T R A'] * 48)
+
+    def test_page_122a_texte_du_document(self):
+        with fitz.open(str(EXTRAIT)) as doc:
+            meta = pe.PdfTableExtractor(_tpl()).extract_page_grille(doc[8], 8)['metadata']
+        self.assertEqual(meta['LOGO'].replace(' ', ''), 'SIEMENS')
+
+    def test_sans_logo_cellule_vide_et_pas_le_libelle_du_modele(self):
+        tpl = _tpl('REPARTITEUR')
+        _, cellules = _excel([_page({'PAGE': '4', 'INDICE': 'R'}, tpl=tpl)], tpl)
+        self.assertNotIn(tpl.footer_left_label, cellules)
+
+    def test_claude_ligne_logo_et_logo_vertical(self):
+        vertical = REPONSE_PAGE_2.replace('PIED_BRUT: SIEMENS\n', '').replace(
+            'PIED_BRUT: CABLE', 'PIED_BRUT: M | CABLE')
+        _, meta, _ = _parse_pipe_response(vertical + 'LOGO: MATRA\n', _tpl())
+        self.assertEqual(meta['LOGO'], 'M A T R A')
+        _, meta, _ = _parse_pipe_response(REPONSE_PAGE_2 + 'LOGO: M\n', _tpl())
+        self.assertIn('LOGO', meta['ALERTES_PIED'][0])
+
+    def test_prompt_demande_le_logo(self):
+        self.assertIn('LOGO:', _build_prompt(_tpl()))
+
+
+class TestTesseractIndiceNonInvente(unittest.TestCase):
+
+    def test_indice_absent_reste_absent(self):
+        from ocr_processor import BornierTableExtractor
+        from template import DEFAULT_TEMPLATE
+        ex = BornierTableExtractor(template=DEFAULT_TEMPLATE)
+        self.assertNotIn('INDICE', ex._extract_meta([[{'text': 'PAGE : 12'}]]))
+        self.assertEqual(ex._extract_meta([[{'text': 'INDICE : O | PAGE : 12'}]])['INDICE'],
+                         '0')

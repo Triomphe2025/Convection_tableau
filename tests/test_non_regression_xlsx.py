@@ -37,6 +37,9 @@ def _bornier(page, bornier, image, rows):
         'metadata': {
             'PAGE': page, 'BORNIER': bornier, 'PET': 'GARE TRAMWAY',
             'NO_PLAN': '6A 23111 PE 102', 'INDICE': 'R',
+            # Logo relevé dans le document (étape 7) : la cellule gauche du pied
+            # n'affiche plus le libellé du modèle, seulement ce qui a été lu.
+            'LOGO': 'M  T  I',
         },
         'image_path': image,
         'detection_method': 'claude-vision',

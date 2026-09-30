@@ -142,10 +142,11 @@ class TestExtractMeta(unittest.TestCase):
         meta = self._meta(text)
         self.assertEqual(meta['INDICE'], '0')
 
-    def test_indice_absent_defaults_to_zero(self):
+    def test_indice_absent_reste_absent(self):
+        # Étape 7 : plus d'INDICE « 0 » inventé quand le pied n'en montre pas.
         text = 'P.E.T. : EPEULE BORNIER : AA NO PLAN : VD23111 | PAGE : 12'
         meta = self._meta(text)
-        self.assertEqual(meta['INDICE'], '0')
+        self.assertNotIn('INDICE', meta)
 
     def test_bornier_alphanumeric(self):
         text = 'P.E.T. : EPEULE BORNIER : B702A'
@@ -162,9 +163,9 @@ class TestExtractMeta(unittest.TestCase):
         meta = self._meta(text)
         self.assertEqual(meta['PAGE'], '92')
 
-    def test_empty_footer_returns_indice_default(self):
+    def test_empty_footer_sans_indice(self):
         meta = self.ext._extract_meta([])
-        self.assertEqual(meta['INDICE'], '0')
+        self.assertNotIn('INDICE', meta)
         self.assertNotIn('BORNIER', meta)
         self.assertNotIn('PAGE', meta)
 

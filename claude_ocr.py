@@ -228,6 +228,10 @@ def _build_prompt(template) -> str:
         " sans rien omettre, corriger ni réordonner :\n"
         "PIED_BRUT: <1re ligne du pied>\n"
         "PIED_BRUT: <2e ligne du pied>\n"
+        "Enfin, recopie le texte du bloc à gauche du pied (marque, ex : MATRA, SIEMENS) ;"
+        " s'il est écrit verticalement, lis ses lettres de haut en bas ; s'il n'y en a"
+        " pas, n'écris pas cette ligne :\n"
+        "LOGO: <texte du bloc gauche>\n"
     )
 
 
@@ -289,6 +293,7 @@ def _parse_pipe_response(raw: str, template, column_mapping: dict = None) -> tup
     metadata: Dict = {}
     pied_brut: List[str] = []
     revisions: List[str] = []
+    logo = ''
     page_type = 'listing'  # défaut : on extrait
 
     for line in raw.splitlines():
@@ -304,6 +309,9 @@ def _parse_pipe_response(raw: str, template, column_mapping: dict = None) -> tup
         # Avant le test du « | » : une ligne de pied recopiée peut en contenir.
         if line.upper().startswith('PIED_BRUT:'):
             pied_brut.append(line[len('PIED_BRUT:'):].strip())
+            continue
+        if line.upper().startswith('LOGO:'):
+            logo = line[len('LOGO:'):].strip()
             continue
         if line.upper().startswith('REVISIONS:'):
             revisions = line[len('REVISIONS:'):].split()
@@ -371,21 +379,30 @@ def _parse_pipe_response(raw: str, template, column_mapping: dict = None) -> tup
         })
 
     if pied_brut:
-        metadata = _structurer_pied(pied_brut, metadata, template)
+        metadata = _structurer_pied(pied_brut, metadata, template, logo)
+    elif logo:
+        metadata['LOGO'] = _format_logo(logo)
     if revisions:
         metadata['REVISIONS'] = revisions
     return rows, metadata, page_type
 
 
-def _structurer_pied(pied_brut: List[str], meta_json: Dict, template) -> Dict:
+def _format_logo(texte: str) -> str:
+    """« MATRA » ou « M-A-T-R-A » → « M A T R A » : format des Excel corrigés à la main."""
+    return ' '.join(c for c in texte.upper() if c.isalnum())
+
+
+def _structurer_pied(pied_brut: List[str], meta_json: Dict, template,
+                     logo: str = '') -> Dict:
     """Pied recopié par Claude, structuré localement comme une page vectorielle.
 
     Claude recopie, le code structure : les paires du pied recopié priment. Le
     JSON META ne complète que les libellés absents du pied recopié ; un
     désaccord n'est jamais tranché en silence, il devient une alerte.
     """
-    from pied_page import analyser_pied, mots_decor, nettoyer_lignes_pied
-    propres = nettoyer_lignes_pied(pied_brut, getattr(template, 'footer_left_label', ''))
+    from pied_page import analyser_pied, logo_pied, mots_decor, nettoyer_lignes_pied
+    gauche = getattr(template, 'footer_left_label', '')
+    propres = nettoyer_lignes_pied(pied_brut, gauche)
     decor = mots_decor([getattr(template, 'footer_row1_format', ''),
                         getattr(template, 'footer_row2_format', '')])
     structure = analyser_pied(propres, decor=decor)
@@ -402,6 +419,12 @@ def _structurer_pied(pied_brut: List[str], meta_json: Dict, template) -> Dict:
     fusion = {k: v for k, v in meta_json.items() if k not in structure}
     fusion.update(structure)
     fusion['PIED_BRUT'] = propres
+    logo_recopie = logo_pied(pied_brut, gauche)
+    if logo and logo_recopie and _format_logo(logo) != logo_recopie:
+        alertes.append(f"LOGO : ligne LOGO « {logo} », pied recopié « {logo_recopie} »"
+                       " — ligne LOGO retenue")
+    if logo or logo_recopie:
+        fusion['LOGO'] = _format_logo(logo) if logo else logo_recopie
     if alertes:
         fusion['ALERTES_PIED'] = alertes
     return fusion

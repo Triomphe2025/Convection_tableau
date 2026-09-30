@@ -2141,8 +2141,9 @@ class BornierTableExtractor:
             m = re.search(pat, text)
             if m:
                 meta[key] = m.group(1).strip()
-        # Normaliser 'O' → '0' pour INDICE ; défaut à '0' si absent
-        meta['INDICE'] = meta.get('INDICE', '0').replace('O', '0')
+        # Normaliser 'O' → '0' pour INDICE ; absent = vide, jamais « 0 » inventé
+        if 'INDICE' in meta:
+            meta['INDICE'] = meta['INDICE'].replace('O', '0')
 
         # Champs personnalisés définis dans footer_extract_fields (ex: CABLE, TYPE)
         _standard = {'PET', 'BORNIER', 'NO_PLAN', 'INDICE', 'PAGE'}
@@ -3255,7 +3256,7 @@ class BornierTableExtractor:
         ws.merge_cells(start_row=footer_r, start_column=1,
                        end_row=footer_r + 1, end_column=1)
         mti = ws.cell(row=footer_r, column=1,
-                      value=self._tpl.footer_left_label)
+                      value=meta.get('LOGO', ''))
         mti.font = bold
         mti.alignment = Alignment(horizontal='center', vertical='center')
         ws.cell(footer_r, 1).border = Border(
@@ -3363,7 +3364,7 @@ class BornierTableExtractor:
 
         # Cellule gauche fusionnée verticalement
         mti = f1_col0.merge(f2_col0)
-        mti.text = self._tpl.footer_left_label
+        mti.text = meta.get('LOGO', '')
         if mti.paragraphs[0].runs:
             mti.paragraphs[0].runs[0].bold = True
 

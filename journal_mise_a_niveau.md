@@ -481,10 +481,8 @@ comparaison, elle, ignorait déjà les espaces : sa sévérité ne change pas.
   (M A T R A) est prise pour le bloc gauche, pas pour du COMPLEMENT.
 - Révisions de la garde de PE137 : quelques faux indices ramassés sous le tableau (AL2, 53,
   A4) ; ils élargissent la liste et ne peuvent pas masquer un INDICE absent.
-- La cellule gauche du pied Excel affiche toujours le libellé du modèle (« M  T  I ») et non le
-  logo du document (« MATRA ») : écrite par `ocr_processor._fill_worksheet`, non modifié.
-- Mode Tesseract (hors production) : `ocr_processor._extract_meta` garde son INDICE « 0 » par
-  défaut et son O→0 ; non modifié.
+- ~~Cellule gauche du pied = libellé du modèle~~ et ~~INDICE « 0 » du mode Tesseract~~ → corrigés le
+  2026-09-30 (voir « Logo du pied » ci-dessous).
 - ~~PE137 : alerte « BORNIER absent » sur les 48 pages~~ → remplacée le 2026-09-30 (voir ci-dessous).
 
 ### Suite de l'étape 7 (2026-09-30)
@@ -498,3 +496,25 @@ comparaison, elle, ignorait déjà les espaces : sa sévérité ne change pas.
   pages 9 et 104 orphelines, 419/656 cellules identiques (19 confusions, 61 contenus
   différents, 97 espacements, 60 manquants), 19 pieds faux, 4 lignes orphelines. Étape 4 :
   3 pages, 668/668, 0 pied faux, 0 position fausse.
+
+### Logo du pied et INDICE Tesseract (2026-09-30, `ocr_processor.py` autorisé)
+
+- La cellule gauche du pied prend le texte du document au format « M A T R A » ; vide si le
+  document n'en montre pas. Plus jamais le libellé du modèle (« M  T  I » était inventé : les
+  Excel corrigés à la main de PE135, PE136, PE137 portent « M A T R A »).
+- Formes lues (`pied_page.logo_pied`) : lettres espacées (PE137), mot seul (« MATRA », pages
+  TP2 de PE137), une lettre par ligne (logo vertical des scans de 223111PE011), avec ou sans
+  cadre. Claude : ligne `LOGO:` demandée dans le prompt (un logo n'est pas une ligne de texte,
+  Claude pourrait l'omettre du PIED_BRUT) ; à défaut, lettres relevées dans le PIED_BRUT ;
+  désaccord = alerte.
+- `ocr_processor.py`, lignes modifiées : 2144-2146 (INDICE absent = pas de clé, O→0 conservé
+  pour un INDICE lu), 3259 (cellule gauche Excel = `meta.get('LOGO', '')`), 3367 (même chose
+  dans l'ancienne sortie Word).
+- Tests : `test_methods.py` vérifiait l'INDICE « 0 » inventé (2 tests réécrits : absent = pas
+  de clé) ; l'instantané Excel (`test_non_regression_xlsx`) reste **non régénéré** : ses données
+  fabriquées portent désormais le logo qu'un lecteur aurait relevé (`LOGO: 'M  T  I'`).
+- Rejeu : PE137 0 écart, 48 pages, « M A T R A » sur les 48 pieds ; extrait inchangé (10 pages,
+  2 cellules, 5 pieds faux). Cellule gauche des 8 pages Claude de l'extrait vide au rejeu (les
+  réponses rejouées n'ont pas de ligne LOGO) : à vérifier au passage réel.
+- **À confirmer** : les pages vectorielles de 223111PE011 (122a, 104) portent « SIEMENS »
+  (horizontal) et non MATRA ; au format demandé la cellule vaut « S I E M E N S ».

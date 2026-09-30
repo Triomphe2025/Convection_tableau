@@ -14,7 +14,8 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from pied_page import analyser_pied, indices_revisions, mots_decor, nettoyer_lignes_pied
+from pied_page import (analyser_pied, indices_revisions, logo_pied, mots_decor,
+                       nettoyer_lignes_pied)
 from template import DEFAULT_TEMPLATE, TableTemplate
 
 logger = logging.getLogger(__name__)
@@ -611,6 +612,9 @@ class PdfTableExtractor:
         pied_brut = nettoyer_lignes_pied(pied, self._tpl.footer_left_label)
         meta = analyser_pied(pied_brut, decor=self._decor_pied())
         meta['PIED_BRUT'] = pied_brut
+        logo = logo_pied(pied, self._tpl.footer_left_label)
+        if logo:
+            meta['LOGO'] = logo
         # En-tête reconnu = tableau, même sans ligne (CABLE : RESERVE) : la page
         # vide est conservée telle quelle dans le classeur.
         return {
@@ -1070,6 +1074,9 @@ class PdfTableExtractor:
         pied_brut = nettoyer_lignes_pied(lignes, self._tpl.footer_left_label)
         meta = analyser_pied(pied_brut, decor=self._decor_pied())
         meta['PIED_BRUT'] = pied_brut
+        logo = logo_pied(lignes, self._tpl.footer_left_label)
+        if logo:
+            meta['LOGO'] = logo
         return meta
 
     # -- Methodes compatibles avec generer_classeur.py -------------------
