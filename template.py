@@ -73,25 +73,35 @@ class TableTemplate:
         """
         Construit le dict de substitution pour format_map().
         Toutes les clés de meta sont incluses (champs standards ET champs
-        personnalisés comme CABLE, TYPE…). Les clés manquantes retournent ''.
-        INDICE vaut '0' par défaut.
+        personnalisés comme CABLE, TYPE…). Une clé absente rend '' : aucune
+        valeur n'est inventée (plus d'INDICE « 0 » par défaut).
         """
         safe: Dict = defaultdict(str)
         for k, v in meta.items():
-            safe[k] = str(v or '').strip()
-        safe.setdefault('PET',     '')
-        safe.setdefault('BORNIER', '')
-        safe.setdefault('PAGE',    '')
-        safe.setdefault('NO_PLAN', '')
-        safe.setdefault('INDICE',  meta.get('INDICE', '0') or '0')
+            if k != 'PIED_BRUT':
+                safe[k] = str(v or '').strip()
         return safe
 
+    @staticmethod
+    def _lignes_brutes(meta: Dict) -> List[str]:
+        """(ligne 1, ligne 2) du pied lu tel quel, ou [] si aucun pied brut n'a été lu.
+
+        L'Excel n'a que 2 lignes de pied : la dernière ligne du document va en
+        ligne 2 (N° PLAN / INDICE / PAGE), les précédentes sont mises bout à bout
+        en ligne 1 (CABLE puis TYPE sur deux lignes dans 223111PE011).
+        """
+        lignes = [str(x).strip() for x in (meta.get('PIED_BRUT') or []) if str(x).strip()]
+        if not lignes:
+            return []
+        if len(lignes) == 1:
+            return [lignes[0], '']
+        return ['     '.join(lignes[:-1]), lignes[-1]]
+
     def render_footer_row1(self, meta: Dict) -> str:
-        """
-        Rend la ligne 1 du pied depuis footer_row1_format.
-        Tous les placeholders présents dans le format sont résolus depuis meta
-        (champs standards ET champs personnalisés définis dans footer_extract_fields).
-        """
+        """Ligne 1 du pied : le pied brut lu s'il existe, sinon footer_row1_format."""
+        brutes = self._lignes_brutes(meta)
+        if brutes:
+            return brutes[0]
         safe = self._build_safe_meta(meta)
         try:
             return self.footer_row1_format.format_map(safe)
@@ -99,11 +109,10 @@ class TableTemplate:
             return f"P.E.T.   :     {safe['PET']:<50}BORNIER :    {safe['BORNIER']}"
 
     def render_footer_row2(self, meta: Dict) -> str:
-        """
-        Rend la ligne 2 du pied depuis footer_row2_format.
-        Tous les placeholders présents dans le format sont résolus depuis meta
-        (champs standards ET champs personnalisés définis dans footer_extract_fields).
-        """
+        """Ligne 2 du pied : le pied brut lu s'il existe, sinon footer_row2_format."""
+        brutes = self._lignes_brutes(meta)
+        if brutes:
+            return brutes[1]
         safe = self._build_safe_meta(meta)
         try:
             return self.footer_row2_format.format_map(safe)

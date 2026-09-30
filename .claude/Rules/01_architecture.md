@@ -17,6 +17,7 @@ Chaque fichier Python du projet a un rôle unique. Ne jamais mélanger les rôle
 | `docling_ocr.py` | `DoclingExtractor` : OCR par IA locale Docling (IBM Research) |
 | `verificateur.py` | Vérification de conversion : compare deux lectures au format pivot et classe les divergences (IDENTIQUE / BENIN / A_VERIFIER) — module pur, aucun OCR, PDF ni Excel |
 | `mesure_precision.py` | Mesure de précision : compare une sortie à une référence organisée à l'avance (PDF vectoriel ou Excel de vérité terrain) et classe les écarts (cellule, pied de page, position) — module pur, aucun OCR, PDF ni Excel |
+| `pied_page.py` | Pied de page : lignes brutes → toutes les paires LIBELLÉ : valeur, COMPLEMENT (texte libre), indices de révision des pages de garde — module pur, partagé par la grille PDF et la lecture Claude (Claude recopie, le code structure) |
 | `mesurer_precision.py` | Script CLI : lit `.xlsx`/vérité terrain/PDF vectoriel, appelle `mesure_precision`, écrit `mesures.csv` |
 | `generer_classeur.py` | Génération Excel (2 feuilles distinctes) |
 | `word_table_importer.py` | Import tableaux depuis Word structuré |

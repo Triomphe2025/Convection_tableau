@@ -430,3 +430,60 @@ la page 122, `alertes_sequence_pages` écrirait « page 122 répétée » dans l
 **Consigne « ?? » conservée** (coût quasi nul). Elle ne protège pas contre une erreur commise
 avec assurance : page 119, Opus lit « CC » sans hésiter et n'écrit pas « ?? ». Détecter ces
 erreurs est le rôle des étapes 8 (double lecture) et 9 (plus aucune substitution silencieuse).
+
+## Étape 7 — Pied de page lu tel quel, rien d'inventé (2026-09-30)
+
+Choix validés le 2026-09-30 : complément découpé par une table en config ; P.E.T. « EPEULE » et
+INDICE « 0 » supprimés comme « bornier_57 » ; pied de l'Excel = lignes brutes ; révisions lues
+sur les gardes vectorielles et demandées à Claude sur les gardes scannées.
+
+- `pied_page.py` (nouveau, module pur) : nettoyage des lignes (cadre, séparateurs, logo),
+  toutes les paires `LIBELLÉ :` sans liste figée, COMPLEMENT pour le texte libre, indices de
+  révision. Libellés à valeur d'un mot : `PIED_LIBELLES_UN_MOT` (TYPE, CABLE, INDICE, PAGE,
+  BORNIER) ; « n/m » compteur seulement après PAGE/FOLIO (`PIED_LIBELLES_COMPTEUR`).
+- Grille PDF et `_extract_meta` PDF passent par ce module (fini « TYPE : 7P.279 » perdu et
+  « 6/10 » supprimé ; plus de O→0 silencieux sur l'INDICE lu en couche texte).
+- Claude : bloc `PIED_BRUT:` recopié ligne à ligne, structuré localement ; le JSON META ne
+  complète que les libellés absents du pied recopié, un désaccord devient une alerte.
+  Pages de garde : ligne `REVISIONS:`.
+- Excel : le pied affiche les lignes brutes (dernière ligne en ligne 2, les précédentes bout à
+  bout en ligne 1) ; les formats du modèle ne servent plus que sans pied brut (Tesseract,
+  anciens journaux). Plus de nom de bornier tiré du fichier, de P.E.T. de repli ni d'INDICE 0.
+- Contrôles, en alerte seulement : champ de `footer_extract_fields` absent (groupé par champ),
+  INDICE absent des révisions des gardes, N° PLAN différent de la majorité, désaccords du
+  lecteur. Aucune valeur modifiée.
+
+### Mesure par rejeu (sans API)
+
+| Mesure | Avant (fin étape 6) | Après |
+|--------|---------------------|-------|
+| Extrait : pages / cellules fausses | 10 / 2 | 10 / 2 |
+| Extrait : pieds faux | 7 | **5** (122a : TYPE 7P.279 et COMPLEMENT 6/10 retrouvés) |
+| 223400PE137 contre son PDF | 48 pages, 0 écart | 48 pages, 0 écart |
+| Alertes PE137 | — | BORNIER absent (48 pages, modèle REPARTITEUR) ; aucune alerte INDICE |
+
+Les 5 pieds faux restants sont les compléments des pages lues par Claude (2, 3, 119, 122, 123) :
+les réponses rejouées n'ont pas de bloc PIED_BRUT. **Seul le passage réel mesurera le nouveau
+prompt** (cible : 0 pied faux).
+
+### Outil de mesure ajusté (pas le produit)
+
+Le pied brut garde l'espacement du document (« N°   PLAN », « INDICE        : ») : le lecteur de
+mesure (`mesurer_precision._est_pied`, `mesure_precision._LABEL_PIED_RE`) tolère désormais
+tout nombre d'espaces dans ses mots-clés. Sans cela la page 104 n'était plus appariée. La
+comparaison, elle, ignorait déjà les espaces : sa sévérité ne change pas.
+
+### Limites connues
+
+- « JARRETIERAGE » (texte fixe du modèle REPARTITEUR) est écarté des valeurs par
+  `mots_decor` ; il reste visible dans le pied brut.
+- Logo : une ligne d'un seul mot en lettres (SIEMENS, MATRA) ou en lettres espacées
+  (M A T R A) est prise pour le bloc gauche, pas pour du COMPLEMENT.
+- Révisions de la garde de PE137 : quelques faux indices ramassés sous le tableau (AL2, 53,
+  A4) ; ils élargissent la liste et ne peuvent pas masquer un INDICE absent.
+- La cellule gauche du pied Excel affiche toujours le libellé du modèle (« M  T  I ») et non le
+  logo du document (« MATRA ») : écrite par `ocr_processor._fill_worksheet`, non modifié.
+- Mode Tesseract (hors production) : `ocr_processor._extract_meta` garde son INDICE « 0 » par
+  défaut et son O→0 ; non modifié.
+- PE137 avec le modèle REPARTITEUR : alerte « BORNIER absent » sur les 48 pages (le modèle
+  attend BORNIER, le document écrit JARRETIERAGE).

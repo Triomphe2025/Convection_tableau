@@ -10,6 +10,7 @@ Usage :
 
 import re
 import sys
+from collections import Counter
 import time
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
@@ -153,7 +154,7 @@ def raison_page_ignoree(result: Dict, colonnes_modele, min_rows: int,
     """Raison d'écarter la page du classeur, ou None si elle est conservée."""
     if not result.get('success'):
         erreur = result.get('error')
-        if erreur == _ERREUR_HORS_TABLEAU:
+        if erreur in (_ERREUR_HORS_TABLEAU, 'non-listing'):
             return "pas un tableau de câblage (page de garde, modifications, sommaire)"
         return erreur or "lecture impossible, aucune donnée rendue par le moteur"
     attendues = {h.upper() for h in colonnes_modele}
@@ -229,6 +230,48 @@ def alertes_sequence_pages(resultats: List[Dict]) -> List[str]:
     return alertes
 
 
+def _compact(valeur) -> str:
+    return re.sub(r'\s+', '', str(valeur or '')).upper()
+
+
+def alertes_pied(tous: List[Dict], valides: List[Dict], champs_attendus) -> List[str]:
+    """Contrôles du pied, en alerte seulement : aucune valeur n'est complétée ni corrigée."""
+    alertes = []
+    for r in valides:
+        for alerte in r.get('metadata', {}).get('ALERTES_PIED') or []:
+            alertes.append(f"page {numero_page(r)} : {alerte}")
+
+    for cle in champs_attendus:
+        manquantes = [numero_page(r) for r in valides
+                      if not str(r.get('metadata', {}).get(cle, '')).strip()]
+        if manquantes:
+            alertes.append(f"champ {cle} absent du pied, laissé vide : "
+                           f"page(s) {', '.join(manquantes)}")
+
+    revisions = {_compact(x) for r in tous
+                 for x in (r.get('metadata') or {}).get('REVISIONS') or []}
+    if not revisions:
+        alertes.append("contrôle INDICE impossible : aucune liste de révisions lue "
+                       "sur une page de garde")
+    else:
+        for r in valides:
+            indice = r.get('metadata', {}).get('INDICE')
+            if indice and _compact(indice) not in revisions:
+                alertes.append(f"page {numero_page(r)} : INDICE {indice} absent des "
+                               f"révisions de la page de garde (non modifié)")
+
+    plans = Counter(_compact(r['metadata']['NO_PLAN']) for r in valides
+                    if r.get('metadata', {}).get('NO_PLAN'))
+    if len(plans) > 1:
+        majorite, nombre = plans.most_common(1)[0]
+        for r in valides:
+            plan = r.get('metadata', {}).get('NO_PLAN')
+            if plan and _compact(plan) != majorite:
+                alertes.append(f"page {numero_page(r)} : N° PLAN {plan} différent de la "
+                               f"majorité ({majorite}, {nombre} pages), non corrigé")
+    return alertes
+
+
 # ──────────────────────────────────────────────────────────────────────
 # Génération du classeur Excel combiné
 # ──────────────────────────────────────────────────────────────────────
@@ -259,7 +302,6 @@ def generer_excel(
     """
     log = on_log or print
     page_size = Config.PAGE_SIZE
-    station = Config.STATION_NAME
     dictionary = get_dictionary()
 
     valides = []
@@ -276,6 +318,9 @@ def generer_excel(
     # Ordre du document conservé, numéros tels que lus : un tri ou un numéro
     # tiré du nom d'image masquerait une page manquante ou mal lue.
     for alerte in alertes_sequence_pages(valides):
+        log(f"  ⚠ {alerte}")
+    champs_attendus = [fd.get('key', '') for fd in extractor._tpl.footer_extract_fields]
+    for alerte in alertes_pied(results, valides, champs_attendus):
         log(f"  ⚠ {alerte}")
 
     total = len(valides)
@@ -311,25 +356,22 @@ def generer_excel(
     current_row = 1
 
     for i, result in enumerate(valides):
-        meta = result.get('metadata', {})
-        img_stem = Path(result.get('image_path', f'bornier_{i+1}')).stem
-        # Nom du bornier : OCR ou nom du fichier image
-        bornier_name = (meta.get('BORNIER') or img_stem).strip()
-
+        # Aucun nom de bornier ni P.E.T. de repli : un champ absent du pied
+        # reste vide (alerte ci-dessus), jamais tiré du nom de fichier.
         next_row = extractor._fill_worksheet(
             ws, result,
             start_row=current_row,
             page_size=page_size,
             dictionary=dictionary,
-            bornier_name=bornier_name,
-            pet_name=station,
+            bornier_name=None,
+            pet_name=None,
         )
 
         if i < total - 1:
             ws.row_breaks.append(Break(id=next_row - 1))
         current_row = next_row
 
-        barre(i + 1, total, bornier_name)
+        barre(i + 1, total, numero_page(result))
 
     # Zone d'impression = toute la feuille remplie
     n_cols = len(extractor._tpl.columns)
@@ -364,19 +406,13 @@ def generer_excel(
             cur2 = 1
             n_cols2 = len(extractor._tpl.columns)
             for j, result in enumerate(valides_w):
-                meta = result.get('metadata', {})
-                img_stem = Path(
-                    result.get('image_path', f'word_{j+1}')
-                ).stem
-                bornier_name = (meta.get('BORNIER') or img_stem).strip()
-
                 next_row2 = extractor._fill_worksheet(
                     ws2, result,
                     start_row=cur2,
                     page_size=page_size,
                     dictionary=dictionary,
-                    bornier_name=bornier_name,
-                    pet_name=station,
+                    bornier_name=None,
+                    pet_name=None,
                 )
 
                 if j < n_word - 1:

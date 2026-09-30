@@ -96,8 +96,8 @@ class Config:
     # 📄 OPTIONS MISE EN PAGE EXCEL
     # ========================================
 
-    # Nom de la station P.E.T. affiché dans le pied de page de chaque bornier.
-    # Utilisé comme valeur de repli si l'OCR ne parvient pas à l'extraire.
+    # Nom de la station (rapports de livraison). Ne remplit plus jamais le pied :
+    # un P.E.T. absent du document reste vide, avec une alerte (étape 7).
     STATION_NAME = "EPEULE"
 
     # Nombre de lignes par page A4 (1 en-tête + données + rembourrage + 2 pied).
@@ -119,6 +119,21 @@ class Config:
     MARQUEUR_ILLISIBLE = "??"
     # Rouge clair, distinct du jaune « confiance OCR basse » (FFFF99).
     COULEUR_ILLISIBLE = "FFC7CE"
+
+    # ══════════════════════════════════════════════════════════════════
+    # PIED DE PAGE (pied_page.py) — lu tel quel, jamais complété
+    # ══════════════════════════════════════════════════════════════════
+    # Libellés dont la valeur est un seul mot : le texte qui suit (« 8/10 »,
+    # « CORDON TYPE 40 », « REF CE 8707905 ») va dans COMPLEMENT. Les autres
+    # libellés (N° PLAN, P.E.T., libellés inconnus) gardent tout leur segment.
+    PIED_LIBELLES_UN_MOT = ("TYPE", "CABLE", "INDICE", "PAGE", "BORNIER")
+    # Seuls libellés derrière lesquels « n/m » est un compteur de pages ; ailleurs
+    # « 6/10 » est un diamètre de conducteur (dixièmes de mm), donc du COMPLEMENT.
+    PIED_LIBELLES_COMPTEUR = ("PAGE", "FOLIO")
+    # En-têtes de colonne d'un tableau des révisions (page de garde).
+    PIED_ENTETES_REVISIONS = ("INDICE", "RÉVISION", "REVISION", "EDITION", "ÉDITION")
+    # Forme d'un indice de révision : « A », « R », « 00 », « R10 », « TP2 ».
+    PIED_INDICE_MOTIF = r"[A-Z]{0,2}\d{1,2}|[A-Z]"
 
     # Nombre max de colonnes de template affectées automatiquement.
     # Au-delà, l'affectation automatique par frontières pixel devient peu

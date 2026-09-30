@@ -55,7 +55,9 @@ def _est_entete(valeurs: List[str]) -> bool:
 
 def _est_pied(valeurs: List[str]) -> bool:
     haut = [v.strip().upper() for v in valeurs]
-    joint = ' '.join(haut)
+    # Pied recopié tel qu'imprimé depuis l'étape 7 : « N°   PLAN », « INDICE     : ».
+    joint = re.sub(r'\s*:', ' :', ' '.join(' '.join(haut).split()))
+    joint = re.sub(r'N°\s*PLAN', 'N° PLAN', joint)
     return any(v for v in haut) and (
         any(mk in haut for mk in _FOOTER_KWS_EXACT)
         or any(mk in joint for mk in _FOOTER_KWS_SUBSTR)

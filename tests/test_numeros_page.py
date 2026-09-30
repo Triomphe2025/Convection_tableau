@@ -106,7 +106,9 @@ class TestGenererExcelOrdreEtNumeros(unittest.TestCase):
         messages, valeurs = self._classeur([b3, b1, b2])
         positions = [valeurs.index(v) for v in ('ALIM 24V', 'COMMUN TS GR3 105TS', 'TC IDPO1')]
         self.assertEqual(positions, sorted(positions), "ordre 3-1-2 non conservé")
-        alertes = [m.strip() for m in messages if '⚠' in m]
+        # Depuis l'étape 7, d'autres contrôles (révisions, champs absents) écrivent
+        # aussi des alertes : seules celles de séquence concernent l'ordre.
+        alertes = [m.strip() for m in messages if '⚠' in m and 'séquence' in m]
         self.assertEqual(alertes, ["⚠ séquence non croissante : page 1 après page 3 "
                                    "(ordre du document conservé)"])
 
@@ -130,9 +132,9 @@ class TestLectureSuffixe(unittest.TestCase):
         self.assertEqual(_meta_pied(ex, 'INDICE : TP3 PAGE : 122a')['PAGE'], '122a')
         self.assertEqual(_meta_pied(ex, 'PAGE: 44B')['PAGE'], '44B')
 
-    def test_pdf_mot_colle_non_pris_pour_suffixe(self):
+    def test_pdf_libelle_suivant_non_pris_dans_le_numero(self):
         ex = pe.PdfTableExtractor(TemplateManager().get('REPARTITEUR 2'))
-        self.assertEqual(_meta_pied(ex, 'PAGE : 92PET')['PAGE'], '92')
+        self.assertEqual(_meta_pied(ex, 'PAGE : 92 P.E.T. : GRAND-BUT')['PAGE'], '92')
 
     def test_grille_page_122a_de_223111PE011(self):
         tpl = TemplateManager().get('REPARTITEUR 2')

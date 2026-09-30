@@ -14,6 +14,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from pied_page import analyser_pied, indices_revisions, mots_decor, nettoyer_lignes_pied
 from template import DEFAULT_TEMPLATE, TableTemplate
 
 logger = logging.getLogger(__name__)
@@ -213,9 +214,6 @@ _PIED_GRILLE_RE = re.compile(
     re.IGNORECASE,
 )
 _SEPARATEUR_RE = re.compile(r'^[\s|\-_°=]*$')
-# Une lettre isolée après les chiffres est un suffixe (122a) ; suivie d'autres
-# lettres, c'est le mot suivant collé (« 92PET ») et elle n'est pas prise.
-_PAGE_RE = r'PAGE\s*[:\-]?\s*(\d+(?:[A-Z](?![A-Z]))?)'
 
 
 def _mot_cle(texte: str) -> str:
@@ -559,6 +557,9 @@ class PdfTableExtractor:
             result = self._fail(page_num)
             result['detection_method'] = 'pdf-grille'
             result['error'] = "pas d'en-tête du modèle (page de garde, modifications…)"
+            revisions = indices_revisions(lignes)
+            if revisions:
+                result['metadata'] = {'REVISIONS': revisions}
             return result
 
         # Lignes de section (« NOM DU CABLE : GAT/CA 01 ») testées AVANT le pied :
@@ -607,9 +608,9 @@ class PdfTableExtractor:
                 rows.append({'type': 'data', 'cells': cellules, 'confidence': [100] * n})
         if len(cellules_par_ligne) in sections:
             rows.append({'type': 'section', 'text': sections[len(cellules_par_ligne)]})
-        # Espaces réduits pour le pied seulement : _extract_meta borne à 30
-        # caractères l'écart entre « PET : GRAND-BUT » et « JARRETIERAGE ».
-        meta = self._extract_meta([[(0, 0, 0, 0, ' '.join(lg.split()))] for lg in pied])
+        pied_brut = nettoyer_lignes_pied(pied, self._tpl.footer_left_label)
+        meta = analyser_pied(pied_brut, decor=self._decor_pied())
+        meta['PIED_BRUT'] = pied_brut
         # En-tête reconnu = tableau, même sans ligne (CABLE : RESERVE) : la page
         # vide est conservée telle quelle dans le classeur.
         return {
@@ -1060,60 +1061,15 @@ class PdfTableExtractor:
 
     # -- Extraction des metadonnees --------------------------------------
 
+    def _decor_pied(self):
+        return mots_decor([self._tpl.footer_row1_format, self._tpl.footer_row2_format])
+
     def _extract_meta(self, footer_lines: List[List]) -> Dict:
-        """Extrait BORNIER, PAGE, PET, INDICE, NO_PLAN depuis les lignes de pied."""
-        brut = ' '.join(w[4] for line in footer_lines for w in line)
-        text = brut.upper()
-        meta: Dict = {}
-
-        m = re.search(
-            r'P\.?E\.?T\.?\s*[:\-]?\s*([A-Z][A-Z0-9\s\-]{1,30}?)(?:BORNIER|JARRET|\||\Z)',
-            text)
-        if m:
-            meta['PET'] = m.group(1).strip()
-
-        m = re.search(r'BORNIER\s*[:\-]?\s*([A-Z0-9\-]{2,20})', text)
-        if m:
-            meta['BORNIER'] = m.group(1).strip()
-
-        m = re.search(
-            r'(?:NO\.?\s*PLAN|N\xb0\s*PLAN)\s*[:\-]?\s*([A-Z0-9\s]{3,30}?)(?:\||INDICE|\Z)',
-            text)
-        if m:
-            meta['NO_PLAN'] = m.group(1).strip()
-
-        m = re.search(r'INDICE\s*[:\-]?\s*([0-9A-Z]{1,5})', text)
-        if m:
-            meta['INDICE'] = m.group(1).strip().replace('O', '0')
-
-        # Lettre finale comprise (122a, 44B), casse d'origine : le numéro est
-        # recopié tel qu'imprimé, jamais recalculé ni renuméroté.
-        m = re.search(_PAGE_RE, brut, re.IGNORECASE)
-        if m:
-            meta['PAGE'] = m.group(1).strip()
-
-        # Champs personnalisés définis dans footer_extract_fields (ex: CABLE, TYPE)
-        # Analyse ligne par ligne : évite que "10/10" (compteur de pages en fin de
-        # ligne TYPE) ne pollue le pattern qui travaillait sur le texte joint.
-        _standard = {'PET', 'BORNIER', 'NO_PLAN', 'INDICE', 'PAGE'}
-        line_texts = [' '.join(w[4] for w in line).upper() for line in footer_lines]
-        for fdef in self._tpl.footer_extract_fields:
-            key   = fdef.get('key', '').upper()
-            label = fdef.get('label', '').upper()
-            if not key or not label or key in _standard or key in meta:
-                continue
-            label_re = re.sub(r'\.', r'\\.?', re.escape(label))
-            label_re = label_re.replace(r'\ ', r'\\s+')
-            for lt in line_texts:
-                m = re.search(
-                    rf'{label_re}\s*[:\-]\s*([A-Z0-9/][A-Z0-9\s\-/]{{0,50}}?)'
-                    rf'(?:\s+\d+/\d+)?$',
-                    lt.strip()
-                )
-                if m:
-                    meta[key] = m.group(1).strip()
-                    break
-
+        """Paires LIBELLÉ : valeur du pied (pied_page), lignes brutes dans PIED_BRUT."""
+        lignes = [' '.join(w[4] for w in line) for line in footer_lines]
+        pied_brut = nettoyer_lignes_pied(lignes, self._tpl.footer_left_label)
+        meta = analyser_pied(pied_brut, decor=self._decor_pied())
+        meta['PIED_BRUT'] = pied_brut
         return meta
 
     # -- Methodes compatibles avec generer_classeur.py -------------------

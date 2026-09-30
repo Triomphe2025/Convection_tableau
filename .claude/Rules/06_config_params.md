@@ -20,11 +20,15 @@ Config.TESSERACT_PATH   # référencer uniquement
 | `TESSERACT_PATH` | `C:\Tesseract\TesseractOCR\tesseract.exe` | Chemin Tesseract |
 | `OCR_LANGUAGE` | `fra` | Langue Tesseract |
 | `PAGE_SIZE` | `48` | Lignes par page A4 dans Excel |
-| `STATION_NAME` | `EPEULE` | Nom P.E.T. de repli si OCR échoue |
+| `STATION_NAME` | `EPEULE` | Nom de station des rapports ; ne remplit plus jamais le pied (P.E.T. absent = vide + alerte) |
 | `MIN_DATA_ROWS` | `1` | Seuil minimal de lignes pour valider un bornier ; un tableau vide (0 ligne sous l'en-tête) est conservé |
 | `PAGE_DENSITE_MIN` | `0.15` | Part minimale de cellules lisibles ; en dessous la page est écartée (gribouillage) |
 | `MARQUEUR_ILLISIBLE` | `??` | Écrit par Claude à la place d'un caractère illisible (prompt) ; gardé dans l'Excel |
 | `COULEUR_ILLISIBLE` | `FFC7CE` | Fond des cellules contenant le marqueur (distinct du jaune « confiance basse ») |
+| `PIED_LIBELLES_UN_MOT` | `TYPE, CABLE, INDICE, PAGE, BORNIER` | Libellés à valeur d'un mot ; la suite va dans COMPLEMENT (les autres gardent tout leur segment) |
+| `PIED_LIBELLES_COMPTEUR` | `PAGE, FOLIO` | Seuls libellés où « n/m » est un compteur ; ailleurs « 6/10 » est un diamètre → COMPLEMENT |
+| `PIED_ENTETES_REVISIONS` | `INDICE, RÉVISION, EDITION…` | En-têtes d'un tableau des révisions (page de garde) |
+| `PIED_INDICE_MOTIF` | `[A-Z]{0,2}\d{1,2}\|[A-Z]` | Forme d'un indice de révision (A, R, 00, R10, TP2) |
 | `IMAGES_FOLDER_NAME` | `VD23111 PE 162` | Nom du dossier de sortie des images |
 | `OCR_MODE` | `tesseract` | Mode OCR par défaut |
 | `CLAUDE_API_KEY` | `""` | Clé API Anthropic |

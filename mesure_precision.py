@@ -331,7 +331,7 @@ def classer_cellule(valeur_ref, valeur_conv) -> str:
 # ── Pieds de page : paires LIBELLÉ : valeur, sans liste figée ─────────
 
 _LABEL_PIED_RE = re.compile(
-    r"((?:N°|NO)\s?PLAN|P\.?E\.?T\.?|\bCABLE|\bTYPE|INDICE|BORNIER|REF\s+CE|COMPL[EÉ]MENT)\s*:\s*"
+    r"((?:N°|NO)\s*PLAN|P\.?E\.?T\.?|\bCABLE|\bTYPE|INDICE|BORNIER|REF\s+CE|COMPL[EÉ]MENT)\s*:\s*"
     r"|(PAGE)\s*:?\s*(?=\w)",
     re.IGNORECASE,
 )

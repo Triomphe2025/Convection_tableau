@@ -162,6 +162,7 @@ Fichier Word source (.docx) — images de borniers scannés
 | `recuperer_image.py` | `ImageExtractor` + `ImageStorage` — extraction images du ZIP `.docx` |
 | `verificateur.py` | Vérification de conversion : compare deux lectures (format pivot) et classe les divergences en IDENTIQUE / BENIN / A_VERIFIER — module pur, appelé uniquement par `converter.py` (`Converter.verifier_conversion`) |
 | `mesure_precision.py` | Mesure de précision : compare une sortie à une référence organisée à l'avance (PDF vectoriel ou Excel de vérité terrain), classe les écarts cellule/pied/position — module pur, outil de QA indépendant du produit livré |
+| `pied_page.py` | Pied de page : lignes brutes → toutes les paires LIBELLÉ : valeur, COMPLEMENT (texte libre), indices de révision des pages de garde — module pur, partagé par la grille PDF et la lecture Claude (Claude recopie, le code structure) |
 | `mesurer_precision.py` | Script CLI : `python mesurer_precision.py <sortie.xlsx> <reference>` — lit les fichiers, appelle `mesure_precision`, écrit une ligne dans `mesures.csv` |
 
 ### Fichiers de packaging et outils
@@ -214,7 +215,7 @@ pytest tests\ -v
 | `TESSERACT_PATH` | `C:\Tesseract\TesseractOCR\tesseract.exe` | Chemin Tesseract OCR |
 | `OCR_LANGUAGE` | `fra` | Langue Tesseract |
 | `PAGE_SIZE` | `48` | Lignes par page A4 dans Excel |
-| `STATION_NAME` | `EPEULE` | Nom P.E.T. de repli si OCR échoue |
+| `STATION_NAME` | `EPEULE` | Nom de station des rapports ; ne remplit plus jamais le pied (P.E.T. absent = vide + alerte) |
 | `MIN_DATA_ROWS` | `1` | Seuil minimal de lignes pour valider un bornier |
 | `IMAGES_FOLDER_NAME` | `VD23111 PE 162` | Nom du dossier de sortie des images |
 
@@ -393,6 +394,7 @@ Raccourci → `/build-exe`.
 | v1.7 | 2026-09 | `campagne_mesure.py` : campagne de mesure des modèles Claude (surcharge en mémoire, sortie dans `mesures/`, historique `mesures/campagne.csv`, coût estimé par `CLAUDE_PRIX_MODELES`, plafond `CAMPAGNE_BUDGET_MAX_USD`) ; garde-fou de troncature (max_tokens 64000 à effort xhigh/max, réponse tronquée = page en erreur) |
 | v1.7 | 2026-09 | Étape 6 : `MIN_DATA_ROWS` = 1 ; chaque page écartée écrite au journal (« page ignorée : <numéro> <raison> ») ; tableau vide (CABLE : RESERVE) conservé |
 | v1.7 | 2026-09 | Étape 6 : numéros de page à suffixe (122a, 44B), ni renumérotés ni retriés — ordre du document conservé, alerte si la séquence n'est pas croissante |
+| v1.7 | 2026-09 | Étape 7 : pied de page lu sans liste figée (`pied_page.py`) — toutes les paires LIBELLÉ : valeur, texte libre en COMPLEMENT, « 6/10 » diamètre sauf après PAGE/FOLIO ; Claude recopie le pied (bloc `PIED_BRUT`), le code le structure ; l'Excel affiche le pied brut ; aucune valeur inventée (ni nom de bornier tiré du fichier, ni P.E.T. EPEULE, ni INDICE 0) ; alertes : champ absent, INDICE hors révisions de la page de garde, N° PLAN minoritaire |
 | v1.7 | 2026-09 | Étape 6 : caractère illisible → Claude écrit « ?? » (jamais deviné ni corrigé), gardé dans l'Excel et coloré (`MARQUEUR_ILLISIBLE`, `COULEUR_ILLISIBLE`) |
 
 ---

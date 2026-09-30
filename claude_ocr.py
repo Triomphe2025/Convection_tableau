@@ -196,7 +196,10 @@ def _build_prompt(template) -> str:
         "                             texte descriptif sans tableau de données\n"
         "En cas de doute, choisis listing.\n"
         "Si non-listing : écris uniquement la ligne META ci-dessous,"
-        " sans aucune ligne de données.\n\n"
+        " sans aucune ligne de données. Si la page porte un tableau des révisions"
+        " (indices, éditions), ajoute une ligne REVISIONS: suivie des indices lus"
+        " dans sa 1re colonne, séparés par des espaces (ex : REVISIONS: 00 A 02 R R1 TP1)."
+        "\n\n"
         "ÉTAPE 2 — EXTRACTION (seulement si TYPE_PAGE: listing) :\n"
         f"Colonnes dans l'ordre visuel (de gauche à droite) : {col_zones}\n\n"
         "RÈGLE FONDAMENTALE — INSERTION PAR POSITION :\n"
@@ -219,6 +222,12 @@ def _build_prompt(template) -> str:
         "avec les valeurs trouvées dans le pied de page.\n"
         "PAGE : recopie le numéro exactement comme imprimé, lettre finale comprise"
         " (ex : 122a, 44B) ; ne le déduis jamais des pages voisines.\n"
+        "Puis recopie le pied de page exactement comme il est imprimé, une ligne de"
+        " sortie par ligne du document, chacune précédée de PIED_BRUT: — tous les"
+        " libellés, toutes les valeurs et tout texte libre (ex : REF CE 8707905, 8/10),"
+        " sans rien omettre, corriger ni réordonner :\n"
+        "PIED_BRUT: <1re ligne du pied>\n"
+        "PIED_BRUT: <2e ligne du pied>\n"
     )
 
 
@@ -278,6 +287,8 @@ def _parse_pipe_response(raw: str, template, column_mapping: dict = None) -> tup
     n_cols = len(col_names)
     rows: List[Dict] = []
     metadata: Dict = {}
+    pied_brut: List[str] = []
+    revisions: List[str] = []
     page_type = 'listing'  # défaut : on extrait
 
     for line in raw.splitlines():
@@ -289,6 +300,13 @@ def _parse_pipe_response(raw: str, template, column_mapping: dict = None) -> tup
             val = line[10:].strip().lower()
             if 'non' in val or 'autre' in val or 'cover' in val or 'modif' in val:
                 page_type = 'non-listing'
+            continue
+        # Avant le test du « | » : une ligne de pied recopiée peut en contenir.
+        if line.upper().startswith('PIED_BRUT:'):
+            pied_brut.append(line[len('PIED_BRUT:'):].strip())
+            continue
+        if line.upper().startswith('REVISIONS:'):
+            revisions = line[len('REVISIONS:'):].split()
             continue
         # Ligne métadonnées
         if line.upper().startswith('META:'):
@@ -352,7 +370,45 @@ def _parse_pipe_response(raw: str, template, column_mapping: dict = None) -> tup
             'raw': line,  # segments originaux conservés pour le mode hybride
         })
 
+    if pied_brut:
+        metadata = _structurer_pied(pied_brut, metadata, template)
+    if revisions:
+        metadata['REVISIONS'] = revisions
     return rows, metadata, page_type
+
+
+def _structurer_pied(pied_brut: List[str], meta_json: Dict, template) -> Dict:
+    """Pied recopié par Claude, structuré localement comme une page vectorielle.
+
+    Claude recopie, le code structure : les paires du pied recopié priment. Le
+    JSON META ne complète que les libellés absents du pied recopié ; un
+    désaccord n'est jamais tranché en silence, il devient une alerte.
+    """
+    from pied_page import analyser_pied, mots_decor, nettoyer_lignes_pied
+    propres = nettoyer_lignes_pied(pied_brut, getattr(template, 'footer_left_label', ''))
+    decor = mots_decor([getattr(template, 'footer_row1_format', ''),
+                        getattr(template, 'footer_row2_format', '')])
+    structure = analyser_pied(propres, decor=decor)
+    alertes = []
+    for cle, valeur in meta_json.items():
+        if cle not in structure:
+            continue
+        lu, recopie = _sans_espaces(valeur), _sans_espaces(structure[cle])
+        # « TYPE : 2P.279 8/10 » dans le JSON = TYPE + COMPLEMENT du pied recopié.
+        avec_complement = recopie + _sans_espaces(structure.get('COMPLEMENT', ''))
+        if lu not in (recopie, avec_complement):
+            alertes.append(f"{cle} : META « {valeur} », pied recopié « {structure[cle]} »"
+                           " — pied recopié retenu")
+    fusion = {k: v for k, v in meta_json.items() if k not in structure}
+    fusion.update(structure)
+    fusion['PIED_BRUT'] = propres
+    if alertes:
+        fusion['ALERTES_PIED'] = alertes
+    return fusion
+
+
+def _sans_espaces(valeur) -> str:
+    return re.sub(r'\s+', '', str(valeur or '')).upper()
 
 
 class ClaudeVisionExtractor:
@@ -627,6 +683,7 @@ class ClaudeVisionExtractor:
                 'success': False,
                 'error':   'Page ignorée (page de garde / modifications / sommaire)',
                 'image_path': str(image_path),
+                'metadata': metadata,
                 'detection_method': 'claude-vision',
                 'api_usage': dict(usage, model=modele_servi),
             }
@@ -743,6 +800,7 @@ class LogReplayer:
                     'success':          False,
                     'error':            entry.get('error', 'Erreur inconnue'),
                     'image_path':       entry.get('image', ''),
+                    'metadata':         entry.get('metadata', {}),
                     'detection_method': 'log-replay',
                 })
                 continue
@@ -774,6 +832,7 @@ class LogReplayer:
                         'success': False,
                         'error':   'Page ignorée (page de garde / modifications / sommaire)',
                         'image_path': entry.get('image', ''),
+                        'metadata': metadata,
                         'detection_method': 'log-replay',
                     })
                     continue
