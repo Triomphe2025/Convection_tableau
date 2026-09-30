@@ -191,6 +191,11 @@ class TestPE137PiedsIdentiquesALOriginal(unittest.TestCase):
         for (resultat, _), pied in zip(self.pages, pieds):
             self.assertEqual(pied, resultat['metadata']['PIED_BRUT'][-1])
 
+    def test_bornier_absent_une_ligne_et_non_48(self):
+        lignes = [m for m in self.messages if 'BORNIER' in m]
+        self.assertEqual([m.strip() for m in lignes],
+                         ["⚠ BORNIER absent de tout le document : vérifier le modèle"])
+
     def test_indices_trouves_dans_les_revisions_des_gardes(self):
         self.assertFalse([m for m in self.messages if 'INDICE' in m and '⚠' in m])
 
@@ -290,8 +295,8 @@ class TestAucuneValeurInventee(unittest.TestCase):
         messages, cellules = _excel([_page(meta, image='bornier_57.png', tpl=tpl)], tpl)
         self.assertFalse(any('bornier_57' in c for c in cellules))
         self.assertFalse(any('EPEULE' in c for c in cellules))
-        self.assertTrue(any('champ BORNIER absent' in m for m in messages))
-        self.assertTrue(any('champ PET absent' in m for m in messages))
+        self.assertTrue(any('BORNIER absent de tout le document' in m for m in messages))
+        self.assertTrue(any('PET absent de tout le document' in m for m in messages))
 
     def test_indice_absent_non_invente(self):
         tpl = _tpl()
@@ -334,11 +339,19 @@ class TestAlertesPied(unittest.TestCase):
         self.assertIn('page 3 : N° PLAN 223111PE012 différent de la majorité', alertes[0])
         self.assertEqual(pages[2]['metadata']['NO_PLAN'], '223111PE012')
 
-    def test_champ_attendu_absent_groupe_par_champ(self):
+    def test_champ_absent_de_toutes_les_pages_une_seule_ligne(self):
         garde = {'success': False, 'metadata': {'REVISIONS': ['R']}}
-        pages = [self._meta('1'), self._meta('2')]
+        pages = [self._meta('1'), self._meta('2'), self._meta('3')]
         self.assertEqual(alertes_pied([garde] + pages, pages, ['CABLE']),
-                         ["champ CABLE absent du pied, laissé vide : page(s) 1, 2"])
+                         ["CABLE absent de tout le document : vérifier le modèle"])
+
+    def test_champ_absent_d_une_page_sur_trois_alerte_sur_cette_page(self):
+        garde = {'success': False, 'metadata': {'REVISIONS': ['R']}}
+        pages = [self._meta('1'), self._meta('2'), self._meta('3')]
+        for p in (pages[0], pages[2]):
+            p['metadata']['BORNIER'] = 'B702A'
+        self.assertEqual(alertes_pied([garde] + pages, pages, ['BORNIER']),
+                         ["champ BORNIER absent du pied, laissé vide : page(s) 2"])
 
     def test_alerte_du_lecteur_rapportee_avec_sa_page(self):
         garde = {'success': False, 'metadata': {'REVISIONS': ['R']}}

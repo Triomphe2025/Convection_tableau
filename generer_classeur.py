@@ -244,7 +244,13 @@ def alertes_pied(tous: List[Dict], valides: List[Dict], champs_attendus) -> List
     for cle in champs_attendus:
         manquantes = [numero_page(r) for r in valides
                       if not str(r.get('metadata', {}).get(cle, '')).strip()]
-        if manquantes:
+        if not manquantes:
+            continue
+        # Absent partout = le modèle ne correspond pas au document : une ligne, pas
+        # une par page (un bruit répété apprend à ignorer les alertes).
+        if len(manquantes) == len(valides):
+            alertes.append(f"{cle} absent de tout le document : vérifier le modèle")
+        else:
             alertes.append(f"champ {cle} absent du pied, laissé vide : "
                            f"page(s) {', '.join(manquantes)}")
 

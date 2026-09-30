@@ -485,5 +485,16 @@ comparaison, elle, ignorait déjà les espaces : sa sévérité ne change pas.
   logo du document (« MATRA ») : écrite par `ocr_processor._fill_worksheet`, non modifié.
 - Mode Tesseract (hors production) : `ocr_processor._extract_meta` garde son INDICE « 0 » par
   défaut et son O→0 ; non modifié.
-- PE137 avec le modèle REPARTITEUR : alerte « BORNIER absent » sur les 48 pages (le modèle
-  attend BORNIER, le document écrit JARRETIERAGE).
+- ~~PE137 : alerte « BORNIER absent » sur les 48 pages~~ → remplacée le 2026-09-30 (voir ci-dessous).
+
+### Suite de l'étape 7 (2026-09-30)
+
+- **Alerte de champ absent** : un champ absent de TOUTES les pages donne une seule ligne,
+  « BORNIER absent de tout le document : vérifier le modèle » (PE137 : 1 ligne au lieu de 48).
+  L'alerte par page ne reste que si le champ manque sur une partie des pages seulement.
+- **Tests dorés des étapes 3 et 4 inchangés** après l'ajustement du lecteur de mesure :
+  recalculés sur e62b552 (avant l'étape 7, arbre de travail séparé) et sur l'étape 7, sorties
+  identiques ligne à ligne (258 lignes, chaque écart détaillé). Étape 3 : 8 pages appariées,
+  pages 9 et 104 orphelines, 419/656 cellules identiques (19 confusions, 61 contenus
+  différents, 97 espacements, 60 manquants), 19 pieds faux, 4 lignes orphelines. Étape 4 :
+  3 pages, 668/668, 0 pied faux, 0 position fausse.
