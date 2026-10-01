@@ -534,3 +534,14 @@ comparaison, elle, ignorait déjà les espaces : sa sévérité ne change pas.
   `STATION_NAME` ne sert toujours à rien dans le pied.
 - Rejeu : inchangé (aucun P.E.T. vide sur l'extrait ni sur PE137). Test : PE137 avec le P.E.T.
   vidé sur 1 page sur 48 → GRAND-BUT repris, coloré, commenté, autres pages intactes.
+
+### Logo recopié tel qu'imprimé (2026-10-01, décision de l'utilisateur)
+
+- Aucune conversion de forme : « SIEMENS » compact sur 122a et 104 (seule forme présente dans
+  les PDF), « M A T R A » là où MATRA est imprimé espacé, « MATRA » là où il est imprimé
+  compact (pages TP2 de 223400PE137 : pages 32, 33, 49). Le MATRA vertical des scans (une
+  lettre par ligne) s'écrit « M A T R A ». Remplace la règle précédente (tout au format espacé).
+- Claude : la ligne `LOGO:` demande le texte tel qu'imprimé, et pour un logo vertical les
+  lettres séparées par une espace ; le parseur ne reformate plus. Désaccord avec le pied
+  recopié jugé sans les espaces.
+- Tests dorés des étapes 3 et 4 : identiques.

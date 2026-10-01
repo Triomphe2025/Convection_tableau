@@ -29,11 +29,13 @@ def _compact(texte: str) -> str:
 
 
 def _lettres_logo(texte: str, libelle_gauche: str, seule_lettre: bool = False) -> List[str]:
-    """Lettres du bloc gauche du pied si le texte en est un, sinon [].
+    """Morceaux du bloc gauche du pied, tels qu'imprimés, si le texte en est un ; sinon [].
 
-    Formes vues : libellé du modèle, mot seul en lettres (« MATRA », « SIEMENS »),
+    Formes vues : libellé du modèle, mot seul en lettres (« SIEMENS » compact sur les
+    pages vectorielles de 223111PE011, « MATRA » sur les pages TP2 de 223400PE137),
     lettres espacées (« M A T R A »), et — avec seule_lettre — une lettre isolée,
     morceau d'un logo vertical (scans de 223111PE011 : une lettre par ligne).
+    Aucune conversion de forme : seuls les blancs entre morceaux sont ramenés à un.
     Un texte libre à garder en COMPLEMENT porte des chiffres (« REF CE 8707905 »).
     """
     t = texte.strip()
@@ -41,13 +43,13 @@ def _lettres_logo(texte: str, libelle_gauche: str, seule_lettre: bool = False) -
     if not t:
         return []
     if libelle_gauche and _compact(t) == _compact(libelle_gauche):
-        return list(_compact(t))
+        return mots
     if len(mots) == 1 and len(t) >= 3 and t.isalpha():
-        return list(t.upper())
+        return [t]
     if len(mots) >= 3 and all(len(m) == 1 and m.isalpha() for m in mots):
-        return [m.upper() for m in mots]
+        return mots
     if seule_lettre and len(t) == 1 and t.isalpha():
-        return [t.upper()]
+        return [t]
     return []
 
 
@@ -93,7 +95,7 @@ def nettoyer_lignes_pied(lignes: Iterable[str], libelle_gauche: str = '') -> Lis
 
 
 def logo_pied(lignes: Iterable[str], libelle_gauche: str = '') -> str:
-    """Texte du bloc gauche lu dans le document, au format « M A T R A » ; '' s'il n'y en a pas."""
+    """Bloc gauche tel qu'imprimé (« SIEMENS », « M A T R A ») ; vertical → « M A T R A » ; ''."""
     return ' '.join(_separer_logo(lignes, libelle_gauche)[1])
 
 

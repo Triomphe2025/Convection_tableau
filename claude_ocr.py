@@ -228,9 +228,10 @@ def _build_prompt(template) -> str:
         " sans rien omettre, corriger ni réordonner :\n"
         "PIED_BRUT: <1re ligne du pied>\n"
         "PIED_BRUT: <2e ligne du pied>\n"
-        "Enfin, recopie le texte du bloc à gauche du pied (marque, ex : MATRA, SIEMENS) ;"
-        " s'il est écrit verticalement, lis ses lettres de haut en bas ; s'il n'y en a"
-        " pas, n'écris pas cette ligne :\n"
+        "Enfin, recopie le texte du bloc à gauche du pied (marque, ex : SIEMENS) tel"
+        " qu'il est imprimé, espaces compris ; s'il est écrit verticalement (une lettre"
+        " par ligne), écris ses lettres de haut en bas séparées par une espace"
+        " (ex : M A T R A) ; s'il n'y en a pas, n'écris pas cette ligne :\n"
         "LOGO: <texte du bloc gauche>\n"
     )
 
@@ -381,15 +382,10 @@ def _parse_pipe_response(raw: str, template, column_mapping: dict = None) -> tup
     if pied_brut:
         metadata = _structurer_pied(pied_brut, metadata, template, logo)
     elif logo:
-        metadata['LOGO'] = _format_logo(logo)
+        metadata['LOGO'] = logo
     if revisions:
         metadata['REVISIONS'] = revisions
     return rows, metadata, page_type
-
-
-def _format_logo(texte: str) -> str:
-    """« MATRA » ou « M-A-T-R-A » → « M A T R A » : format des Excel corrigés à la main."""
-    return ' '.join(c for c in texte.upper() if c.isalnum())
 
 
 def _structurer_pied(pied_brut: List[str], meta_json: Dict, template,
@@ -420,11 +416,12 @@ def _structurer_pied(pied_brut: List[str], meta_json: Dict, template,
     fusion.update(structure)
     fusion['PIED_BRUT'] = propres
     logo_recopie = logo_pied(pied_brut, gauche)
-    if logo and logo_recopie and _format_logo(logo) != logo_recopie:
+    # Forme comparée sans les espaces : seul un texte différent est un désaccord.
+    if logo and logo_recopie and _sans_espaces(logo) != _sans_espaces(logo_recopie):
         alertes.append(f"LOGO : ligne LOGO « {logo} », pied recopié « {logo_recopie} »"
                        " — ligne LOGO retenue")
     if logo or logo_recopie:
-        fusion['LOGO'] = _format_logo(logo) if logo else logo_recopie
+        fusion['LOGO'] = logo or logo_recopie
     if alertes:
         fusion['ALERTES_PIED'] = alertes
     return fusion

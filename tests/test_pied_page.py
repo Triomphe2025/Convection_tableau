@@ -388,7 +388,6 @@ class TestLogoPied(unittest.TestCase):
         from pied_page import logo_pied
         cas = {
             'lettres espacées': ['|  |  P.E.T. : GRAND-BUT  |', '|   M A T R A   |------|'],
-            'mot seul': ['PET :GRAND-BUT', 'MATRA', 'N° PLAN : 223400 PE 137'],
             'vertical avec cadre': ['M | CABLE : ACC/PH01', 'A | TYPE : 2P.279', 'T |', 'R |',
                                     'A | N° PLAN : 223111PE011'],
             'vertical sans cadre': ['M   CABLE : ACC/PH01', 'A   TYPE : 2P.279', 'T', 'R',
@@ -396,6 +395,12 @@ class TestLogoPied(unittest.TestCase):
         }
         for nom, lignes in cas.items():
             self.assertEqual(logo_pied(lignes, 'M  T  I'), 'M A T R A', nom)
+
+    def test_mot_compact_garde_sa_forme(self):
+        from pied_page import logo_pied
+        self.assertEqual(logo_pied(['PET :GRAND-BUT', 'MATRA', 'N° PLAN : P'], 'M  T  I'),
+                         'MATRA')
+        self.assertEqual(logo_pied(['CABLE : X', 'Siemens', 'N° PLAN : P'], ''), 'Siemens')
 
     def test_sans_logo_vide(self):
         from pied_page import logo_pied
@@ -410,7 +415,7 @@ class TestLogoPied(unittest.TestCase):
 
 class TestLogoDansLExcel(unittest.TestCase):
 
-    def test_pe137_matra_sur_les_48_pages(self):
+    def test_pe137_logo_de_chaque_page(self):
         tpl = _tpl('REPARTITEUR')
         lecteur = pe.PdfTableExtractor(tpl)
         with fitz.open(str(PE137)) as doc:
@@ -423,12 +428,14 @@ class TestLogoDansLExcel(unittest.TestCase):
             ws = openpyxl.load_workbook(sortie).worksheets[0]
             gauche = [ws.cell(row=c.row - 1, column=1).value for c in ws['B']
                       if isinstance(c.value, str) and 'INDICE' in c.value]
-        self.assertEqual(gauche, ['M A T R A'] * 48)
+        # Pages 32, 33, 49 (TP2) : « MATRA » imprimé compact ; ailleurs espacé.
+        self.assertEqual(sorted(set(gauche)), ['M A T R A', 'MATRA'])
+        self.assertEqual(gauche.count('MATRA'), 3)
 
     def test_page_122a_texte_du_document(self):
         with fitz.open(str(EXTRAIT)) as doc:
             meta = pe.PdfTableExtractor(_tpl()).extract_page_grille(doc[8], 8)['metadata']
-        self.assertEqual(meta['LOGO'].replace(' ', ''), 'SIEMENS')
+        self.assertEqual(meta['LOGO'], 'SIEMENS')
 
     def test_sans_logo_cellule_vide_et_pas_le_libelle_du_modele(self):
         tpl = _tpl('REPARTITEUR')
@@ -436,10 +443,17 @@ class TestLogoDansLExcel(unittest.TestCase):
         self.assertNotIn(tpl.footer_left_label, cellules)
 
     def test_claude_ligne_logo_et_logo_vertical(self):
-        vertical = REPONSE_PAGE_2.replace('PIED_BRUT: SIEMENS\n', '').replace(
-            'PIED_BRUT: CABLE', 'PIED_BRUT: M | CABLE')
-        _, meta, _ = _parse_pipe_response(vertical + 'LOGO: MATRA\n', _tpl())
+        # Scan de 223111PE011 : MATRA vertical, une lettre par ligne du pied.
+        vertical = (REPONSE_PAGE_2.split('PIED_BRUT')[0]
+                    + 'PIED_BRUT: M | CABLE : ACC/PH02\n'
+                    + 'PIED_BRUT: A | TYPE : 3PC200     REF CE 8707905\n'
+                    + 'PIED_BRUT: T |\nPIED_BRUT: R |\n'
+                    + 'PIED_BRUT: A | N° PLAN : 223111PE011  | INDICE : R  | PAGE : 2\n')
+        _, meta, _ = _parse_pipe_response(vertical + 'LOGO: M A T R A\n', _tpl())
         self.assertEqual(meta['LOGO'], 'M A T R A')
+        self.assertNotIn('ALERTES_PIED', meta)
+        _, meta, _ = _parse_pipe_response(REPONSE_PAGE_2 + 'LOGO: SIEMENS\n', _tpl())
+        self.assertEqual(meta['LOGO'], 'SIEMENS')
         _, meta, _ = _parse_pipe_response(REPONSE_PAGE_2 + 'LOGO: M\n', _tpl())
         self.assertIn('LOGO', meta['ALERTES_PIED'][0])
 
