@@ -134,9 +134,13 @@ class Config:
     PIED_ENTETES_REVISIONS = ("INDICE", "RÉVISION", "REVISION", "EDITION", "ÉDITION")
     # Forme d'un indice de révision : « A », « R », « 00 », « R10 », « TP2 ».
     PIED_INDICE_MOTIF = r"[A-Z]{0,2}\d{1,2}|[A-Z]"
-    # Champs propres à chaque page : jamais repris des autres pages, même s'ils
-    # figurent dans les champs constants d'un modèle.
-    PIED_CHAMPS_JAMAIS_DEDUITS = ("INDICE", "PAGE")
+    # Champs constants d'un document : une case vide est reprise des autres pages
+    # du MÊME document si toutes celles qui portent le champ donnent la même valeur.
+    # Par modèle de tableau (nom du modèle → clés) ; modèle absent → défaut.
+    CHAMPS_CONSTANTS_DEFAUT = ("PET",)
+    CHAMPS_CONSTANTS_PAR_MODELE = {}
+    # Champs qui varient d'une page à l'autre : jamais repris, même listés ci-dessus.
+    PIED_CHAMPS_JAMAIS_DEDUITS = ("INDICE", "PAGE", "TYPE", "CABLE")
     # Fond d'une case de pied complétée depuis les autres pages du document
     # (bleu clair, distinct du jaune « confiance basse » et du rouge « ?? »).
     COULEUR_DEDUIT = "DDEBF7"

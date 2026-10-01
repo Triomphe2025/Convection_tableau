@@ -1,7 +1,10 @@
 """
-Champs constants d'un document (P.E.T. par défaut) : une case vide est reprise
-des autres pages du MÊME document si elles concordent toutes, colorée et commentée.
-Une valeur lue n'est jamais remplacée ; INDICE et PAGE ne sont jamais repris.
+Champs constants d'un document (config.py, P.E.T. par défaut).
+
+Une case vide est reprise des autres pages du MÊME document seulement si toutes
+celles qui portent le champ donnent la même valeur (pas de vote majoritaire) ;
+la cellule est colorée et commentée. Une valeur lue n'est jamais remplacée.
+INDICE, PAGE, TYPE et CABLE ne sont jamais repris.
 
 Lancement :
     env\\Scripts\\python.exe -m pytest tests/test_champs_constants.py -v
@@ -12,112 +15,144 @@ import io
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-import fitz
 import openpyxl
 
 import pdf_extractor as pe
 from config import Config
-from generer_classeur import deduire_champs_constants, generer_excel, marquer_deduits
-from pied_page import inserer_valeur
-from template import TableTemplate, TemplateManager
+from generer_classeur import (champs_constants, deduire_champs_constants, generer_excel,
+                              marquer_deduits)
+from pied_page import inserer_valeur, libelle_affiche
+from template import TemplateManager
 
-PE137 = Path(__file__).parent / 'fixtures' / '223400PE137.pdf'
 DEDUIT = "déduit des autres pages du document"
 
 
-def _page(page, **meta):
-    return {'success': True, 'headers': ['FIL'], 'image_path': f'page_{page}.png',
-            'metadata': dict(PAGE=page, **meta),
-            'rows': [{'type': 'data', 'cells': ['X'], 'confidence': [100]}]}
+def _page(page, pet=None, **meta):
+    """Page de tableau REPARTITEUR avec un pied brut où P.E.T. est lu ou laissé vide."""
+    pied = [f"P.E.T. : {pet or ''}      JARRETIERAGE",
+            f"N° PLAN  : 223400PE137     |  INDICE : R  |   PAGE : {page}"]
+    meta = dict(meta, PAGE=str(page), NO_PLAN='223400PE137', INDICE='R', PIED_BRUT=pied)
+    if pet:
+        meta['PET'] = pet
+    return {'success': True, 'headers': ['TENANT', 'JAR', 'ABOUTISSANT', 'SIGNAL'],
+            'image_path': f'page_{page}', 'detection_method': 'pdf-grille',
+            'metadata': meta,
+            'rows': [{'type': 'data', 'cells': ['PH 01', '0792N', 'PF 12', 'X'],
+                      'confidence': [100] * 4}]}
 
 
-class TestPE137UnPetVide(unittest.TestCase):
-    """P.E.T. = GRAND-BUT sur 47 pages, vidé sur 1 : cette page reçoit GRAND-BUT, colorée."""
+def _document(valeurs):
+    return [_page(i + 1, v) for i, v in enumerate(valeurs)]
 
-    @classmethod
-    def setUpClass(cls):
+
+class _Classeur(unittest.TestCase):
+
+    def _generer(self, pages):
         tpl = TemplateManager().get('REPARTITEUR')
-        lecteur = pe.PdfTableExtractor(tpl)
-        with fitz.open(str(PE137)) as doc:
-            resultats = [lecteur.extract_page_grille(doc[i], i) for i in range(len(doc))]
-        tableaux = [r for r in resultats if r['success']]
-        cls.cible = tableaux[10]
-        meta = cls.cible['metadata']
-        cls.page = meta['PAGE']
-        del meta['PET']
-        meta['PIED_BRUT'] = [ligne.replace('GRAND-BUT', '         ')
-                             for ligne in meta['PIED_BRUT']]
-        cls.messages = []
+        messages = []
         with tempfile.TemporaryDirectory() as tmp:
             sortie = Path(tmp) / 's.xlsx'
             with contextlib.redirect_stdout(io.StringIO()):
-                generer_excel(resultats, lecteur, sortie, on_log=cls.messages.append)
+                generer_excel(pages, pe.PdfTableExtractor(tpl), sortie,
+                              on_log=messages.append)
             ws = openpyxl.load_workbook(sortie).worksheets[0]
-            cls.pieds = [ws.cell(row=c.row - 1, column=2) for c in ws['B']
-                         if isinstance(c.value, str) and 'INDICE' in c.value]
+            pieds = [ws.cell(row=c.row - 1, column=2) for c in ws['B']
+                     if isinstance(c.value, str) and 'INDICE' in c.value]
+        return [m.strip() for m in messages if '⚠' in m], pieds
 
-    def test_48_pieds(self):
-        self.assertEqual(len(self.pieds), 48)
 
-    def test_page_videe_recoit_grand_but_coloree_et_commentee(self):
-        cellule = self.pieds[10]
-        self.assertIn('GRAND-BUT', cellule.value)
-        self.assertEqual(cellule.fill.fgColor.rgb, '00' + Config.COULEUR_DEDUIT)
-        self.assertIn(DEDUIT, cellule.comment.text)
+class TestQuaranteSeptEpeuleEtUneVide(_Classeur):
 
-    def test_autres_pages_ni_colorees_ni_commentees(self):
-        autres = [c for i, c in enumerate(self.pieds) if i != 10]
-        self.assertTrue(all(c.comment is None for c in autres))
-        self.assertTrue(all(c.fill.fill_type is None for c in autres))
+    def test_remplie_coloree_commentee(self):
+        alertes, pieds = self._generer(_document(['EPEULE'] * 47 + [None]))
+        self.assertEqual(len(pieds), 48)
+        self.assertIn('EPEULE', pieds[47].value)
+        self.assertEqual(pieds[47].fill.fgColor.rgb, '00' + Config.COULEUR_DEDUIT)
+        self.assertIn(DEDUIT, pieds[47].comment.text)
+        self.assertTrue(all(c.comment is None and c.fill.fill_type is None
+                            for c in pieds[:47]))
+        self.assertFalse([a for a in alertes if 'P.E.T.' in a or 'PET' in a])
 
-    def test_pas_d_alerte_pet_absent(self):
-        self.assertFalse([m for m in self.messages if 'PET' in m])
 
-    def test_resultat_d_origine_non_modifie(self):
-        self.assertNotIn('PET', self.cible['metadata'])
+class TestAutresPagesPasUnanimes(_Classeur):
+
+    def test_vide_et_alerte(self):
+        alertes, pieds = self._generer(_document(['EPEULE'] * 46 + ['GRAND-BUT', None]))
+        self.assertNotIn('EPEULE', pieds[47].value)
+        self.assertIsNone(pieds[47].comment)
+        self.assertIn("⚠ P.E.T. vide, non complété : page(s) 48 — les autres pages ne sont "
+                      "pas unanimes (EPEULE, GRAND-BUT)", alertes)
+
+
+class TestValeurLueDifferente(_Classeur):
+
+    def test_epeulf_conserve_et_alerte(self):
+        alertes, pieds = self._generer(_document(['EPEULE'] * 47 + ['EPEULF']))
+        self.assertIn('EPEULF', pieds[47].value)
+        self.assertIsNone(pieds[47].comment)
+        self.assertEqual([a for a in alertes if 'P.E.T.' in a],
+                         ["⚠ page 48 : P.E.T. EPEULF différent des autres pages (EPEULE), "
+                          "conservé"])
+
+
+class TestIndiceVide(_Classeur):
+
+    def test_reste_vide_meme_liste_en_champ_constant(self):
+        pages = _document(['EPEULE'] * 3)
+        del pages[2]['metadata']['INDICE']
+        resultats, _ = deduire_champs_constants(pages, ['PET', 'INDICE'], {})
+        self.assertNotIn('INDICE', resultats[2]['metadata'])
+
+
+class TestJamaisDUnDocumentALAutre(unittest.TestCase):
+
+    def test_un_document_sans_valeur_reste_vide(self):
+        deduire_champs_constants(_document(['EPEULE', 'EPEULE']), ['PET'], {})
+        resultats, alertes = deduire_champs_constants(_document([None, None]), ['PET'], {})
+        self.assertTrue(all('PET' not in r['metadata'] for r in resultats))
+        self.assertEqual(alertes, [])
+
+    def test_chaque_document_sa_propre_valeur(self):
+        a, _ = deduire_champs_constants(_document(['EPEULE', None]), ['PET'], {})
+        b, _ = deduire_champs_constants(_document(['GRAND-BUT', None]), ['PET'], {})
+        self.assertEqual((a[1]['metadata']['PET'], b[1]['metadata']['PET']),
+                         ('EPEULE', 'GRAND-BUT'))
 
 
 class TestDeduireChampsConstants(unittest.TestCase):
 
-    def test_valeurs_differentes_case_vide_et_alerte(self):
-        pages = [_page('1', PET='GRAND-BUT'), _page('2', PET='EPEULE'), _page('3')]
-        resultats, alertes = deduire_champs_constants(pages, ['PET'], {})
-        self.assertNotIn('PET', resultats[2]['metadata'])
-        self.assertEqual(alertes, ["PET vide, non complété : page(s) 3 — les autres pages "
-                                   "ne concordent pas (GRAND-BUT, EPEULE)"])
-
-    def test_valeur_lue_jamais_remplacee(self):
-        pages = [_page('1', PET='GRAND-BUT'), _page('2', PET='GRAND-BUT'),
-                 _page('3', PET='GRAND BUT')]
-        resultats, alertes = deduire_champs_constants(pages, ['PET'], {})
-        self.assertEqual(resultats[2]['metadata']['PET'], 'GRAND BUT')
-        self.assertEqual(alertes, [])
-
-    def test_indice_vide_jamais_complete(self):
-        pages = [_page('1', INDICE='R'), _page('2', INDICE='R'), _page('3')]
-        resultats, alertes = deduire_champs_constants(pages, ['INDICE', 'PAGE'], {})
-        self.assertNotIn('INDICE', resultats[2]['metadata'])
-        self.assertEqual(alertes, [])
-
-    def test_champ_absent_partout_rien_a_reprendre(self):
-        resultats, alertes = deduire_champs_constants([_page('1'), _page('2')], ['PET'], {})
-        self.assertNotIn('PET', resultats[0]['metadata'])
-        self.assertEqual(alertes, [])
-
-    def test_trace_de_la_deduction_et_pied_brut(self):
-        pages = [_page('1', PET='GRAND-BUT'),
-                 _page('2', PIED_BRUT=['P.E.T. :      JARRETIERAGE', 'N° PLAN : P'])]
-        resultats, _ = deduire_champs_constants(pages, ['PET'], {'PET': 'P.E.T.'})
+    def test_trace_et_pied_brut(self):
+        resultats, _ = deduire_champs_constants(_document(['EPEULE', None]), ['PET'], {})
         meta = resultats[1]['metadata']
-        self.assertEqual((meta['PET'], meta['DEDUITS']), ('GRAND-BUT', ['PET']))
-        self.assertEqual(meta['PIED_BRUT'][0], 'P.E.T. : GRAND-BUT      JARRETIERAGE')
+        self.assertEqual(meta['DEDUITS'], ['PET'])
+        self.assertEqual(meta['PIED_BRUT'][0], 'P.E.T. : EPEULE       JARRETIERAGE')
 
     def test_entree_non_modifiee(self):
-        pages = [_page('1', PET='GRAND-BUT'), _page('2')]
+        pages = _document(['EPEULE', None])
         avant = copy.deepcopy(pages)
         deduire_champs_constants(pages, ['PET'], {})
         self.assertEqual(pages, avant)
+
+    def test_une_seule_page_lue_suffit(self):
+        resultats, alertes = deduire_champs_constants(_document(['EPEULE', None]), ['PET'], {})
+        self.assertEqual((resultats[1]['metadata']['PET'], alertes), ('EPEULE', []))
+
+    def test_valeur_unique_lue_sans_autre_page_pas_d_alerte(self):
+        self.assertEqual(deduire_champs_constants(_document(['EPEULE']), ['PET'], {})[1], [])
+
+
+class TestChampsConstantsDuModele(unittest.TestCase):
+
+    def test_pet_par_defaut(self):
+        self.assertEqual(champs_constants('REPARTITEUR'), ['PET'])
+
+    def test_par_modele_sans_les_champs_qui_varient(self):
+        reglage = {'REPARTITEUR': ('PET', 'NO_PLAN', 'INDICE', 'PAGE', 'TYPE', 'CABLE')}
+        with patch.object(Config, 'CHAMPS_CONSTANTS_PAR_MODELE', reglage):
+            self.assertEqual(champs_constants('REPARTITEUR'), ['PET', 'NO_PLAN'])
+            self.assertEqual(champs_constants('REPARTITEUR 2'), ['PET'])
 
 
 class TestInsererValeur(unittest.TestCase):
@@ -135,6 +170,15 @@ class TestInsererValeur(unittest.TestCase):
         self.assertEqual(inserer_valeur([], 'PET', 'P.E.T.', 'G'), ['P.E.T. : G'])
 
 
+class TestLibelleAffiche(unittest.TestCase):
+
+    def test_libelles(self):
+        self.assertEqual(libelle_affiche('PET'), 'P.E.T.')
+        self.assertEqual(libelle_affiche('NO_PLAN'), 'N° PLAN')
+        self.assertEqual(libelle_affiche('ARMOIRE', {'ARMOIRE': 'ARM.'}), 'ARM.')
+        self.assertEqual(libelle_affiche('ARMOIRE'), 'ARMOIRE')
+
+
 class TestMarquerDeduits(unittest.TestCase):
 
     def test_colore_la_ligne_qui_porte_la_valeur(self):
@@ -149,21 +193,6 @@ class TestMarquerDeduits(unittest.TestCase):
     def test_rien_de_deduit(self):
         ws = openpyxl.Workbook().active
         self.assertEqual(marquer_deduits(ws, 10, {'PET': 'X'}, 'DDEBF7'), 0)
-
-
-class TestReglageParModele(unittest.TestCase):
-
-    def test_pet_par_defaut(self):
-        self.assertEqual(TableTemplate(name='t', columns=['A']).champs_constants, ['PET'])
-
-    def test_ancien_templates_json_sans_le_reglage(self):
-        tpl = TableTemplate.from_dict({'name': 't', 'columns': ['A']})
-        self.assertEqual(tpl.champs_constants, ['PET'])
-
-    def test_saisie_de_l_interface(self):
-        self.assertEqual(TableTemplate.lire_champs_constants('P.E.T., N° PLAN, pet, , '),
-                         ['PET', 'NO_PLAN'])
-        self.assertEqual(TableTemplate.lire_champs_constants(''), [])
 
 
 if __name__ == '__main__':

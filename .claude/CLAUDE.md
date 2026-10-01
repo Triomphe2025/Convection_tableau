@@ -277,7 +277,6 @@ meta['INDICE'] = meta.get('INDICE', '0').replace('O', '0')
 Structure définie par `TableTemplate` :
 - colonnes ordonnées + largeurs Excel
 - mot-clé de ligne de séparation (ex : `NOM DU CABLE`)
-- champs constants du document (`champs_constants`, P.E.T. par défaut) : case vide reprise des autres pages si elles concordent
 - pied de page : étiquette gauche, format ligne 1 et ligne 2 avec placeholders `{PET}`, `{BORNIER}`, `{PAGE}`, `{NO_PLAN}`, `{INDICE}`
 
 Modèle par défaut : **"Bornier standard"** — colonnes `[BORNE, COULEUR, SIGNAL, JARRETIERES]`
@@ -395,7 +394,7 @@ Raccourci → `/build-exe`.
 | v1.7 | 2026-09 | `campagne_mesure.py` : campagne de mesure des modèles Claude (surcharge en mémoire, sortie dans `mesures/`, historique `mesures/campagne.csv`, coût estimé par `CLAUDE_PRIX_MODELES`, plafond `CAMPAGNE_BUDGET_MAX_USD`) ; garde-fou de troncature (max_tokens 64000 à effort xhigh/max, réponse tronquée = page en erreur) |
 | v1.7 | 2026-09 | Étape 6 : `MIN_DATA_ROWS` = 1 ; chaque page écartée écrite au journal (« page ignorée : <numéro> <raison> ») ; tableau vide (CABLE : RESERVE) conservé |
 | v1.7 | 2026-09 | Étape 6 : numéros de page à suffixe (122a, 44B), ni renumérotés ni retriés — ordre du document conservé, alerte si la séquence n'est pas croissante |
-| v1.7 | 2026-10 | Étape 7 : champs constants par modèle (`champs_constants`, P.E.T. par défaut, réglable dans l'éditeur de modèle) — case vide reprise des autres pages du même document si toutes concordent (sinon vide + alerte), cellule colorée `COULEUR_DEDUIT` et commentée ; INDICE et PAGE jamais repris |
+| v1.7 | 2026-10 | Étape 7 : champs constants d'un document (`CHAMPS_CONSTANTS_DEFAUT` = P.E.T., `CHAMPS_CONSTANTS_PAR_MODELE` dans config.py) — case vide reprise si les autres pages du même document sont unanimes (cellule colorée `COULEUR_DEDUIT`, commentée), sinon vide + alerte, sans vote ; valeur lue jamais remplacée (différente : conservée + alerte) ; INDICE, PAGE, TYPE, CABLE jamais repris |
 | v1.7 | 2026-09 | Étape 7 : cellule gauche du pied = logo recopié tel qu'imprimé sur sa page (« SIEMENS » compact, « M A T R A » espacé ; vertical, une lettre par ligne → « M A T R A »), vide s'il n'y en a pas — plus le libellé du modèle ; Claude : ligne `LOGO:` ; mode Tesseract : plus d'INDICE « 0 » par défaut ; champ absent de tout le document = une seule alerte |
 | v1.7 | 2026-09 | Étape 7 : pied de page lu sans liste figée (`pied_page.py`) — toutes les paires LIBELLÉ : valeur, texte libre en COMPLEMENT, « 6/10 » diamètre sauf après PAGE/FOLIO ; Claude recopie le pied (bloc `PIED_BRUT`), le code le structure ; l'Excel affiche le pied brut ; aucune valeur inventée (ni nom de bornier tiré du fichier, ni P.E.T. EPEULE, ni INDICE 0) ; alertes : champ absent, INDICE hors révisions de la page de garde, N° PLAN minoritaire |
 | v1.7 | 2026-09 | Étape 6 : caractère illisible → Claude écrit « ?? » (jamais deviné ni corrigé), gardé dans l'Excel et coloré (`MARQUEUR_ILLISIBLE`, `COULEUR_ILLISIBLE`) |

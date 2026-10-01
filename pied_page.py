@@ -107,6 +107,13 @@ def cle_libelle(libelle: str) -> str:
     return re.sub(r'[^A-Z0-9]+', '_', compact).strip('_')
 
 
+def libelle_affiche(cle: str, libelles: Optional[Dict[str, str]] = None) -> str:
+    """Libellé lisible d'une clé pour le journal : PET → « P.E.T. », NO_PLAN → « N° PLAN »."""
+    if libelles and libelles.get(cle):
+        return libelles[cle]
+    return {'PET': 'P.E.T.', 'NO_PLAN': 'N° PLAN'}.get(cle, cle)
+
+
 def mots_decor(formats: Iterable[str]) -> Set[str]:
     """Mots fixes des formats de pied du modèle (« JARRETIERAGE »), hors libellés."""
     decor: Set[str] = set()

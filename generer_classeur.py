@@ -234,40 +234,56 @@ def _compact(valeur) -> str:
     return re.sub(r'\s+', '', str(valeur or '')).upper()
 
 
-def deduire_champs_constants(valides: List[Dict], champs, libelles: Dict[str, str]):
-    """Complète une case vide d'un champ constant depuis les autres pages du document.
+def champs_constants(nom_modele: str) -> List[str]:
+    """Champs constants du modèle (config.py), sans ceux qui varient d'une page à l'autre."""
+    champs = Config.CHAMPS_CONSTANTS_PAR_MODELE.get(nom_modele, Config.CHAMPS_CONSTANTS_DEFAUT)
+    jamais = {c.upper() for c in Config.PIED_CHAMPS_JAMAIS_DEDUITS}
+    return [c.upper() for c in champs if c.upper() not in jamais]
 
-    Trois conditions : la case est vide (une valeur lue n'est jamais remplacée),
-    toutes les pages qui portent le champ concordent (sinon case vide + alerte),
-    et la page garde la trace de la déduction (meta['DEDUITS'], cellule colorée).
+
+def deduire_champs_constants(valides: List[Dict], champs, libelles: Dict[str, str]):
+    """Champs constants d'UN document : case vide reprise si les autres pages sont unanimes.
+
+    - une case vide reçoit la valeur seulement si toutes les autres pages qui portent
+      le champ donnent la même valeur ; sinon elle reste vide + alerte (pas de vote) ;
+    - une valeur lue n'est jamais remplacée ; si toutes les autres pages donnent une
+      autre valeur, elle est gardée + alerte « différent des autres pages » ;
+    - les pages complétées portent meta['DEDUITS'] (cellule colorée, commentée).
+    Ne voit que les pages d'un appel : jamais de passage d'un document à l'autre.
     Renvoie (résultats, alertes) ; les résultats reçus ne sont pas modifiés.
     """
-    from pied_page import inserer_valeur
+    from pied_page import inserer_valeur, libelle_affiche
     resultats = [dict(r, metadata=dict(r.get('metadata') or {})) for r in valides]
     alertes = []
     jamais = {c.upper() for c in Config.PIED_CHAMPS_JAMAIS_DEDUITS}
     for cle in (c.upper() for c in champs):
         if cle in jamais:
             continue
-        lues = [r['metadata'][cle] for r in resultats if str(r['metadata'].get(cle, '')).strip()]
+        nom = libelle_affiche(cle, libelles)
+        lues = [r for r in resultats if str(r['metadata'].get(cle, '')).strip()]
         vides = [r for r in resultats if not str(r['metadata'].get(cle, '')).strip()]
+        for r in lues:
+            valeur = str(r['metadata'][cle]).strip()
+            autres = {_compact(o['metadata'][cle]) for o in lues if o is not r}
+            if len(autres) == 1 and _compact(valeur) not in autres:
+                autre = next(str(o['metadata'][cle]).strip() for o in lues if o is not r)
+                alertes.append(f"page {numero_page(r)} : {nom} {valeur} différent des autres "
+                               f"pages ({autre}), conservé")
         if not lues or not vides:
             continue
-        distinctes = list(dict.fromkeys(_compact(v) for v in lues))
-        if len(distinctes) > 1:
-            formes = ', '.join(dict.fromkeys(str(v).strip() for v in lues))
-            alertes.append(f"{cle} vide, non complété : page(s) "
+        distinctes = list(dict.fromkeys(str(r['metadata'][cle]).strip() for r in lues))
+        if len({_compact(v) for v in distinctes}) > 1:
+            alertes.append(f"{nom} vide, non complété : page(s) "
                            f"{', '.join(numero_page(r) for r in vides)} — les autres pages "
-                           f"ne concordent pas ({formes})")
+                           f"ne sont pas unanimes ({', '.join(distinctes)})")
             continue
-        valeur = str(lues[0]).strip()
+        valeur = distinctes[0]
         for r in vides:
             meta = r['metadata']
             meta[cle] = valeur
             meta['DEDUITS'] = list(meta.get('DEDUITS') or []) + [cle]
             if meta.get('PIED_BRUT'):
-                meta['PIED_BRUT'] = inserer_valeur(meta['PIED_BRUT'], cle,
-                                                   libelles.get(cle, cle), valeur)
+                meta['PIED_BRUT'] = inserer_valeur(meta['PIED_BRUT'], cle, nom, valeur)
     return resultats, alertes
 
 
@@ -382,7 +398,7 @@ def generer_excel(
     libelles = {fd.get('key', '').upper(): fd.get('label', '')
                 for fd in extractor._tpl.footer_extract_fields}
     valides, alertes_deduction = deduire_champs_constants(
-        valides, getattr(extractor._tpl, 'champs_constants', ['PET']), libelles)
+        valides, champs_constants(extractor._tpl.name), libelles)
     for alerte in alertes_deduction:
         log(f"  ⚠ {alerte}")
     for alerte in alertes_pied(results, valides, champs_attendus):

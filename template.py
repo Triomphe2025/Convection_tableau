@@ -60,10 +60,6 @@ class TableTemplate:
         ]
     )
 
-    # Champs constants d'un document (P.E.T., N° PLAN…) : une case vide est
-    # reprise des autres pages du même document si elles concordent toutes.
-    champs_constants: List[str] = field(default_factory=lambda: ['PET'])
-
     # Largeurs Excel par nom de colonne (0 = largeur auto 20)
     col_widths: Dict[str, float] = field(default_factory=dict)
 
@@ -127,13 +123,6 @@ class TableTemplate:
 
     def to_dict(self) -> Dict:
         return asdict(self)
-
-    @staticmethod
-    def lire_champs_constants(texte: str) -> List[str]:
-        """« P.E.T., N° PLAN » saisi dans l'interface → ['PET', 'NO_PLAN'] (doublons retirés)."""
-        from pied_page import cle_libelle
-        champs = [cle_libelle(c) for c in (texte or '').split(',')]
-        return list(dict.fromkeys(c for c in champs if c))
 
     @classmethod
     def from_dict(cls, d: Dict) -> "TableTemplate":

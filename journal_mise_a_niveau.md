@@ -545,3 +545,21 @@ comparaison, elle, ignorait déjà les espaces : sa sévérité ne change pas.
   lettres séparées par une espace ; le parseur ne reformate plus. Désaccord avec le pied
   recopié jugé sans les espaces.
 - Tests dorés des étapes 3 et 4 : identiques.
+
+### Champs constants revus (2026-10-01, règles de l'utilisateur) — remplace la section précédente
+
+- Liste dans `config.py` : `CHAMPS_CONSTANTS_DEFAUT = ("PET",)`, `CHAMPS_CONSTANTS_PAR_MODELE`
+  par nom de modèle. Le réglage ajouté à l'éditeur de modèle et à `template.py` au commit
+  eeba8cb est retiré (les deux fichiers reviennent à leur état antérieur).
+- Jamais repris : INDICE, PAGE, TYPE, CABLE (`PIED_CHAMPS_JAMAIS_DEDUITS`), même listés.
+- Case vide : reprise seulement si TOUTES les autres pages du document qui portent le champ
+  donnent la même valeur ; cellule colorée, commentaire « déduit des autres pages du
+  document ». Sinon case vide + une alerte ; pas de vote majoritaire.
+- Valeur lue jamais remplacée ; si toutes les autres pages donnent une autre valeur : gardée +
+  alerte « P.E.T. … différent des autres pages ».
+- Jamais d'un document à l'autre : la déduction ne voit que les pages d'une même conversion
+  (fonction pure, sans état ; testé).
+- Tests : 47 EPEULE + 1 vide → remplie, colorée, commentée ; 46 EPEULE + 1 GRAND-BUT + 1 vide
+  → vide + alerte ; 47 EPEULE + 1 EPEULF → EPEULF conservé + alerte ; INDICE vide → reste vide.
+  Contre-épreuves (vote, remplacement, INDICE repris, alerte supprimée) : chacune fait échouer
+  un test. Suite complète verte, tests dorés des étapes 3 et 4 identiques, rejeu inchangé.
