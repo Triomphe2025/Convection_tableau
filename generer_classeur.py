@@ -234,6 +234,59 @@ def _compact(valeur) -> str:
     return re.sub(r'\s+', '', str(valeur or '')).upper()
 
 
+def deduire_champs_constants(valides: List[Dict], champs, libelles: Dict[str, str]):
+    """Complète une case vide d'un champ constant depuis les autres pages du document.
+
+    Trois conditions : la case est vide (une valeur lue n'est jamais remplacée),
+    toutes les pages qui portent le champ concordent (sinon case vide + alerte),
+    et la page garde la trace de la déduction (meta['DEDUITS'], cellule colorée).
+    Renvoie (résultats, alertes) ; les résultats reçus ne sont pas modifiés.
+    """
+    from pied_page import inserer_valeur
+    resultats = [dict(r, metadata=dict(r.get('metadata') or {})) for r in valides]
+    alertes = []
+    jamais = {c.upper() for c in Config.PIED_CHAMPS_JAMAIS_DEDUITS}
+    for cle in (c.upper() for c in champs):
+        if cle in jamais:
+            continue
+        lues = [r['metadata'][cle] for r in resultats if str(r['metadata'].get(cle, '')).strip()]
+        vides = [r for r in resultats if not str(r['metadata'].get(cle, '')).strip()]
+        if not lues or not vides:
+            continue
+        distinctes = list(dict.fromkeys(_compact(v) for v in lues))
+        if len(distinctes) > 1:
+            formes = ', '.join(dict.fromkeys(str(v).strip() for v in lues))
+            alertes.append(f"{cle} vide, non complété : page(s) "
+                           f"{', '.join(numero_page(r) for r in vides)} — les autres pages "
+                           f"ne concordent pas ({formes})")
+            continue
+        valeur = str(lues[0]).strip()
+        for r in vides:
+            meta = r['metadata']
+            meta[cle] = valeur
+            meta['DEDUITS'] = list(meta.get('DEDUITS') or []) + [cle]
+            if meta.get('PIED_BRUT'):
+                meta['PIED_BRUT'] = inserer_valeur(meta['PIED_BRUT'], cle,
+                                                   libelles.get(cle, cle), valeur)
+    return resultats, alertes
+
+
+def marquer_deduits(ws, ligne_fin: int, meta: Dict, couleur: str) -> int:
+    """Colore et commente les lignes de pied (2 dernières du bloc) portant une valeur déduite."""
+    n = 0
+    for cle in meta.get('DEDUITS') or []:
+        valeur = str(meta.get(cle, ''))
+        for ligne in (ligne_fin - 2, ligne_fin - 1):
+            cellule = ws.cell(row=ligne, column=2)
+            if isinstance(cellule.value, str) and valeur and valeur in cellule.value:
+                cellule.fill = PatternFill('solid', fgColor=couleur)
+                cellule.comment = Comment(f"{cle} : {valeur}, déduit des autres pages du "
+                                          "document", 'TriosSeconverter')
+                n += 1
+                break
+    return n
+
+
 def alertes_pied(tous: List[Dict], valides: List[Dict], champs_attendus) -> List[str]:
     """Contrôles du pied, en alerte seulement : aucune valeur n'est complétée ni corrigée."""
     alertes = []
@@ -326,6 +379,12 @@ def generer_excel(
     for alerte in alertes_sequence_pages(valides):
         log(f"  ⚠ {alerte}")
     champs_attendus = [fd.get('key', '') for fd in extractor._tpl.footer_extract_fields]
+    libelles = {fd.get('key', '').upper(): fd.get('label', '')
+                for fd in extractor._tpl.footer_extract_fields}
+    valides, alertes_deduction = deduire_champs_constants(
+        valides, getattr(extractor._tpl, 'champs_constants', ['PET']), libelles)
+    for alerte in alertes_deduction:
+        log(f"  ⚠ {alerte}")
     for alerte in alertes_pied(results, valides, champs_attendus):
         log(f"  ⚠ {alerte}")
 
@@ -372,6 +431,8 @@ def generer_excel(
             bornier_name=None,
             pet_name=None,
         )
+
+        marquer_deduits(ws, next_row, result.get('metadata', {}), Config.COULEUR_DEDUIT)
 
         if i < total - 1:
             ws.row_breaks.append(Break(id=next_row - 1))

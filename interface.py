@@ -6743,6 +6743,19 @@ class TemplateEditorDialog(tk.Toplevel):
                   command=self._fld_remove,
                   ).pack(fill='x', pady=2)
 
+        self._section(parent, "Champs constants du document")
+        tk.Label(parent,
+                 text="Case vide reprise des autres pages si elles concordent toutes "
+                      "(colorée). Ex : PET, NO_PLAN — INDICE et PAGE jamais repris.",
+                 font=("Segoe UI", 8), fg=FG_MUTED, bg=BG_MAIN,
+                 anchor='w', justify='left', wraplength=420).pack(fill='x', pady=(0, 2))
+        self._constants_var = tk.StringVar(
+            value=', '.join(getattr(self._tpl, 'champs_constants', ['PET'])))
+        tk.Entry(parent, textvariable=self._constants_var,
+                 font=FONT_MAIN, bg=BG_LOG, fg=FG_TEXT,
+                 insertbackground=FG_TEXT, relief='flat', bd=4,
+                 ).pack(fill='x', pady=(0, 6))
+
     # ── Panneau aperçu (droite) ───────────────────────────────────────
 
     def _build_preview_panel(self, parent):
@@ -7019,6 +7032,7 @@ class TemplateEditorDialog(tk.Toplevel):
             footer_detect_keywords=detect_kw,
             footer_mti_tokens=self._tpl.footer_mti_tokens,
             footer_extract_fields=fld_fields,
+            champs_constants=TableTemplate.lire_champs_constants(self._constants_var.get()),
             col_widths={c: 20.0 for c in cols},
             description="",
         )

@@ -134,6 +134,12 @@ class Config:
     PIED_ENTETES_REVISIONS = ("INDICE", "RÉVISION", "REVISION", "EDITION", "ÉDITION")
     # Forme d'un indice de révision : « A », « R », « 00 », « R10 », « TP2 ».
     PIED_INDICE_MOTIF = r"[A-Z]{0,2}\d{1,2}|[A-Z]"
+    # Champs propres à chaque page : jamais repris des autres pages, même s'ils
+    # figurent dans les champs constants d'un modèle.
+    PIED_CHAMPS_JAMAIS_DEDUITS = ("INDICE", "PAGE")
+    # Fond d'une case de pied complétée depuis les autres pages du document
+    # (bleu clair, distinct du jaune « confiance basse » et du rouge « ?? »).
+    COULEUR_DEDUIT = "DDEBF7"
 
     # Nombre max de colonnes de template affectées automatiquement.
     # Au-delà, l'affectation automatique par frontières pixel devient peu

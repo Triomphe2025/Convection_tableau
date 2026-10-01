@@ -28,6 +28,8 @@ Config.TESSERACT_PATH   # référencer uniquement
 | `PIED_LIBELLES_UN_MOT` | `TYPE, CABLE, INDICE, PAGE, BORNIER` | Libellés à valeur d'un mot ; la suite va dans COMPLEMENT (les autres gardent tout leur segment) |
 | `PIED_LIBELLES_COMPTEUR` | `PAGE, FOLIO` | Seuls libellés où « n/m » est un compteur ; ailleurs « 6/10 » est un diamètre → COMPLEMENT |
 | `PIED_ENTETES_REVISIONS` | `INDICE, RÉVISION, EDITION…` | En-têtes d'un tableau des révisions (page de garde) |
+| `PIED_CHAMPS_JAMAIS_DEDUITS` | `INDICE, PAGE` | Jamais repris des autres pages, même listés en champs constants d'un modèle |
+| `COULEUR_DEDUIT` | `DDEBF7` | Fond d'une case de pied reprise des autres pages (commentaire « déduit des autres pages du document ») |
 | `PIED_INDICE_MOTIF` | `[A-Z]{0,2}\d{1,2}\|[A-Z]` | Forme d'un indice de révision (A, R, 00, R10, TP2) |
 | `IMAGES_FOLDER_NAME` | `VD23111 PE 162` | Nom du dossier de sortie des images |
 | `OCR_MODE` | `tesseract` | Mode OCR par défaut |

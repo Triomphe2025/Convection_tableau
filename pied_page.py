@@ -168,6 +168,25 @@ def analyser_pied(lignes: Iterable[str],
     return meta
 
 
+def inserer_valeur(lignes: List[str], cle: str, libelle: str, valeur: str) -> List[str]:
+    """Lignes du pied avec la valeur posée après son libellé vide, ou ajoutée en fin de 1re ligne.
+
+    Sert à afficher une valeur reprise des autres pages : le reste des lignes
+    brutes est inchangé.
+    """
+    lignes = list(lignes)
+    for i, ligne in enumerate(lignes):
+        for m in _LIBELLE_RE.finditer(ligne):
+            if cle_libelle(m.group(1)) == cle:
+                lignes[i] = f"{ligne[:m.end()]} {valeur}{ligne[m.end():]}"
+                return lignes
+    ajout = f"{libelle} : {valeur}"
+    if not lignes:
+        return [ajout]
+    lignes[0] = f"{lignes[0]}     {ajout}"
+    return lignes
+
+
 def indices_revisions(lignes: Iterable[str]) -> List[str]:
     """Indices de la 1re colonne d'un tableau des révisions (page de garde), dans l'ordre."""
     entetes = tuple(e.upper() for e in Config.PIED_ENTETES_REVISIONS)

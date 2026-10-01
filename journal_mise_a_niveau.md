@@ -518,3 +518,19 @@ comparaison, elle, ignorait déjà les espaces : sa sévérité ne change pas.
   réponses rejouées n'ont pas de ligne LOGO) : à vérifier au passage réel.
 - **À confirmer** : les pages vectorielles de 223111PE011 (122a, 104) portent « SIEMENS »
   (horizontal) et non MATRA ; au format demandé la cellule vaut « S I E M E N S ».
+
+### Champs constants d'un document (2026-10-01)
+
+- Réglage par modèle `champs_constants` (P.E.T. par défaut ; éditeur de modèle, section
+  « Champs constants du document » ; saisie « P.E.T., N° PLAN » acceptée). Anciens modèles de
+  `templates.json` sans ce réglage : P.E.T. par défaut, fichier non modifié.
+- Case vide d'un champ constant reprise des autres pages du MÊME document, à trois
+  conditions : case vide (une valeur lue n'est jamais remplacée) ; toutes les pages qui portent
+  le champ concordent (sinon case vide + alerte « non complété … ne concordent pas ») ; cellule
+  du pied colorée (`COULEUR_DEDUIT`, bleu clair) avec le commentaire « déduit des autres pages
+  du document ». La valeur est posée après son libellé vide dans le pied brut, ou ajoutée en fin
+  de 1re ligne si le libellé n'y figure pas.
+- Jamais repris : INDICE et PAGE (`PIED_CHAMPS_JAMAIS_DEDUITS`), même listés dans le modèle.
+  `STATION_NAME` ne sert toujours à rien dans le pied.
+- Rejeu : inchangé (aucun P.E.T. vide sur l'extrait ni sur PE137). Test : PE137 avec le P.E.T.
+  vidé sur 1 page sur 48 → GRAND-BUT repris, coloré, commenté, autres pages intactes.
