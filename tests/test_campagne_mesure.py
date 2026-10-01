@@ -37,13 +37,16 @@ class FauxAnthropic:
     """Remplace anthropic.Anthropic : 1000 tokens en entrée, 500 en sortie par appel."""
 
     requetes = []
+    identifiant_fixe = None
 
     def __init__(self, api_key=None):
         self.messages = SimpleNamespace(create=self._create)
 
     def _create(self, **kwargs):
         FauxAnthropic.requetes.append(kwargs)
+        ident = FauxAnthropic.identifiant_fixe or f"msg_faux_{len(FauxAnthropic.requetes)}"
         return SimpleNamespace(
+            id=ident,
             content=[SimpleNamespace(type='text', text=TEXTE_FAUX)],
             stop_reason='end_turn', model=kwargs['model'],
             usage=SimpleNamespace(input_tokens=1000, output_tokens=500,
@@ -66,6 +69,7 @@ class _BaseCampagne(unittest.TestCase):
 
     def setUp(self):
         FauxAnthropic.requetes = []
+        FauxAnthropic.identifiant_fixe = None
         self._tmp = tempfile.TemporaryDirectory()
         self.dossier = Path(self._tmp.name)
         self.pdf = _pdf_deux_pages(self.dossier)
@@ -76,11 +80,12 @@ class _BaseCampagne(unittest.TestCase):
         self._tmp.cleanup()
 
     def _campagne(self, modele='claude-haiku-4-5-20251001', effort='aucun', passages=1,
-                  budget=None):
+                  budget=None, pdf=None, rejouer=False):
         with patch('anthropic.Anthropic', FauxAnthropic):
             return cm.lancer_campagne(
-                modele, effort, passages, self.pdf, VERITE, 'REPARTITEUR 2', self.racine,
-                CLE_TEST, budget=budget, afficher=self.messages.append,
+                modele, effort, passages, pdf or self.pdf, VERITE, 'REPARTITEUR 2',
+                self.racine, CLE_TEST, budget=budget, afficher=self.messages.append,
+                rejouer=rejouer,
             )
 
 
@@ -158,6 +163,45 @@ class TestLancerCampagne(_BaseCampagne):
     def test_modele_sans_prix_refuse(self):
         with self.assertRaises(ValueError):
             self._campagne(modele='claude-inconnu')
+
+
+class TestAppelsReels(_BaseCampagne):
+
+    def test_n_passages_n_vrais_appels(self):
+        lignes = self._campagne(passages=3)
+        self.assertEqual(len(FauxAnthropic.requetes), 3)
+        self.assertEqual([lg['erreurs'] for lg in lignes], ['', '', ''])
+
+    def test_identifiant_repete_signale_comme_rejoue(self):
+        FauxAnthropic.identifiant_fixe = 'msg_identique'
+        lignes = self._campagne(passages=2)
+        self.assertEqual(lignes[0]['erreurs'], '')
+        self.assertIn('réponse rejouée', lignes[1]['erreurs'])
+        self.assertIn('msg_identique', lignes[1]['erreurs'])
+
+    def test_identifiant_d_une_campagne_precedente_signale(self):
+        FauxAnthropic.identifiant_fixe = 'msg_ancien'
+        self._campagne()
+        self.assertIn('réponse rejouée', self._campagne()[0]['erreurs'])
+
+    def test_journal_comme_source_refuse_sans_option(self):
+        journal = self.dossier / 'ancien_claude.jsonl'
+        journal.write_text('', 'utf-8')
+        with self.assertRaises(ValueError):
+            self._campagne(pdf=journal)
+        self.assertEqual(FauxAnthropic.requetes, [])
+
+
+class TestControleAppelsReels(unittest.TestCase):
+
+    def test_sans_identifiant_signale(self):
+        problemes = cm.controle_appels_reels({'pages_envoyees': 2, '_ids': ['msg_a']}, set())
+        self.assertEqual(problemes, ['1 réponse(s) sans identifiant'])
+
+    def test_identifiants_nouveaux_retenus(self):
+        vus = set()
+        self.assertEqual(cm.controle_appels_reels({'pages_envoyees': 1, '_ids': ['m1']}, vus), [])
+        self.assertEqual(vus, {'m1'})
 
 
 class TestLireJournal(unittest.TestCase):

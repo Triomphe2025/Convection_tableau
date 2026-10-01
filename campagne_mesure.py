@@ -92,7 +92,8 @@ def lire_journal(chemin: Path) -> Dict:
     Les tokens de cache (lus / écrits) sont comptés en entrée au plein tarif :
     l'estimation est un majorant (aucun cache n'est demandé par claude_ocr).
     """
-    bilan = {'pages_envoyees': 0, 'tokens_entree': 0, 'tokens_sortie': 0, 'erreurs': []}
+    bilan = {'pages_envoyees': 0, 'tokens_entree': 0, 'tokens_sortie': 0, 'erreurs': [],
+             'ids': []}
     if not chemin.exists():
         return bilan
     for ligne in chemin.read_text(encoding='utf-8').splitlines():
@@ -102,6 +103,8 @@ def lire_journal(chemin: Path) -> Dict:
         if 'image' not in entree:
             continue
         bilan['pages_envoyees'] += 1
+        if entree.get('id'):
+            bilan['ids'].append(entree['id'])
         usage = entree.get('usage') or {}
         bilan['tokens_entree'] += (
             usage.get('input_tokens', 0) + usage.get('cache_read_input_tokens', 0)
@@ -196,6 +199,7 @@ def executer_passage(pdf: Path, verite: Path, gabarit: str, modele: str, effort:
         'tokens_sortie': journal['tokens_sortie'],
         'cout_usd': round(cout_usd(modele, journal['tokens_entree'], journal['tokens_sortie']), 4),
         'duree_s': round(duree, 1),
+        '_ids': journal['ids'],
     }
 
 
@@ -210,13 +214,45 @@ def ajouter_ligne_csv(chemin: Path, ligne: Dict) -> None:
         ecrivain.writerow({c: ligne.get(c, '') for c in COLONNES_CSV})
 
 
+def ids_deja_vus(racine: Path) -> set:
+    """Identifiants de réponse de tous les journaux de passage déjà présents sous racine."""
+    vus = set()
+    for journal in racine.glob('*/*_claude.jsonl'):
+        vus.update(lire_journal(journal)['ids'])
+    return vus
+
+
+def controle_appels_reels(ligne: Dict, vus: set) -> List[str]:
+    """Signes qu'un passage n'a pas fait que de vrais appels ; ajoute ses identifiants à vus."""
+    ids = ligne.get('_ids') or []
+    problemes = []
+    if ligne.get('pages_envoyees') and len(ids) < ligne['pages_envoyees']:
+        problemes.append(f"{ligne['pages_envoyees'] - len(ids)} réponse(s) sans identifiant")
+    repetes = [i for i in ids if i in vus] + [i for k, i in enumerate(ids) if i in ids[:k]]
+    if repetes:
+        problemes.append(f"réponse rejouée : {len(repetes)} identifiant(s) déjà vu(s) "
+                         f"({', '.join(sorted(set(repetes))[:3])})")
+    vus.update(ids)
+    return problemes
+
+
 def lancer_campagne(modele: str, effort: str, passages: int, pdf: Path, verite: Path,
                     gabarit: str, racine: Path, cle: str,
-                    budget: Optional[float] = None, afficher=print) -> List[Dict]:
-    """Enchaîne les passages ; s'arrête avant un passage si le budget est atteint."""
+                    budget: Optional[float] = None, afficher=print,
+                    rejouer: bool = False) -> List[Dict]:
+    """Enchaîne les passages ; s'arrête avant un passage si le budget est atteint.
+
+    Chaque passage fait de vrais appels : une source .jsonl (rejeu d'un journal,
+    sans appel) est refusée sans rejouer=True, et un identifiant de réponse déjà
+    vu dans un passage précédent est inscrit dans la colonne erreurs.
+    """
     budget = Config.CAMPAGNE_BUDGET_MAX_USD if budget is None else budget
     if modele not in Config.CLAUDE_PRIX_MODELES:
         raise ValueError(f"Pas de prix pour {modele!r} dans CLAUDE_PRIX_MODELES (config.py).")
+    if Path(pdf).suffix.lower() == '.jsonl' and not rejouer:
+        raise ValueError(f"{Path(pdf).name} est un journal : le convertir rejouerait des réponses "
+                         "enregistrées, sans appel. Utilisez --rejouer pour le vouloir.")
+    vus = set() if rejouer else ids_deja_vus(racine)
     lignes: List[Dict] = []
     cumul = 0.0
     for i in range(1, passages + 1):
@@ -226,6 +262,10 @@ def lancer_campagne(modele: str, effort: str, passages: int, pdf: Path, verite: 
             break
         afficher(f"Passage {i}/{passages} — {modele}, effort {effort}…")
         ligne = executer_passage(pdf, verite, gabarit, modele, effort, racine, cle)
+        if not rejouer:
+            problemes = controle_appels_reels(ligne, vus)
+            if problemes:
+                ligne['erreurs'] = ' ; '.join(filter(None, [ligne['erreurs']] + problemes))
         ajouter_ligne_csv(racine / NOM_CSV, ligne)
         cumul += ligne['cout_usd']
         lignes.append(ligne)
@@ -286,12 +326,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument('--gabarit', default='REPARTITEUR 2', help='Nom du modèle de tableau')
     parser.add_argument('--budget', type=float, default=None,
                         help='Plafond en $ (défaut : CAMPAGNE_BUDGET_MAX_USD)')
+    parser.add_argument('--rejouer', action='store_true',
+                        help="Autorise --pdf <journal .jsonl> : rejeu sans appel ni coût")
     args = parser.parse_args(argv)
 
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     cle = cle_api()
-    if not cle:
+    if not cle and not args.rejouer:
         print("Clé API absente : définissez ANTHROPIC_API_KEY dans ce terminal.")
         return 2
     for chemin in (args.pdf, args.verite):
@@ -299,8 +341,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"Fichier introuvable : {chemin}")
             return 2
 
-    lancer_campagne(args.modele, args.effort, args.passages, args.pdf, args.verite,
-                    args.gabarit, DOSSIER_MESURES, cle, budget=args.budget)
+    try:
+        lancer_campagne(args.modele, args.effort, args.passages, args.pdf, args.verite,
+                        args.gabarit, DOSSIER_MESURES, cle, budget=args.budget,
+                        rejouer=args.rejouer)
+    except ValueError as exc:
+        print(exc)
+        return 2
     print()
     print(tableau_comparatif(DOSSIER_MESURES / NOM_CSV))
     return 0

@@ -616,6 +616,9 @@ class ClaudeVisionExtractor:
         raw = _texte_reponse(response)
         usage = _consommation(response)
         modele_servi = getattr(response, 'model', model)
+        # Identifiant de la réponse : prouve qu'un passage a fait de vrais appels
+        # (deux passages ne peuvent pas partager un même identifiant).
+        id_reponse = getattr(response, 'id', '') or ''
         logger.info(
             f"Claude {modele_servi} — {image_path.name} : "
             f"{usage['input_tokens']} tokens en entrée, {usage['output_tokens']} en sortie"
@@ -632,6 +635,7 @@ class ClaudeVisionExtractor:
                 'ts':        datetime.datetime.now().isoformat(timespec='seconds'),
                 'image':     image_path.name,
                 'model':     modele_servi,
+                'id':     id_reponse,
                 'usage':     usage,
                 'error':     'refus du modèle',
                 'categorie': categorie,
@@ -652,6 +656,7 @@ class ClaudeVisionExtractor:
                 'ts':         datetime.datetime.now().isoformat(timespec='seconds'),
                 'image':      image_path.name,
                 'model':      modele_servi,
+                'id':      id_reponse,
                 'usage':      usage,
                 'max_tokens': max_tokens,
                 'raw':        raw,
@@ -677,6 +682,7 @@ class ClaudeVisionExtractor:
                 'ts':      datetime.datetime.now().isoformat(timespec='seconds'),
                 'image':   image_path.name,
                 'model':   modele_servi,
+                'id':   id_reponse,
                 'usage':   usage,
                 'error':   str(e),
                 'success': False,
@@ -692,6 +698,7 @@ class ClaudeVisionExtractor:
                 'ts':       datetime.datetime.now().isoformat(timespec='seconds'),
                 'image':    image_path.name,
                 'model':    modele_servi,
+                'id':    id_reponse,
                 'usage':    usage,
                 'raw':      raw,
                 'rows':     0,
@@ -716,6 +723,7 @@ class ClaudeVisionExtractor:
             'ts':        datetime.datetime.now().isoformat(timespec='seconds'),
             'image':     image_path.name,
             'model':     modele_servi,
+            'id':     id_reponse,
             'usage':     usage,
             'raw':       raw,
             'rows':      len(rows),
