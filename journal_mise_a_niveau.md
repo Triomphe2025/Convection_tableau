@@ -563,3 +563,18 @@ comparaison, elle, ignorait déjà les espaces : sa sévérité ne change pas.
   → vide + alerte ; 47 EPEULE + 1 EPEULF → EPEULF conservé + alerte ; INDICE vide → reste vide.
   Contre-épreuves (vote, remplacement, INDICE repris, alerte supprimée) : chacune fait échouer
   un test. Suite complète verte, tests dorés des étapes 3 et 4 identiques, rejeu inchangé.
+
+### Pages de garde de 223111PE011 : fixture et page tournée (2026-10-01)
+
+- `tests/fixtures/223111PE011_garde.pdf` : pages 1 (garde scannée, cartouche « Modifications »
+  01 02 R R1 R2 TP1 03 TP2 TP3), 2 (tableau des révisions vectoriel, **tourné de 90°**), 3
+  (tableau scanné, PAGE 1, INDICE R) et 16 (tableau vectoriel, PAGE 14, INDICE TP3) du document
+  complet. Extrait de 10 pages et vérité inchangés.
+- La page 2 était illisible en grille : `get_text` donne les positions de la page non tournée,
+  chaque ligne y devenait verticale. `grille_page` ramène désormais les caractères au sens de
+  lecture (`page.rotation_matrix`). Seule page tournée des 6 PDF de test et du document
+  complet : aucune mesure existante ne change (tests dorés identiques, rejeu identique).
+  Révisions lues : 01 02 R R1 R2 TP1 03 TP2 TP3 (+ « 08 », pris d'une ligne de suite :
+  élargit la liste, ne masque rien).
+- **Correction du journal de l'étape 6** : 122a n'est pas la seule page à suffixe du document
+  complet ; les pages 34b et 34c existent (vectorielles, lues « 34b », « 34c »).

@@ -470,3 +470,29 @@ class TestTesseractIndiceNonInvente(unittest.TestCase):
         self.assertNotIn('INDICE', ex._extract_meta([[{'text': 'PAGE : 12'}]]))
         self.assertEqual(ex._extract_meta([[{'text': 'INDICE : O | PAGE : 12'}]])['INDICE'],
                          '0')
+
+
+class TestGarde223111PE011(unittest.TestCase):
+    """Pages de garde de 223111PE011 : révisions sur une page vectorielle tournée de 90°."""
+
+    GARDE = FIXTURES / '223111PE011_garde.pdf'
+
+    @classmethod
+    def setUpClass(cls):
+        tpl = _tpl()
+        lecteur = pe.PdfTableExtractor(tpl)
+        with fitz.open(str(cls.GARDE)) as doc:
+            cls.rotation = doc[1].rotation
+            cls.revisions = lecteur.extract_page_grille(doc[1], 1)['metadata']['REVISIONS']
+            cls.page_14 = lecteur.extract_page_grille(doc[3], 3)
+        cls.messages, _ = _excel([cls.page_14, {'success': False, 'error': 'non-listing',
+                                                'metadata': {'REVISIONS': cls.revisions}}], tpl)
+
+    def test_page_tournee_lue_dans_son_sens(self):
+        self.assertEqual(self.rotation, 90)
+        self.assertEqual([r for r in self.revisions if r != '08'],
+                         ['01', '02', 'R', 'R1', 'R2', 'TP1', '03', 'TP2', 'TP3'])
+
+    def test_indice_de_la_page_14_dans_les_revisions_sans_alerte(self):
+        self.assertEqual(self.page_14['metadata']['INDICE'], 'TP3')
+        self.assertFalse([m for m in self.messages if 'INDICE' in m])

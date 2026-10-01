@@ -116,6 +116,21 @@ def motif_page_ignoree(diagnostic: Dict) -> str:
 
 # -- Lecture de la couche texte en grille de caractères ----------------
 
+def _sens_de_lecture(span: Dict, matrice) -> Tuple[Dict, List[Dict]]:
+    """Span et caractères ramenés au sens de lecture d'une page tournée.
+
+    get_text donne les positions dans la page non tournée : sur la page des
+    révisions de 223111PE011 (rotation 90°), chaque ligne lue y est verticale.
+    """
+    import fitz
+    caracteres = [
+        dict(c, origin=tuple(fitz.Point(c['origin']) * matrice),
+             bbox=tuple(fitz.Rect(c['bbox']) * matrice))
+        for c in span['chars']
+    ]
+    return dict(span, origin=tuple(fitz.Point(span['origin']) * matrice)), caracteres
+
+
 def grille_page(page) -> List[str]:
     """Reconstruit une page de texte vectoriel en lignes à positions exactes.
 
@@ -153,6 +168,8 @@ def grille_page(page) -> List[str]:
                 caracteres = span['chars']
                 if not caracteres:
                     continue
+                if page.rotation:
+                    span, caracteres = _sens_de_lecture(span, page.rotation_matrix)
                 num_span += 1
                 xs = [c['origin'][0] for c in caracteres]
                 ecarts.update(round(b - a, 2) for a, b in zip(xs, xs[1:]))
