@@ -704,3 +704,27 @@ espacement interne, « RM       11B ») : 0 écart de position. Les 4 autres pag
 ces extraits sont des gardes ou des pages de révisions (sans en-tête de tableau).
 Contre-épreuve (test) : sur PE137, un espacement interne réduit à un espace dans la sortie est
 retrouvé, à la bonne cellule.
+
+## Vérité des positions des scans : feuille « Verite_positions » (2026-10-02)
+
+Feuille facultative d'un Excel de vérité terrain, lue par `mesurer_precision.lire_verite_excel`.
+**À remplir à la main** : la générer depuis Tesseract mesurerait le commit A avec son propre outil.
+
+| Colonne | Contenu |
+|---------|---------|
+| Page | même valeur que la 1re colonne de `Verite_tableaux` (« Page extrait ») |
+| Ligne | même valeur que la colonne « Ligne » de `Verite_tableaux` |
+| Colonne | nom de colonne du tableau (FIL, TENANT, …), comme dans l'en-tête de `Verite_tableaux` |
+| Sous-champ | n° du mot dans la cellule, à partir de 1 (un mot = suite de caractères sans espace) |
+| Début | colonne, en caractères, du 1er caractère du sous-champ |
+
+- Seuls les **écarts entre sous-champs** d'une même cellule comptent : l'origine du comptage
+  (0 ou 1, bord de la cellule ou de la ligne) est libre. Exemple « PH  QTEL2   09 » :
+  sous-champs 1, 2, 3 aux colonnes 1, 5, 13 (ou 0, 4, 12).
+- Une cellule saisie n'est comparée en position que si son contenu est identique (une erreur de
+  contenu est déjà comptée comme telle). Les cellules non saisies gardent la règle actuelle.
+- Saisie contrôlée à la lecture : page, ligne ou colonne inconnue → erreur qui cite la ligne de
+  la feuille ; colonne de feuille manquante → erreur qui la nomme. En-têtes reconnus sans
+  tenir compte des accents ni de la casse (« Début », « debut »).
+- Tests : `TestVeritePositions` (vérité fabriquée) — conformité, écart à sa cellule, origine et
+  ordre libres, erreurs de saisie.

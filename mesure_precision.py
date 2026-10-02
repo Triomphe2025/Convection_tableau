@@ -70,7 +70,9 @@ class EcartPosition:
     """Colonne de départ différente pour une cellule pourtant identique.
 
     Ne survient que si la référence préserve la géométrie exacte (PDF
-    vectoriel reconstruit en grille) : `page_ref['rows'][i]['exact']` est vrai.
+    vectoriel reconstruit en grille) : `page_ref['rows'][i]['exact']` est vrai,
+    ou si la ligne porte une vérité des positions (`row['positions']`, feuille
+    Verite_positions d'une vérité terrain).
     """
 
     page_ref: int
@@ -459,10 +461,17 @@ def comparer_page(
             classe = classer_cellule(vr, vc)
             if classe != IDENTIQUE and k in glisse:
                 classe = GLISSEMENT
+            attendues = (r.get('positions') or {}).get(nom_col)
             if classe != IDENTIQUE:
                 ecarts.append(EcartCellule(
                     num_ref, num_conv, i, j, nom_col, _espace(vr), _espace(vc), classe,
                 ))
+            elif attendues is not None:
+                # Vérité des positions saisie à part (scans) : elle fait foi pour cette cellule.
+                if attendues != _decalages(vc):
+                    positions.append(EcartPosition(
+                        num_ref, num_conv, i, j, nom_col, attendues, _decalages(vc),
+                    ))
             elif r.get('exact') and _decalages(vr) != _decalages(vc):
                 positions.append(EcartPosition(
                     num_ref, num_conv, i, j, nom_col, _decalages(vr), _decalages(vc),

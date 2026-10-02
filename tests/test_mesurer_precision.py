@@ -417,3 +417,68 @@ class TestMainOptionPdf(unittest.TestCase):
                       '--csv', str(Path(tmp) / 'm.csv')])
         self.assertIn('Positions contre la grille du PDF : 1 page(s) vectorielle(s)',
                       sortie.getvalue())
+
+
+class TestVeritePositions(unittest.TestCase):
+    """Feuille Verite_positions : positions des sous-champs saisies à la main (scans)."""
+
+    COLS = ['FIL', 'TENANT', 'SIGNAL', 'ABOUTISSANT']
+
+    def _verite(self, tmp, positions, entete=('Page', 'Ligne', 'Colonne', 'Sous-champ', 'Début')):
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = 'Verite_tableaux'
+        ws.append(['Page extrait', 'Page document', 'Ligne', *self.COLS, 'Valide par moi (x)'])
+        ws.append([1, '7', 1, 'G', 'PH QTEL2 09', 'TEL PMS Q1', 'PH ACC/A 01', 'x'])
+        ws.append([1, '7', 2, 'BC', 'PH QTEL2 10', 'TEL PMS Q1', 'PH ACC/A 02', 'x'])
+        wp = wb.create_sheet('Verite_positions')
+        wp.append(list(entete))
+        for ligne in positions:
+            wp.append(list(ligne))
+        chemin = Path(tmp) / 'verite.xlsx'
+        wb.save(chemin)
+        return chemin
+
+    def _mesurer(self, positions, tenant='PH  QTEL2   09'):
+        import mesure_precision as mp
+        with tempfile.TemporaryDirectory() as tmp:
+            verite, colonnes = mpr.lire_verite_excel(self._verite(tmp, positions))
+        converti = [{'success': True, 'metadata': {}, 'pied_texte': [], 'rows': [
+            {'type': 'data', 'cells': ['G', tenant, 'TEL PMS Q1', 'PH ACC/A 01']},
+            {'type': 'data', 'cells': ['BC', 'PH QTEL2 10', 'TEL PMS Q1', 'PH ACC/A 02']}]}]
+        return mp.mesurer(verite, converti, colonnes)
+
+    # « PH  QTEL2   09 » : sous-champs aux colonnes 1, 5, 13 (comptées depuis 1).
+    CONFORMES = [(1, 1, 'TENANT', 1, 1), (1, 1, 'TENANT', 2, 5), (1, 1, 'TENANT', 3, 13)]
+
+    def test_positions_conformes_aucun_ecart(self):
+        self.assertEqual(self._mesurer(self.CONFORMES).ecarts_positions, [])
+
+    def test_origine_du_comptage_et_ordre_des_lignes_libres(self):
+        depuis_zero = [(1, 1, 'TENANT', 3, 12), (1, 1, 'TENANT', 1, 0), (1, 1, 'TENANT', 2, 4)]
+        self.assertEqual(self._mesurer(depuis_zero).ecarts_positions, [])
+
+    def test_ecart_retrouve_a_sa_cellule(self):
+        ecarts = self._mesurer(self.CONFORMES, tenant='PH QTEL2 09').ecarts_positions
+        self.assertEqual([(e.page_ref, e.ligne_ref, e.colonne, e.decalages_ref, e.decalages_conv)
+                          for e in ecarts], [(0, 0, 'TENANT', (0, 4, 12), (0, 3, 9))])
+
+    def test_cellules_non_saisies_non_mesurees_par_cette_feuille(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            verite, _ = mpr.lire_verite_excel(self._verite(tmp, self.CONFORMES))
+        self.assertEqual(verite[0]['rows'][0]['positions'], {'TENANT': (0, 4, 12)})
+        self.assertNotIn('positions', verite[0]['rows'][1])
+
+    def test_colonne_inconnue_signalee_avec_sa_ligne(self):
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaises(ValueError) as erreur:
+            mpr.lire_verite_excel(self._verite(tmp, [(1, 1, 'BORNE', 1, 1)]))
+        self.assertIn('ligne 2', str(erreur.exception))
+
+    def test_ligne_absente_de_verite_tableaux(self):
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaises(ValueError):
+            mpr.lire_verite_excel(self._verite(tmp, [(1, 9, 'TENANT', 1, 1)]))
+
+    def test_colonne_de_feuille_manquante(self):
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaises(ValueError) as erreur:
+            mpr.lire_verite_excel(self._verite(tmp, [], entete=('Page', 'Ligne', 'Colonne')))
+        self.assertIn('sous-champ', str(erreur.exception))

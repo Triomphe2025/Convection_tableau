@@ -20,6 +20,7 @@ import csv
 import re
 import subprocess
 import sys
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -132,8 +133,11 @@ def lire_verite_excel(chemin: Path) -> Tuple[List[dict], List[str]]:
         # l'original font partie du résultat attendu (« D_T       02A »).
         lignes_par_page.setdefault(extrait, []).append({
             'type': 'data', 'cells': cellules, 'confidence': [100] * len(cellules),
-            'exact': True,
+            'exact': True, 'ligne_verite': valeurs[debut - 1],
         })
+
+    if 'Verite_positions' in wb.sheetnames:
+        _attacher_positions(wb['Verite_positions'], lignes_par_page, colonnes)
 
     pieds_par_page: dict = {}
     if 'Verite_pieds' in wb.sheetnames:
@@ -168,6 +172,49 @@ def lire_verite_excel(chemin: Path) -> Tuple[List[dict], List[str]]:
             'pied_texte': pieds_par_page.get(extrait, []),
         })
     return pages, colonnes
+
+
+def _cle_entete(texte) -> str:
+    sans_accents = unicodedata.normalize('NFKD', str(texte or ''))
+    sans_accents = ''.join(c for c in sans_accents if not unicodedata.combining(c))
+    return re.sub(r'[^a-z]', '', sans_accents.lower())
+
+
+def _attacher_positions(ws, lignes_par_page: dict, colonnes: List[str]) -> None:
+    """Feuille Verite_positions → row['positions'] = {colonne: décalages des sous-champs}.
+
+    Une ligne de la feuille : page, ligne, colonne, sous-champ (n° du mot dans la
+    cellule, à partir de 1), début (colonne du 1er caractère du sous-champ). Seuls les
+    écarts entre sous-champs comptent : l'origine du comptage de « début » est libre.
+    Saisie humaine (jamais tirée d'un OCR) : une page, une ligne ou une colonne
+    inconnue est une erreur de saisie, signalée avec sa ligne dans la feuille.
+    """
+    entetes = {_cle_entete(c.value): k for k, c in enumerate(next(ws.iter_rows(max_row=1)))}
+    requis = {'page': 'page', 'ligne': 'ligne', 'colonne': 'colonne',
+              'souschamp': 'sous-champ', 'debut': 'début'}
+    manquants = [nom for cle, nom in requis.items()
+                 if not any(e.startswith(cle) for e in entetes)]
+    if manquants:
+        raise ValueError(f"Verite_positions : colonne(s) absente(s) : {', '.join(manquants)}")
+    index = {cle: next(k for e, k in entetes.items() if e.startswith(cle)) for cle in requis}
+    debuts: dict = {}
+    for num, row in enumerate(ws.iter_rows(min_row=2), start=2):
+        v = [c.value for c in row]
+        if all(x in (None, '') for x in v):
+            continue
+        page, ligne, colonne = int(v[index['page']]), v[index['ligne']], str(v[index['colonne']])
+        if colonne not in colonnes:
+            raise ValueError(f"Verite_positions ligne {num} : colonne inconnue {colonne!r}")
+        cible = next((r for r in lignes_par_page.get(page, [])
+                      if str(r['ligne_verite']) == str(ligne)), None)
+        if cible is None:
+            raise ValueError(f"Verite_positions ligne {num} : page {page} ligne {ligne} "
+                             "absente de Verite_tableaux")
+        debuts.setdefault((id(cible), colonne), (cible, {}))[1][
+            int(v[index['souschamp']])] = int(v[index['debut']])
+    for (_, colonne), (cible, par_mot) in debuts.items():
+        ordonnes = [par_mot[k] for k in sorted(par_mot)]
+        cible.setdefault('positions', {})[colonne] = tuple(d - ordonnes[0] for d in ordonnes)
 
 
 # ── Référence PDF vectoriel (couche texte reconstruite en grille) ────
