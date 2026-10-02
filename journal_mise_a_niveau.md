@@ -652,3 +652,30 @@ n'a aucune cellule à double espace ou à retrait (0 sur les 10 pages, 104 et 12
 le marqueur `exact` est posé sur toutes ses lignes, la comparaison se réduit donc à « la
 conversion n'a pas ajouté d'espaces ». Les positions ne sont réellement mesurées que contre
 une référence en grille vectorielle (vérité TP2 de 223400PE137, ou un PDF vectoriel).
+
+## Étape 7 — passage réel (2026-10-02, commit 51ec9c2) — document complet reporté à l'étape 10
+
+### Extrait 223111PE011, Opus 5.5 medium (passages 6 et 7)
+
+| Passage | Pages | Cellules fausses | Pieds faux | Lignes absentes / en trop | Glissements / déplacées | Coût |
+|---------|-------|------------------|------------|---------------------------|-------------------------|------|
+| 6 | 10/10 | 2 / 664 | 0 | 0 / 0 | 0 / 0 | 0,333 $ |
+| 7 | 10/10 | 2 / 664 | 0 | 0 / 0 | 0 / 0 | 0,333 $ |
+
+- Vrais appels : 16 identifiants de réponse distincts (`msg_011Cfdc…`), aucun vide, horodatages
+  successifs (~50 s pour les 2 111 tokens de la page 52). Les réponses sont pourtant identiques
+  au caractère près d'un passage à l'autre, et identiques à celles des passages 4 et 5 : le
+  modèle rend la même réponse pour la même image et le même prompt. Ce n'est pas un rejeu.
+- Les 2 cellules fausses restent celles de la page 119 (« OC » lu « CC »), cas des étapes 8 et 9.
+- Avec les passages 2 à 5 : 0 ligne absente, 0 en trop, 0 cellule « manquant » sur toutes les pages.
+
+### Contrôle INDICE — `tests/fixtures/223111PE011_garde.pdf` (2 appels, ~0,06 $)
+
+- Page 1 (garde scannée) : Claude rend `REVISIONS: 01 02 R R1 R2 TP1 03 TP2 TP3`, conforme au
+  cartouche imprimé. Page 2 (révisions vectorielles tournées de 90°) : mêmes indices, lus en
+  grille sans appel (+ « 08 » parasite).
+- Page 3 (scan, PAGE 1) : INDICE R ; page 4 (vectorielle, PAGE 14) : INDICE TP3 ; tous deux dans
+  les révisions. Journal de conversion : aucune ligne « contrôle INDICE impossible » ni
+  « INDICE absent des révisions » — contrôle fait, sans fausse alerte. Limite : le contrôle
+  réussi ne laisse aucune ligne positive dans le journal, seulement l'absence d'alerte.
+- Logo des pages Claude : « M A T R A » (ligne LOGO:), conforme au scan vertical.
