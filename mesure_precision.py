@@ -115,6 +115,9 @@ class RapportMesure:
     ecarts_cellules: List[EcartCellule] = field(default_factory=list)
     ecarts_pieds: List[EcartPied] = field(default_factory=list)
     ecarts_positions: List[EcartPosition] = field(default_factory=list)
+    # (page de la référence de positions, page convertie) : pages dont les positions
+    # ont été mesurées contre une référence géométrique (grille d'un PDF vectoriel).
+    pages_positions_geometriques: List[Tuple[int, int]] = field(default_factory=list)
     nb_cellules_comparees: int = 0
     nb_cellules_identiques: int = 0
 
@@ -486,6 +489,23 @@ def apparier_deplacees(orphelines: List[LigneOrpheline], num_ref: int, num_conv:
     return [o for o in orphelines if id(o) not in prises], deplacees
 
 
+# ── Positions contre une référence géométrique ───────────────────────
+
+def remplacer_positions(rapport: RapportMesure, positions: RapportMesure) -> None:
+    """Positions des pages couvertes par `positions` (référence géométrique) à la place
+    de celles du rapport ; les autres pages gardent les leurs.
+
+    `positions` est un rapport mesuré contre une référence qui porte la géométrie
+    (grille d'un PDF vectoriel) : seules ses positions et ses pages appariées servent.
+    """
+    couvertes = {conv for _, conv in positions.pages_appariees}
+    rapport.ecarts_positions = (
+        [e for e in rapport.ecarts_positions if e.page_conv not in couvertes]
+        + list(positions.ecarts_positions)
+    )
+    rapport.pages_positions_geometriques = sorted(positions.pages_appariees)
+
+
 # ── Orchestration ──────────────────────────────────────────────────────
 
 def mesurer(reference: List[dict], converti: List[dict], colonnes: List[str]) -> RapportMesure:
@@ -532,6 +552,9 @@ def formater_rapport(rapport: RapportMesure, max_ecarts: Optional[int] = None) -
             lignes.append(f"  {classe:20} {n}")
     if rapport.ecarts_pieds:
         lignes.append(f"Écarts pied de page   : {len(rapport.ecarts_pieds)}")
+    if rapport.pages_positions_geometriques:
+        lignes.append(f"Positions contre la grille du PDF : "
+                      f"{len(rapport.pages_positions_geometriques)} page(s) vectorielle(s)")
     if rapport.ecarts_positions:
         lignes.append(f"Écarts de position    : {len(rapport.ecarts_positions)}")
     if rapport.lignes_orphelines:

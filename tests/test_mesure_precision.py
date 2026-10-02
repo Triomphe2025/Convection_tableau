@@ -361,6 +361,24 @@ class TestRapportMesure(unittest.TestCase):
         self.assertEqual(mp.RapportMesure().cellules_par_classe(), {})
 
 
+class TestRemplacerPositions(unittest.TestCase):
+
+    def _pos(self, page_conv):
+        return mp.EcartPosition(0, page_conv, 0, 0, 'SIGNAL', (0, 3), (0, 4))
+
+    def test_pages_couvertes_remplacees_les_autres_gardees(self):
+        rapport = mp.RapportMesure(ecarts_positions=[self._pos(1), self._pos(2)])
+        geometrie = mp.RapportMesure(pages_appariees=[(5, 2)], ecarts_positions=[self._pos(2)])
+        mp.remplacer_positions(rapport, geometrie)
+        self.assertEqual(rapport.ecarts_positions, [self._pos(1), self._pos(2)])
+        self.assertEqual(rapport.pages_positions_geometriques, [(5, 2)])
+
+    def test_page_couverte_sans_ecart_efface_l_ancien(self):
+        rapport = mp.RapportMesure(ecarts_positions=[self._pos(2)])
+        mp.remplacer_positions(rapport, mp.RapportMesure(pages_appariees=[(5, 2)]))
+        self.assertEqual(rapport.ecarts_positions, [])
+
+
 class TestFormaterRapport(unittest.TestCase):
 
     def test_contient_les_comptes_principaux(self):

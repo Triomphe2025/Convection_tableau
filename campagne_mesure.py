@@ -118,12 +118,18 @@ def lire_journal(chemin: Path) -> Dict:
     return bilan
 
 
-def mesurer_sortie(xlsx: Path, verite: Path, gabarit: str) -> Dict:
-    """Mesure une sortie contre une vérité (.xlsx de vérité terrain ou PDF vectoriel)."""
+def mesurer_sortie(xlsx: Path, verite: Path, gabarit: str, pdf: Optional[Path] = None) -> Dict:
+    """Mesure une sortie contre une vérité (.xlsx de vérité terrain ou PDF vectoriel).
+
+    pdf : document source ; les positions de ses pages vectorielles sont mesurées
+    contre sa propre grille, pas contre la vérité Excel (qui ne garde pas la géométrie).
+    """
     from mesure_precision import (
         AJOUTE, CONFUSION, CONTENU_DIFFERENT, ESPACEMENT, GLISSEMENT, MANQUANT, mesurer,
     )
-    from mesurer_precision import lire_pdf_vectoriel, lire_verite_excel, lire_xlsx
+    from mesurer_precision import (
+        lire_pdf_vectoriel, lire_verite_excel, lire_xlsx, positions_contre_pdf,
+    )
     from template import TemplateManager
 
     if verite.suffix.lower() == '.pdf':
@@ -132,7 +138,11 @@ def mesurer_sortie(xlsx: Path, verite: Path, gabarit: str) -> Dict:
         reference = lire_pdf_vectoriel(verite, colonnes, template=modele_tableau)
     else:
         reference, colonnes = lire_verite_excel(verite)
-    rapport = mesurer(reference, lire_xlsx(xlsx), colonnes)
+    converti = lire_xlsx(xlsx)
+    rapport = mesurer(reference, converti, colonnes)
+    if pdf is not None and verite.suffix.lower() != '.pdf':
+        positions_contre_pdf(rapport, converti, pdf, colonnes,
+                             template=TemplateManager().get(gabarit))
     compte = rapport.cellules_par_classe()
     orphelines = [o.cote for o in rapport.lignes_orphelines]
     return {
@@ -186,7 +196,7 @@ def executer_passage(pdf: Path, verite: Path, gabarit: str, modele: str, effort:
     duree = time.monotonic() - debut
 
     journal = lire_journal(dossier / f"{pdf.stem}_claude.jsonl")
-    mesures = mesurer_sortie(Path(resultat['excel']), verite, gabarit)
+    mesures = mesurer_sortie(Path(resultat['excel']), verite, gabarit, pdf=pdf)
     return {
         'date': datetime.now().strftime('%Y-%m-%d %H:%M'),
         'commit': _version_git(),

@@ -29,7 +29,7 @@ import openpyxl
 from config import Config
 from mesure_precision import (
     AJOUTE, CONFUSION, CONTENU_DIFFERENT, ESPACEMENT, GLISSEMENT, MANQUANT,
-    formater_rapport, mesurer,
+    formater_rapport, mesurer, remplacer_positions,
 )
 from template import TemplateManager
 
@@ -177,6 +177,27 @@ def _est_entete_grille(ligne: str, colonnes: List[str]) -> bool:
     return all(re.sub(r'[^A-Z0-9]', '', c.upper()) in mots for c in colonnes)
 
 
+def positions_contre_pdf(rapport, converti: List[dict], pdf: Path, colonnes: List[str],
+                         template=None) -> None:
+    """Positions des pages vectorielles du PDF source mesurées contre sa propre grille.
+
+    Remplace, pour ces pages, les positions mesurées contre une vérité Excel qui
+    ne garde pas la géométrie. Les pages scannées ou à couche OCR invisible ne
+    sont pas une référence de positions : elles sont écartées.
+    """
+    import fitz
+    from pdf_extractor import VECTORIEL, classer_page
+
+    with fitz.open(str(pdf)) as doc:
+        vectorielles = {i for i, page in enumerate(doc) if classer_page(page) == VECTORIEL}
+    reference = [
+        page if i in vectorielles else {'success': True, 'rows': [], 'metadata': {},
+                                        'pied_texte': []}
+        for i, page in enumerate(lire_pdf_vectoriel(pdf, colonnes, template=template))
+    ]
+    remplacer_positions(rapport, mesurer(reference, converti, colonnes))
+
+
 def lire_pdf_vectoriel(chemin: Path, colonnes: List[str], template=None) -> List[dict]:
     """Lit un PDF vectoriel : une page pivot par page PDF, lignes gardant leur
     espacement d'origine (`exact=True`) pour la comparaison de position.
@@ -307,6 +328,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument(
         '--csv', default=None, help='Chemin du fichier de mesures (défaut : config)',
     )
+    parser.add_argument(
+        '--pdf', default=None,
+        help="PDF source : positions de ses pages vectorielles mesurées contre sa grille",
+    )
     args = parser.parse_args(argv)
 
     if hasattr(sys.stdout, 'reconfigure'):
@@ -332,6 +357,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     converti = lire_xlsx(chemin_sortie)
     rapport = mesurer(reference, converti, colonnes)
+    if args.pdf:
+        modele = TemplateManager().get(args.modele) if args.modele else None
+        positions_contre_pdf(rapport, converti, Path(args.pdf), colonnes, template=modele)
 
     print(formater_rapport(rapport, max_ecarts=args.max_ecarts))
 

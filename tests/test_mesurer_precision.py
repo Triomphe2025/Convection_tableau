@@ -348,3 +348,72 @@ class TestMain(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestPositionsContrePdf(unittest.TestCase):
+    """Positions des pages vectorielles mesurées contre la grille du PDF source."""
+
+    FIX = Path(__file__).parent / 'fixtures'
+
+    def test_extrait_122a_et_104_seules_pages_vectorielles(self):
+        import mesure_precision as mp
+        verite, colonnes = mpr.lire_verite_excel(self.FIX / '223111PE011_extrait_verite.xlsx')
+        converti = mpr.lire_xlsx(self.FIX / '223111PE011_extrait_sortie_v1.7.xlsx')
+        rapport = mp.mesurer(verite, converti, colonnes)
+        mpr.positions_contre_pdf(rapport, converti, self.FIX / '223111PE011_extrait_10pages.pdf',
+                                 colonnes)
+        # v1.7 a perdu la page 104 : seule 122a (page 9 du PDF) est appariée.
+        self.assertEqual(rapport.pages_positions_geometriques, [(8, 7)])
+        self.assertEqual(rapport.ecarts_positions, [])
+
+    def test_pe137_chaine_complete_puis_espace_retire_retrouve(self):
+        import contextlib
+        import io
+
+        import fitz
+
+        import mesure_precision as mp
+        from generer_classeur import generer_excel
+        from pdf_extractor import PdfTableExtractor
+        from template import TemplateManager
+        tpl = TemplateManager().get('REPARTITEUR')
+        colonnes = list(tpl.columns)
+        pdf = self.FIX / '223400PE137.pdf'
+        lecteur = PdfTableExtractor(tpl)
+        with fitz.open(str(pdf)) as doc:
+            resultats = [lecteur.extract_page_grille(doc[i], i) for i in range(len(doc))]
+        with tempfile.TemporaryDirectory() as tmp:
+            classeur = Path(tmp) / 's.xlsx'
+            with contextlib.redirect_stdout(io.StringIO()):
+                generer_excel(resultats, lecteur, classeur, on_log=lambda m: None)
+            converti = mpr.lire_xlsx(classeur)
+        rapport = mp.RapportMesure()
+        mpr.positions_contre_pdf(rapport, converti, pdf, colonnes, template=tpl)
+        self.assertEqual(len(rapport.pages_positions_geometriques), 48)
+        self.assertEqual(rapport.ecarts_positions, [])
+
+        page, ligne, k = next((p, i, k) for p, pg in enumerate(converti)
+                              for i, r in enumerate(pg['rows'])
+                              for k, c in enumerate(r['cells']) if '   ' in c.strip())
+        cellule = converti[page]['rows'][ligne]['cells'][k]
+        converti[page]['rows'][ligne]['cells'][k] = ' '.join(cellule.split())
+        rapport = mp.RapportMesure()
+        mpr.positions_contre_pdf(rapport, converti, pdf, colonnes, template=tpl)
+        trouves = [(e.page_conv, e.ligne_conv, e.colonne) for e in rapport.ecarts_positions]
+        self.assertEqual(trouves, [(page, ligne, colonnes[k])])
+
+
+class TestMainOptionPdf(unittest.TestCase):
+
+    def test_option_pdf_affiche_les_pages_vectorielles_mesurees(self):
+        import contextlib
+        import io
+        fix = Path(__file__).parent / 'fixtures'
+        sortie = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stdout(sortie):
+            mpr.main([str(fix / '223111PE011_extrait_sortie_v1.7.xlsx'),
+                      str(fix / '223111PE011_extrait_verite.xlsx'),
+                      '--pdf', str(fix / '223111PE011_extrait_10pages.pdf'),
+                      '--csv', str(Path(tmp) / 'm.csv')])
+        self.assertIn('Positions contre la grille du PDF : 1 page(s) vectorielle(s)',
+                      sortie.getvalue())

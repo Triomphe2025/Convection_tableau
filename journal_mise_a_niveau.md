@@ -679,3 +679,28 @@ une référence en grille vectorielle (vérité TP2 de 223400PE137, ou un PDF ve
   « INDICE absent des révisions » — contrôle fait, sans fausse alerte. Limite : le contrôle
   réussi ne laisse aucune ligne positive dans le journal, seulement l'absence d'alerte.
 - Logo des pages Claude : « M A T R A » (ligne LOGO:), conforme au scan vertical.
+
+## Positions des pages vectorielles contre la grille du PDF (2026-10-02)
+
+`mesurer_precision.positions_contre_pdf` : les pages **vectorielles** du PDF source (classées
+comme au routage ; scans et couches OCR invisibles exclus) sont lues en grille et appariées par
+contenu à la sortie ; pour ces pages, leurs positions remplacent celles mesurées contre l'Excel
+de vérité. Ligne de commande : `--pdf <source.pdf>` ; campagne : automatique.
+
+Rappel de ce qu'est une position : l'écart entre les mots **à l'intérieur** d'une cellule, à
+partir de son premier mot (`_decalages`) — pas le retrait de la cellule dans sa colonne.
+
+| Sortie | Avant (contre la vérité) | Après (contre le PDF) | Pages vectorielles mesurées |
+|--------|--------------------------|-----------------------|------------------------------|
+| Extrait 223111PE011, passages réels 1 à 7 | 0 | 0 | 104 (0 ligne) et 122a (56 cellules) |
+| Extrait 223111PE011, sortie v1.7 | 0 | 0 | 122a seule (v1.7 a perdu 104) |
+
+Sur 223111PE011, la mesure reste presque vide de matière : 122a n'a aucune cellule à
+espacement interne (« PH QTELMG 13 », un espace entre les mots). Nouveaux extraits, mesurés en
+lecture seule (grille → Excel → relecture, comme PE137 TP2 ; fichiers non modifiés, tests à
+venir avec leur intégration) : 223111PE012 pages 5, 9, 10 (« Bornier standard », 302 cellules,
+1 à espacement interne) et 6A23111PE133 pages 7, 8 (« REPARTITEUR », 272 cellules dont **142** à
+espacement interne, « RM       11B ») : 0 écart de position. Les 4 autres pages vectorielles de
+ces extraits sont des gardes ou des pages de révisions (sans en-tête de tableau).
+Contre-épreuve (test) : sur PE137, un espacement interne réduit à un espace dans la sortie est
+retrouvé, à la bonne cellule.
