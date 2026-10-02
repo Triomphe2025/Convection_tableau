@@ -240,6 +240,42 @@ class TestMotsEtJaccard(unittest.TestCase):
         self.assertEqual(mp._jaccard({'A'}, set()), 0.0)
 
 
+class TestGlissements(unittest.TestCase):
+
+    def test_valeur_passee_dans_la_colonne_suivante(self):
+        self.assertEqual(mp.glissements(['G', 'PH Q 09', '', 'X'], ['G', '', 'PH Q 09', 'X']),
+                         {1, 2})
+
+    def test_vers_la_colonne_precedente_avec_texte_deja_present(self):
+        self.assertEqual(mp.glissements(['A', 'B', 'C', 'PH 01'], ['A', 'B', 'C PH 01', '']),
+                         {2, 3})
+
+    def test_mot_perdu_sans_reapparition_n_est_pas_un_glissement(self):
+        self.assertEqual(mp.glissements(['A', 'TEL PMS', 'X', ''], ['A', 'TEL', 'X', '']), set())
+
+    def test_echange_avec_autre_changement_n_est_pas_un_glissement(self):
+        self.assertEqual(mp.glissements(['A', 'B', '', ''], ['A', '', 'B Z', '']), set())
+
+    def test_ligne_identique(self):
+        self.assertEqual(mp.glissements(['A', 'B'], ['A', 'B']), set())
+
+
+class TestApparierDeplacees(unittest.TestCase):
+
+    def test_absente_et_en_trop_de_meme_contenu(self):
+        orph = [mp.LigneOrpheline('MANQUANTE', 0, 4, 'A|B'),
+                mp.LigneOrpheline('EN_TROP', 0, 5, 'A|B'),
+                mp.LigneOrpheline('EN_TROP', 0, 9, 'C|D')]
+        restantes, deplacees = mp.apparier_deplacees(orph, 0, 0)
+        self.assertEqual(deplacees, [mp.LigneDeplacee(0, 4, 0, 5, 'A|B')])
+        self.assertEqual(restantes, [orph[2]])
+
+    def test_contenus_differents_restent_orphelins(self):
+        orph = [mp.LigneOrpheline('MANQUANTE', 0, 4, 'A|B'),
+                mp.LigneOrpheline('EN_TROP', 0, 5, 'A|C')]
+        self.assertEqual(mp.apparier_deplacees(orph, 0, 0), (orph, []))
+
+
 class TestComparerPage(unittest.TestCase):
 
     def test_cellule_differente_remonte_un_ecart(self):

@@ -624,3 +624,31 @@ Les 7 alertes restantes (journal Claude) : 48V lu « 4H », DISCORDANCE lu DISCO
 page 11 (2 alertes, défaut de la relecture). Divergence DISCORDANCE trouvée sur les deux couples.
 Test lent de bout en bout : 31 s au lieu de ~5 min. Tests dorés de la mesure de précision
 identiques (`normaliser` sert aussi à ses signatures de ligne).
+
+## Contrôle du banc de mesure avant l'étape 8 (2026-10-02, sans appel API)
+
+**1. Compteurs non affichés, 4 passages réels de l'étape 7 (medium 2 à 5)** : 10 pages
+appariées sur 10 ; par page (1, 2, 3, 9, 52, 104, 119, 122, 122a, 123) : 0 ligne absente, 0 ligne
+en trop, 0 cellule « manquant », partout.
+
+**2. Thermomètre** (`tests/test_mesure_thermometre.py`, graine 20261002) : copie en mémoire de
+la vérité de l'extrait, fautes injectées sur des lignes distantes d'au moins deux lignes :
+10 valeurs déplacées dans la colonne voisine, 10 mots supprimés, 5 lignes supprimées, 3 lignes
+dupliquées, 2 paires de lignes inversées. Toutes retrouvées au bon endroit (cellule, ligne,
+page) et aucun autre écart. Ajouts au banc :
+- catégorie `GLISSEMENT_COLONNE` : les mots perdus par une cellule sont exactement les mots
+  gagnés par sa voisine de la même ligne (multiensemble de mots), sans autre changement ;
+- `LigneDeplacee` : ligne absente à sa place et en trop ailleurs, contenu identique (inversion) ;
+- colonnes `glissement` et `lignes_deplacees` dans `mesures/campagne.csv` et `mesures.csv` ;
+  un historique à l'ancien en-tête est réécrit avec les nouvelles colonnes (vides) pour que
+  les valeurs ne glissent pas.
+Contrôles : 30 autres graines, toutes vertes ; trois mutations du banc (glissement non détecté,
+lignes déplacées non appariées, cellules jamais comparées) font chacune échouer le test.
+Tests dorés des étapes 3 et 4 : chiffres identiques (la sortie v1.7 n'a ni glissement strict
+ni ligne déplacée).
+
+**3. « Positions fausses » sur l'extrait : ne mesure rien d'utile.** La vérité de l'extrait
+n'a aucune cellule à double espace ou à retrait (0 sur les 10 pages, 104 et 122a comprises) ;
+le marqueur `exact` est posé sur toutes ses lignes, la comparaison se réduit donc à « la
+conversion n'a pas ajouté d'espaces ». Les positions ne sont réellement mesurées que contre
+une référence en grille vectorielle (vérité TP2 de 223400PE137, ou un PDF vectoriel).

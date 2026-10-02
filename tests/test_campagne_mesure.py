@@ -231,6 +231,26 @@ class TestLireJournal(unittest.TestCase):
         self.assertEqual(cm.lire_journal(Path('absent.jsonl'))['pages_envoyees'], 0)
 
 
+class TestAjouterLigneCsv(unittest.TestCase):
+
+    def test_ancien_entete_reecrit_valeurs_a_leur_place(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            chemin = Path(tmp) / 'campagne.csv'
+            ancien = [c for c in cm.COLONNES_CSV if c not in ('glissement', 'lignes_deplacees')]
+            with open(chemin, 'w', newline='', encoding='utf-8') as f:
+                w = csv.DictWriter(f, fieldnames=ancien)
+                w.writeheader()
+                w.writerow({c: c for c in ancien})
+            cm.ajouter_ligne_csv(chemin, {c: 'neuf' for c in cm.COLONNES_CSV})
+            with open(chemin, encoding='utf-8') as f:
+                lecteur = csv.DictReader(f)
+                lignes = list(lecteur)
+                self.assertEqual(lecteur.fieldnames, cm.COLONNES_CSV)
+        self.assertEqual(lignes[0]['cout_usd'], 'cout_usd')
+        self.assertEqual(lignes[0]['glissement'], '')
+        self.assertEqual(lignes[1]['glissement'], 'neuf')
+
+
 class TestCoutUsd(unittest.TestCase):
 
     def test_opus55(self):

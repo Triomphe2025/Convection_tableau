@@ -266,6 +266,24 @@ class TestEcrireMesureCsv(unittest.TestCase):
             self.assertEqual(len(lignes), 3)
 
 
+class TestEcrireMesureCsvAncienEntete(unittest.TestCase):
+
+    def test_ancien_historique_complete_sans_glissement_de_valeurs(self):
+        import mesure_precision as mp
+        with tempfile.TemporaryDirectory() as tmp:
+            chemin = Path(tmp) / 'mesures.csv'
+            ancien = mpr.ENTETE_MESURES_CSV[:-2]
+            with open(chemin, 'w', newline='', encoding='utf-8') as f:
+                w = csv.writer(f)
+                w.writerow(ancien)
+                w.writerow([str(i) for i in range(len(ancien))])
+            mpr.ecrire_mesure_csv(chemin, Path('b.xlsx'), mp.RapportMesure())
+            lignes = list(csv.DictReader(chemin.open(encoding='utf-8')))
+        self.assertEqual(lignes[0]['ecarts_positions'], str(len(ancien) - 1))
+        self.assertEqual((lignes[0]['glissement'], lignes[0]['lignes_deplacees']), ('', ''))
+        self.assertEqual((lignes[1]['glissement'], lignes[1]['lignes_deplacees']), ('0', '0'))
+
+
 class TestMain(unittest.TestCase):
 
     def _fabriquer_paire(self, tmp):

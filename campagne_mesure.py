@@ -46,6 +46,7 @@ COLONNES_CSV = [
     'espacement', 'confusion', 'contenu_different', 'manquant', 'ajoute',
     'positions_fausses', 'pieds_faux', 'lignes_manquantes', 'lignes_en_trop',
     'pages_ref_orphelines', 'tokens_entree', 'tokens_sortie', 'cout_usd', 'duree_s',
+    'glissement', 'lignes_deplacees',
 ]
 
 
@@ -120,7 +121,7 @@ def lire_journal(chemin: Path) -> Dict:
 def mesurer_sortie(xlsx: Path, verite: Path, gabarit: str) -> Dict:
     """Mesure une sortie contre une vérité (.xlsx de vérité terrain ou PDF vectoriel)."""
     from mesure_precision import (
-        AJOUTE, CONFUSION, CONTENU_DIFFERENT, ESPACEMENT, MANQUANT, mesurer,
+        AJOUTE, CONFUSION, CONTENU_DIFFERENT, ESPACEMENT, GLISSEMENT, MANQUANT, mesurer,
     )
     from mesurer_precision import lire_pdf_vectoriel, lire_verite_excel, lire_xlsx
     from template import TemplateManager
@@ -142,6 +143,8 @@ def mesurer_sortie(xlsx: Path, verite: Path, gabarit: str) -> Dict:
         'contenu_different': compte.get(CONTENU_DIFFERENT, 0),
         'manquant': compte.get(MANQUANT, 0),
         'ajoute': compte.get(AJOUTE, 0),
+        'glissement': compte.get(GLISSEMENT, 0),
+        'lignes_deplacees': len(rapport.lignes_deplacees),
         'positions_fausses': len(rapport.ecarts_positions),
         'pieds_faux': len(rapport.ecarts_pieds),
         'lignes_manquantes': orphelines.count('MANQUANTE'),
@@ -204,9 +207,23 @@ def executer_passage(pdf: Path, verite: Path, gabarit: str, modele: str, effort:
 
 
 def ajouter_ligne_csv(chemin: Path, ligne: Dict) -> None:
-    """Ajoute une ligne à l'historique de campagne (en-tête écrit si fichier neuf)."""
+    """Ajoute une ligne à l'historique de campagne (en-tête écrit si fichier neuf).
+
+    Un historique à l'ancien en-tête est d'abord réécrit avec les colonnes actuelles
+    (colonnes nouvelles vides) : sinon les valeurs glisseraient d'une colonne.
+    """
     nouveau = not chemin.exists()
     chemin.parent.mkdir(parents=True, exist_ok=True)
+    if not nouveau:
+        with open(chemin, newline='', encoding='utf-8') as f:
+            lecteur = csv.DictReader(f)
+            anciennes = list(lecteur)
+            entete = lecteur.fieldnames
+        if entete != COLONNES_CSV:
+            with open(chemin, 'w', newline='', encoding='utf-8') as f:
+                ecrivain = csv.DictWriter(f, fieldnames=COLONNES_CSV)
+                ecrivain.writeheader()
+                ecrivain.writerows({c: a.get(c, '') for c in COLONNES_CSV} for a in anciennes)
     with open(chemin, 'a', newline='', encoding='utf-8') as f:
         ecrivain = csv.DictWriter(f, fieldnames=COLONNES_CSV)
         if nouveau:

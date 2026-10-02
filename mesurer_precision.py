@@ -28,7 +28,7 @@ import openpyxl
 
 from config import Config
 from mesure_precision import (
-    AJOUTE, CONFUSION, CONTENU_DIFFERENT, ESPACEMENT, MANQUANT,
+    AJOUTE, CONFUSION, CONTENU_DIFFERENT, ESPACEMENT, GLISSEMENT, MANQUANT,
     formater_rapport, mesurer,
 )
 from template import TemplateManager
@@ -238,21 +238,36 @@ def _version_git() -> str:
         return '?'
 
 
+ENTETE_MESURES_CSV = [
+    'date', 'document', 'version_git', 'precision',
+    'cellules_comparees', 'cellules_identiques',
+    'espacement', 'confusion', 'contenu_different', 'manquant', 'ajoute',
+    'pages_ref_orphelines', 'pages_conv_orphelines',
+    'ecarts_pieds', 'ecarts_positions', 'glissement', 'lignes_deplacees',
+]
+
+
 def ecrire_mesure_csv(chemin_csv: Path, document: Path, rapport) -> None:
-    """Ajoute une ligne de mesure à l'historique CSV (créé si absent)."""
+    """Ajoute une ligne de mesure à l'historique CSV (créé si absent).
+
+    Un historique à l'ancien en-tête est complété (colonnes nouvelles vides).
+    """
     chemin_csv = Path(chemin_csv)
     nouveau = not chemin_csv.exists()
+    if not nouveau:
+        with open(chemin_csv, newline='', encoding='utf-8') as f:
+            anciennes = list(csv.reader(f))
+        if anciennes and anciennes[0] != ENTETE_MESURES_CSV:
+            n = len(ENTETE_MESURES_CSV)
+            with open(chemin_csv, 'w', newline='', encoding='utf-8') as f:
+                w = csv.writer(f)
+                w.writerow(ENTETE_MESURES_CSV)
+                w.writerows((a + [''] * n)[:n] for a in anciennes[1:])
     compte = rapport.cellules_par_classe()
     with open(chemin_csv, 'a', newline='', encoding='utf-8') as f:
         w = csv.writer(f)
         if nouveau:
-            w.writerow([
-                'date', 'document', 'version_git', 'precision',
-                'cellules_comparees', 'cellules_identiques',
-                'espacement', 'confusion', 'contenu_different', 'manquant', 'ajoute',
-                'pages_ref_orphelines', 'pages_conv_orphelines',
-                'ecarts_pieds', 'ecarts_positions',
-            ])
+            w.writerow(ENTETE_MESURES_CSV)
         w.writerow([
             datetime.now().strftime('%Y-%m-%d %H:%M'),
             document.name,
@@ -269,6 +284,8 @@ def ecrire_mesure_csv(chemin_csv: Path, document: Path, rapport) -> None:
             len(rapport.pages_conv_orphelines),
             len(rapport.ecarts_pieds),
             len(rapport.ecarts_positions),
+            compte.get(GLISSEMENT, 0),
+            len(rapport.lignes_deplacees),
         ])
 
 

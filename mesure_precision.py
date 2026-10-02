@@ -16,6 +16,7 @@ sur un document client quelconque.
 """
 
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from functools import lru_cache
@@ -30,6 +31,8 @@ CONFUSION = 'CONFUSION'
 CONTENU_DIFFERENT = 'CONTENU_DIFFERENT'
 MANQUANT = 'MANQUANT'
 AJOUTE = 'AJOUTE'
+# Ce qui manque dans une cellule se trouve en trop dans sa voisine de la même ligne.
+GLISSEMENT = 'GLISSEMENT_COLONNE'
 
 _LIGNE_MANQUANTE = 'MANQUANTE'
 _LIGNE_EN_TROP = 'EN_TROP'
@@ -89,6 +92,17 @@ class LigneOrpheline:
     contenu: str
 
 
+@dataclass(frozen=True)
+class LigneDeplacee:
+    """Ligne de contenu identique, absente à sa place et présente ailleurs (inversion)."""
+
+    page_ref: int
+    ligne_ref: int
+    page_conv: int
+    ligne_conv: int
+    contenu: str
+
+
 @dataclass
 class RapportMesure:
     """Bilan d'une mesure de précision sur un document connu."""
@@ -97,6 +111,7 @@ class RapportMesure:
     pages_ref_orphelines: List[int] = field(default_factory=list)
     pages_conv_orphelines: List[int] = field(default_factory=list)
     lignes_orphelines: List[LigneOrpheline] = field(default_factory=list)
+    lignes_deplacees: List[LigneDeplacee] = field(default_factory=list)
     ecarts_cellules: List[EcartCellule] = field(default_factory=list)
     ecarts_pieds: List[EcartPied] = field(default_factory=list)
     ecarts_positions: List[EcartPosition] = field(default_factory=list)
@@ -298,6 +313,26 @@ def aligner_lignes(
 
 # ── Classement d'une cellule ──────────────────────────────────────────
 
+def glissements(cellules_ref: List[str], cellules_conv: List[str]) -> Set[int]:
+    """Indices des cellules d'une ligne touchées par un glissement de colonne.
+
+    Glissement entre k et k±1 : les mots perdus par l'une des deux cellules sont
+    exactement les mots gagnés par l'autre (comparaison en multiensemble de mots).
+    """
+    n = max(len(cellules_ref), len(cellules_conv))
+    ref = [Counter((cellules_ref[k] if k < len(cellules_ref) else '').split()) for k in range(n)]
+    conv = [Counter((cellules_conv[k] if k < len(cellules_conv) else '').split())
+            for k in range(n)]
+    touchees: Set[int] = set()
+    for k in range(n - 1):
+        for depart, arrivee in ((k, k + 1), (k + 1, k)):
+            perdus = ref[depart] - conv[depart]
+            if perdus and perdus == conv[arrivee] - ref[arrivee] \
+                    and not (conv[depart] - ref[depart]) and not (ref[arrivee] - conv[arrivee]):
+                touchees.update((depart, arrivee))
+    return touchees
+
+
 @lru_cache(maxsize=4)
 def _table_confusions(paires: Tuple[str, ...]) -> Set[FrozenSet[str]]:
     return {frozenset(p) for p in paires}
@@ -414,10 +449,13 @@ def comparer_page(
             continue
         r, c = lignes_ref[i], lignes_conv[j]
         cellules_r, cellules_c = r.get('cells', []), c.get('cells', [])
+        glisse = glissements(cellules_r, cellules_c)
         for k, nom_col in enumerate(colonnes):
             vr = cellules_r[k] if k < len(cellules_r) else ''
             vc = cellules_c[k] if k < len(cellules_c) else ''
             classe = classer_cellule(vr, vc)
+            if classe != IDENTIQUE and k in glisse:
+                classe = GLISSEMENT
             if classe != IDENTIQUE:
                 ecarts.append(EcartCellule(
                     num_ref, num_conv, i, j, nom_col, _espace(vr), _espace(vc), classe,
@@ -427,6 +465,25 @@ def comparer_page(
                     num_ref, num_conv, i, j, nom_col, _decalages(vr), _decalages(vc),
                 ))
     return ecarts, positions, orphelines
+
+
+def apparier_deplacees(orphelines: List[LigneOrpheline], num_ref: int, num_conv: int):
+    """Une ligne absente et une ligne en trop de même contenu = une ligne déplacée.
+
+    Retourne (orphelines restantes, lignes déplacées) ; chaque ligne en trop ne
+    sert qu'une fois, dans l'ordre de la page.
+    """
+    manquantes = [o for o in orphelines if o.cote == _LIGNE_MANQUANTE]
+    en_trop = [o for o in orphelines if o.cote == _LIGNE_EN_TROP]
+    deplacees: List[LigneDeplacee] = []
+    prises = set()
+    for m in manquantes:
+        for t in en_trop:
+            if id(t) not in prises and t.contenu == m.contenu:
+                prises.update((id(m), id(t)))
+                deplacees.append(LigneDeplacee(num_ref, m.ligne, num_conv, t.ligne, m.contenu))
+                break
+    return [o for o in orphelines if id(o) not in prises], deplacees
 
 
 # ── Orchestration ──────────────────────────────────────────────────────
@@ -443,9 +500,11 @@ def mesurer(reference: List[dict], converti: List[dict], colonnes: List[str]) ->
         ecarts, positions, orphelines = comparer_page(
             reference[num_ref], converti[num_conv], num_ref, num_conv, colonnes,
         )
+        orphelines, deplacees = apparier_deplacees(orphelines, num_ref, num_conv)
         rapport.ecarts_cellules.extend(ecarts)
         rapport.ecarts_positions.extend(positions)
         rapport.lignes_orphelines.extend(orphelines)
+        rapport.lignes_deplacees.extend(deplacees)
         rapport.ecarts_pieds.extend(
             comparer_pieds(reference[num_ref], converti[num_conv], num_ref, num_conv),
         )
@@ -477,6 +536,8 @@ def formater_rapport(rapport: RapportMesure, max_ecarts: Optional[int] = None) -
         lignes.append(f"Écarts de position    : {len(rapport.ecarts_positions)}")
     if rapport.lignes_orphelines:
         lignes.append(f"Lignes orphelines     : {len(rapport.lignes_orphelines)}")
+    if rapport.lignes_deplacees:
+        lignes.append(f"Lignes déplacées      : {len(rapport.lignes_deplacees)}")
     lignes.append('-' * 60)
     a_afficher = rapport.ecarts_cellules[:max_ecarts] if max_ecarts else rapport.ecarts_cellules
     for e in a_afficher:

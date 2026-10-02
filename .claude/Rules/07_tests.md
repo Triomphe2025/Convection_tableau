@@ -68,6 +68,7 @@ tests/
   test_non_regression_xlsx.py        → Le .xlsx du pipeline reste identique à l'instantané d'avant
   test_mesure_precision.py           → mesure_precision.py, une classe par fonction publique, dicts fabriqués
   test_mesurer_precision.py          → mesurer_precision.py (lecture xlsx/vérité/PDF, CSV, CLI), fichiers fabriqués
+  test_mesure_thermometre.py         → Thermomètre : fautes connues (graine fixe) injectées dans une copie de la vérité de l'extrait, toutes retrouvées au bon endroit, rien d'autre
   test_mesurer_precision_golden.py   → Sortie v1.7 figée 223111PE011 contre la vérité terrain (écarts nommés, sans pipeline)
   test_mesurer_precision_tp2_golden.py → Pages TP2 de 223400PE137 (grille → Excel → relecture) contre la vérité v3 : 0 écart, positions comprises
   test_routage_pdf.py                → Routage PDF par page, tous modes : classement, grille, sections, scan en bandes, pages ignorées
@@ -80,7 +81,7 @@ tests/
   test_claude_opus5.py               → claude_ocr sur Opus 5 / 5.5 : table de capacités, paramètres envoyés, refus avec catégorie, bloc de réflexion, effort refusé, images PNG ≤ 2576 px
 ```
 
-**843 tests passent** (`pytest tests\`, relevé le 2026-10-02), aucun échec attendu, plus 1 test lent
+**860 tests passent** (`pytest tests\`, relevé le 2026-10-02), aucun échec attendu, plus 1 test lent
 facultatif (`VERIF_TEST_LENT=1`, relecture du scan de 15 pages, ~30 s). Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.
 
