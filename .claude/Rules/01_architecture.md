@@ -16,6 +16,7 @@ Chaque fichier Python du projet a un rôle unique. Ne jamais mélanger les rôle
 | `agent_ocr.py` | `AgentVisionExtractor` : OCR via une session Managed Agent Anthropic |
 | `docling_ocr.py` | `DoclingExtractor` : OCR par IA locale Docling (IBM Research) |
 | `verificateur.py` | Vérification de conversion : compare deux lectures au format pivot et classe les divergences (IDENTIQUE / BENIN / A_VERIFIER) — module pur, aucun OCR, PDF ni Excel |
+| `relecture_scan.py` | Relecture indépendante d'un scan pour la vérification (Tesseract psm 6 à 300 DPI, colonnes sur les traits du cadre, lignes à clé de borne) — distincte du moteur de conversion ; appelée par `Converter.verifier_conversion` |
 | `mesure_precision.py` | Mesure de précision : compare une sortie à une référence organisée à l'avance (PDF vectoriel ou Excel de vérité terrain) et classe les écarts (cellule, pied de page, position) — module pur, aucun OCR, PDF ni Excel |
 | `pied_page.py` | Pied de page : lignes brutes → toutes les paires LIBELLÉ : valeur, COMPLEMENT (texte libre), indices de révision des pages de garde — module pur, partagé par la grille PDF et la lecture Claude (Claude recopie, le code structure) |
 | `mesurer_precision.py` | Script CLI : lit `.xlsx`/vérité terrain/PDF vectoriel, appelle `mesure_precision`, écrit `mesures.csv` |
@@ -36,7 +37,7 @@ Chaque fichier Python du projet a un rôle unique. Ne jamais mélanger les rôle
 3. **Pas d'import circulaire** — la dépendance est toujours unidirectionnelle
 4. **Pas de modification des fichiers moteur pour des raisons UX** — seule `interface.py` évolue pour l'UX
 5. **Le module `cad/` est entièrement isolé** — aucune référence à `cad/` depuis `converter.py` ou `ocr_processor.py`
-6. **`verificateur.py` est un module pur** — il n'importe ni `ocr_processor` ni `pdf_extractor` (seulement `config` et la bibliothèque standard). Seul `converter.py` l'appelle (`Converter.verifier_conversion`) ; `interface.py` passe par `Converter`
+6. **`verificateur.py` est un module pur** — il n'importe ni `ocr_processor` ni `pdf_extractor` (seulement `config` et la bibliothèque standard). Seul `converter.py` l'appelle (`Converter.verifier_conversion`) ; `interface.py` passe par `Converter` La lecture de référence d'un scan vient de `relecture_scan.py`, qui n'importe pas non plus `ocr_processor` : une relecture qui partagerait les défauts du moteur de conversion ne pourrait pas les contredire
 7. **`mesure_precision.py` est un module pur** — il n'importe ni `ocr_processor` ni `pdf_extractor` (seulement `config`, `verificateur` et la bibliothèque standard). Toute lecture de fichier (`.xlsx`, vérité terrain, PDF vectoriel) est faite par `mesurer_precision.py`, jamais par `interface.py` ni `converter.py` — c'est un outil de QA autonome, pas une fonctionnalité du produit livré
 
 ## Séparation OCR / Word dans Excel

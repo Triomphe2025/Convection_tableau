@@ -62,6 +62,7 @@ tests/
   test_cad_segment_merger.py         → cad/segment_merger.py
   test_cad_vectorizer.py             → cad/vectorizer.py, détection de source, écriture DXF
   test_verificateur.py               → verificateur.py, une classe par fonction publique, dicts fabriqués
+  test_relecture_scan.py             → relecture_scan.py : clés repliées, en-tête et pied écartés, traits du cadre, page réelle du scan 6A 23111PE102
   test_verificateur_golden.py        → Cas réel 6A 23111PE102 (scan contre conversion), lectures figées
   test_converter_verification.py     → Converter.verifier_conversion et ses aides privées
   test_non_regression_xlsx.py        → Le .xlsx du pipeline reste identique à l'instantané d'avant
@@ -79,9 +80,8 @@ tests/
   test_claude_opus5.py               → claude_ocr sur Opus 5 / 5.5 : table de capacités, paramètres envoyés, refus avec catégorie, bloc de réflexion, effort refusé, images PNG ≤ 2576 px
 ```
 
-**812 tests passent** (`pytest tests\`, relevé le 2026-10-01), plus 1 échec attendu documenté
-(`test_criteres_du_cahier_des_charges` du vérificateur, cibles chiffrées non atteintes) et 1 test lent facultatif
-(`VERIF_TEST_LENT=1`, relecture Tesseract de 15 pages). Barrière de régression à ne jamais abaisser.
+**843 tests passent** (`pytest tests\`, relevé le 2026-10-02), aucun échec attendu, plus 1 test lent
+facultatif (`VERIF_TEST_LENT=1`, relecture du scan de 15 pages, ~30 s). Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.
 
 ## Lancer les tests

@@ -27,12 +27,13 @@ Distance = Callable[[str, str], int]
 # ── Normalisation ─────────────────────────────────────────────────────
 
 def normaliser(texte) -> str:
-    """Majuscules, sans accents ni espaces : base de toute comparaison."""
+    """Majuscules, sans accents, espaces ni ponctuation parasite : base de toute comparaison."""
     if not texte:
         return ''
     decompose = unicodedata.normalize('NFD', str(texte))
     sans_accents = ''.join(c for c in decompose if not unicodedata.combining(c))
-    return ''.join(sans_accents.upper().split())
+    parasite = set(Config.VERIF_PONCTUATION_PARASITE)
+    return ''.join(c for c in sans_accents.upper() if not c.isspace() and c not in parasite)
 
 
 @lru_cache(maxsize=8)
@@ -310,10 +311,17 @@ def classer_ecart(valeur_ref, valeur_conv, confiance_ref: Optional[int] = None,
 
 
 def _classer_region(seg_ref: str, seg_conv: str, conf: Optional[int],
-                    connu_r: bool, connu_c: bool, distance: Optional[Distance]):
+                    connu_r: bool, connu_c: bool, distance: Optional[Distance],
+                    ref_vide: bool = False):
     # Un texte présent seulement dans le converti est d'abord un oubli de la
     # lecture du scan ; il ne redevient suspect que s'il n'est pas une valeur connue.
+    # Comme pour une cellule seule (_classer) : une case que la relecture n'a pas
+    # lue du tout, ou lue à confiance basse, ne peut pas contredire le converti.
     if not seg_ref:
+        if ref_vide:
+            return BENIN, 'REFERENCE_VIDE', None
+        if conf is not None and conf < Config.OCR_REOCR_THRESHOLD:
+            return BENIN, 'CONFIANCE_BASSE', len(seg_conv)
         if connu_c:
             return BENIN, 'REFERENCE_INCOMPLETE', len(seg_conv)
         return A_VERIFIER, 'AJOUT_CONVERTI', len(seg_conv)
@@ -433,7 +441,8 @@ def comparer_cellules(ligne_ref: dict, ligne_conv: dict,
                 connu_r = len(ks) == 1 and connu(cr, ks[0])
                 connu_c = any(connu(cc, x) for x in ks)
                 classe, raison, dist = _classer_region(
-                    seg_r, seg_c, conf, connu_r, connu_c, distance)
+                    seg_r, seg_c, conf, connu_r, connu_c, distance,
+                    ref_vide=not any(fr[x] for x in ks))
                 unites.append((ks[0], ecart(ks, classe, raison, conf, dist, vr, vc)))
         k = fin + 1
 

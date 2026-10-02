@@ -58,7 +58,14 @@ Config.TESSERACT_PATH   # référencer uniquement
 | `VERIF_FUSION_ECARTS` | `3` | Zones qui diffèrent séparées de moins de N caractères identiques = un seul écart |
 | `VERIF_SEUIL_PAGE_EXACTE` | `0.9` | Similarité de lignes identiques au-delà de laquelle deux pages sont appariées directement |
 | `VERIF_LIGNE_BRUIT_MIN_CARS` | `3` | En dessous de N caractères alphanumériques, une ligne orpheline est du bruit |
-| `VERIF_CONFUSIONS_OCR` | `0O, 1IL, 5S, T7, 8B, 2Z` | Groupes de caractères repliés avant comparaison |
+| `VERIF_CONFUSIONS_OCR` | `0O, 1IL, 5S, T7, 8B, 2Z, .,` | Groupes de caractères repliés avant comparaison |
+| `VERIF_PONCTUATION_PARASITE` | `|!‘’`"_;:` | Ponctuation ajoutée par l'OCR, ignorée avant comparaison |
+| `VERIF_RELECTURE_DPI` | `300` | Rendu des pages pour la relecture indépendante du scan |
+| `VERIF_RELECTURE_PSM` | `6` | Mode de segmentation Tesseract de la relecture (bloc uniforme) |
+| `VERIF_RELECTURE_TOL_LIGNE` | `12` | Écart vertical (pixels) sous lequel deux mots sont sur la même ligne |
+| `VERIF_MOTIF_CLE` | `^[A-Z]?[0-9]{1,3}[A-Z]?$` | Forme d'une clé de ligne : en dessous, en-tête / section / pied |
+| `VERIF_REPLI_CLE` | `O→0, Q→0, I→1, L→1` | Repli des lettres lues pour des chiffres dans une clé, pour le seul test du motif |
+| `VERIF_MOTS_PIED` | `P.E.T, PET, NO PLAN…` | Ligne sans clé lue écartée si elle porte un libellé de pied |
 | `VERIF_SEUIL_CONCORDANCE` | `0.98` | Concordance au-dessus de laquelle la conversion est jugée fidèle |
 
 La confiance basse réutilise `OCR_REOCR_THRESHOLD` (pas de paramètre dédié).

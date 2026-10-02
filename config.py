@@ -211,11 +211,33 @@ class Config:
 
     # Confusions OCR courantes : chaque groupe est replié sur son 1er caractère
     # avant comparaison (O/0, I/1/L, S/5, T/7, B/8, Z/2).
-    VERIF_CONFUSIONS_OCR = ("0O", "1IL", "5S", "T7", "8B", "2Z")
+    VERIF_CONFUSIONS_OCR = ("0O", "1IL", "5S", "T7", "8B", "2Z", ".,")
+
+    # Ponctuation que l'OCR ajoute autour du texte (traits du cadre lus « | »,
+    # taches lues « ! », « ‘ ») : ignorée avant toute comparaison.
+    VERIF_PONCTUATION_PARASITE = "|!‘’`\"_;:"
 
     # Concordance minimale (cellules identiques ou bénignes / cellules
     # comparées) au-dessus de laquelle la conversion est jugée fidèle.
     VERIF_SEUIL_CONCORDANCE = 0.98
+
+    # Relecture indépendante d'un scan (relecture_scan.py), réglages repris de
+    # outils_reference/pdf_table_compare.py : psm 6 (bloc de texte uniforme) à
+    # 300 DPI lit « RESERVE CABLEE » et « EP. STAT/TS » que le moteur de
+    # conversion (rendu ×3, ~216 DPI) laissait tomber sur 6A 23111PE102.
+    VERIF_RELECTURE_DPI = 300
+    VERIF_RELECTURE_PSM = "6"
+    # Écart vertical (pixels à VERIF_RELECTURE_DPI) : en dessous, même ligne.
+    VERIF_RELECTURE_TOL_LIGNE = 12
+    # Forme d'une clé de ligne (1re colonne) : 10, A01, 12B, P1. Une ligne dont la
+    # clé n'a pas cette forme (pied « MATRA … », cartouche) n'est pas une donnée.
+    VERIF_MOTIF_CLE = r"^[A-Z]?[0-9]{1,3}[A-Z]?$"
+    # Après la 1re lettre d'une clé, lettres lues à la place d'un chiffre (« AO1 »,
+    # « col », « Pl ») : repliées pour le seul test du motif, la cellule reste telle quelle.
+    VERIF_REPLI_CLE = {"O": "0", "Q": "0", "I": "1", "L": "1"}
+    # Une ligne sans clé lue reste une donnée (borne illisible), sauf si elle porte
+    # un libellé de pied : c'est alors le cartouche, pas le tableau.
+    VERIF_MOTS_PIED = ("P.E.T", "PET", "NO PLAN", "N° PLAN", "INDICE", "BORNIER", "PAGE")
 
     # ========================================
     # 📏 MESURE DE PRÉCISION (outil de QA sur jeu de test connu)

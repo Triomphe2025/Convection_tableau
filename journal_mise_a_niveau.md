@@ -578,3 +578,49 @@ comparaison, elle, ignorait déjà les espaces : sa sévérité ne change pas.
   élargit la liste, ne masque rien).
 - **Correction du journal de l'étape 6** : 122a n'est pas la seule page à suffixe du document
   complet ; les pages 34b et 34c existent (vectorielles, lues « 34b », « 34c »).
+
+## Vérification de conversion : cahier des charges atteint (2026-10-02)
+
+Test `test_criteres_du_cahier_des_charges` (6A 23111PE102, cibles ≤ 20 alertes et ≥ 98 %, non
+baissées) : il échouait à 57 alertes et 93,5 %. Écart analysé avant correction.
+
+### D'où venait l'écart avec outils_reference/pdf_table_compare.py
+
+1. **Pas le même couple** : le prototype compare le scan au PDF final ; le test comparait le scan
+   au journal Claude (vraies erreurs de Claude comprises). Relancé le 2026-10-02 : 98,76 %, 19
+   cellules (98,89 %, 17 relevés auparavant, autre version de Tesseract).
+2. **Le prototype compte plus large** : 546 cases vides comptées « identiques » (98,76 → 98,08 %),
+   écart toléré si similarité ≥ 0,90 (→ 96,87 %, 31 alertes ; tolérance qui classerait « 48V »
+   lu « 4H » en simple artefact), 31 lignes orphelines ni comptées ni vérifiées (→ 62 alertes).
+3. **Lecture de référence bruitée** : notre relecture du scan passait par le moteur de
+   conversion (rendu ×3, ~216 DPI) ; ~30 alertes = mots non lus (« RESERVE » devant « CABLEE »,
+   « EP. » devant « STAT/TS »), 7 = lignes de pied lues comme données (« MATRA fe mm »).
+   Remplacer seulement la lecture par celle du prototype donnait pire (73 alertes) : ponctuation
+   parasite (« | 0038B », « ‘C14 », « EP, ») et pas de confiance par mot.
+
+### Décisions (2026-10-02)
+
+Cible sur les deux couples ; lignes orphelines comptées comme alertes ; lecture figée
+`scan_lecture_tesseract.json` régénérée. Non repris du prototype : tolérance 0,90, cases vides
+« identiques », lignes orphelines ignorées.
+
+### Corrections
+
+- `relecture_scan.py` (nouveau) : Tesseract psm 6 à 300 DPI, confiance par mot, colonnes sur
+  les traits du cadre, lignes à clé de borne (clé repliée O→0, I/L→1 pour le seul test du
+  motif : « AO1 », « col », « Pl »), en-tête et pied écartés. Appelé par
+  `Converter.verifier_conversion` pour le scan de référence.
+- `verificateur.py` : ponctuation parasite de l'OCR ignorée, virgule repliée sur le point ; une
+  case que la relecture n'a pas lue (ou lue à confiance basse) est bénigne aussi dans le chemin
+  par zones, comme elle l'était déjà pour une cellule seule.
+
+| Couple | Avant | Après |
+|--------|-------|-------|
+| Scan / journal Claude | 57 alertes, 93,48 % | **7 alertes, 98,93 %** |
+| Scan / PDF final | 56 alertes, 92,65 % | **4 alertes, 99,62 %** |
+
+Les 7 alertes restantes (journal Claude) : 48V lu « 4H », DISCORDANCE lu DISCONTINUOSITE,
+3 alertes pour deux lignes fusionnées par Claude page 13, et « CABLEE » lu sur sa propre ligne
+page 11 (2 alertes, défaut de la relecture). Divergence DISCORDANCE trouvée sur les deux couples.
+Test lent de bout en bout : 31 s au lieu de ~5 min. Tests dorés de la mesure de précision
+identiques (`normaliser` sert aussi à ses signatures de ligne).

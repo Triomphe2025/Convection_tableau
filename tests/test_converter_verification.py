@@ -223,6 +223,57 @@ class TestImagesDuDossier(unittest.TestCase):
             self.assertEqual(Converter._images_du_dossier(Path(tmp)), [])
 
 
+class TestRelectureDuScan(unittest.TestCase):
+    """Le scan de référence est relu par relecture_scan, pas par le moteur de conversion."""
+
+    def test_pdf_relu_par_relecture_scan(self):
+        conv, _ = _converter()
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf = Path(tmp) / 'scan.pdf'
+            pdf.write_bytes(b'%PDF-1.4')
+            with (patch('relecture_scan.relire_pdf', return_value=[{'success': True}]) as relire,
+                  patch('pdf_extractor.PdfTableExtractor') as moteur):
+                self.assertEqual(conv._charger_pivots(pdf, relecture=True), [{'success': True}])
+        relire.assert_called_once()
+        moteur.assert_not_called()
+
+    def test_journal_jamais_relu(self):
+        conv, _ = _converter()
+        with tempfile.TemporaryDirectory() as tmp:
+            journal = Path(tmp) / 'j.jsonl'
+            journal.write_text('', encoding='utf-8')
+            with (patch('relecture_scan.relire_pdf') as relire,
+                  patch('claude_ocr.LogReplayer') as rejeu):
+                rejeu.return_value.replay_all.return_value = ['rejoue']
+                self.assertEqual(conv._charger_pivots(journal, relecture=True), ['rejoue'])
+        relire.assert_not_called()
+
+    def test_dossier_d_images_relu_image_par_image(self):
+        from PIL import Image
+        conv, _ = _converter()
+        with tempfile.TemporaryDirectory() as tmp:
+            for i in (1, 2):
+                Image.new('RGB', (10, 10), 'white').save(Path(tmp) / f'bornier_{i}.png')
+            with patch('relecture_scan.relire_image',
+                       side_effect=lambda img, cols: {'success': True, 'rows': []}) as relire:
+                pages = conv._charger_pivots(Path(tmp), relecture=True)
+        self.assertEqual(relire.call_count, 2)
+        self.assertEqual([Path(p['image_path']).name for p in pages],
+                         ['bornier_1.png', 'bornier_2.png'])
+
+    def test_verifier_conversion_demande_la_relecture_pour_la_reference(self):
+        conv, _ = _converter()
+        appels = []
+
+        def charger(source, relecture=False):
+            appels.append(relecture)
+            return _lecture_scan()
+
+        with patch.object(conv, '_charger_pivots', side_effect=charger):
+            conv.verifier_conversion(reference='scan.pdf', converti='conv.jsonl')
+        self.assertEqual(appels, [True, False])
+
+
 class TestLireImagesTesseract(unittest.TestCase):
 
     def _images(self, n):

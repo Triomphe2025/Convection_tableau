@@ -3,7 +3,9 @@ Test doré de la vérification de conversion sur le cas réel 6A 23111PE102.
 
 Deux lectures figées dans tests/fixtures/ :
   - scan_lecture_tesseract.json : le scan (15 p., sans couche texte) relu par
-    Tesseract — la lecture INDÉPENDANTE, seule capable de contredire Claude ;
+    relecture_scan (Tesseract psm 6, 300 DPI, colonnes sur les traits du cadre) —
+    la lecture INDÉPENDANTE du moteur de conversion, seule capable de contredire
+    Claude. Régénérée le 2026-10-02 par Converter._charger_pivots(relecture=True) ;
   - journal_claude_6A23111PE102.jsonl : la conversion Claude Vision du même scan
     (rejouée sans appel API), donc le scénario réel du produit ;
   - final_lecture_pdf.json : le PDF final (13 p.) relu par pdf_extractor.
@@ -26,7 +28,6 @@ import unittest
 from pathlib import Path
 
 import fitz
-import pytest
 
 from claude_ocr import LogReplayer
 from config import Config
@@ -89,27 +90,25 @@ class TestCasReelScanContreJournalClaude(unittest.TestCase):
 
     def test_pages_appariees_malgre_les_paginations_differentes(self):
         self.assertEqual(len(self.rapport.pages_appariees), 11)
-        self.assertEqual(self.rapport.pages_ref_orphelines, [1, 2, 3, 4])
+        # Pages 1 à 4 du scan (gardes, sommaire) : aucune ligne à clé de borne,
+        # donc pas des tableaux — elles ne restent plus « sans partenaire ».
+        self.assertEqual(self.rapport.pages_ref_orphelines, [])
         self.assertEqual(self.rapport.pages_conv_orphelines, [])
 
-    def test_barriere_de_regression_sur_le_bruit(self):
-        # Mesuré le 2026-09-20 : 57 alertes, 93,5 % — cette barrière empêche la
-        # dégradation ; les cibles du cahier des charges sont testées plus bas.
-        self.assertLessEqual(len(self.rapport.a_verifier), 65)
-        self.assertGreaterEqual(self.rapport.concordance, 0.90)
-
-    @pytest.mark.xfail(
-        reason="cibles non atteintes, a corriger au debut de l'etape 8", strict=True,
-    )
     def test_criteres_du_cahier_des_charges(self):
-        """Cibles : au plus 20 alertes, concordance >= 98 %. Non atteintes à ce jour.
+        """Cibles : au plus 20 alertes, concordance >= 98 % (mesuré : 7, 98,9 %).
 
-        Cibles maintenues : outils_reference/pdf_table_compare.py les atteint sur le
-        même couple de fichiers (98,89 %, 17 cellules). Quand elles seront atteintes,
-        strict=True fera échouer la suite : retirer alors le marquage.
+        Lignes orphelines comptées comme alertes ; aucune tolérance de similarité.
+        Les 7 restantes : 5 vraies erreurs de Claude (48V lu 4H, DISCONTINUOSITE,
+        lignes fusionnées page 13) et « CABLEE » lu sur sa propre ligne page 11.
         """
         self.assertLessEqual(len(self.rapport.a_verifier), 20)
         self.assertGreaterEqual(self.rapport.concordance, 0.98)
+
+    def test_vraies_erreurs_de_claude_signalees(self):
+        valeurs = [(e.valeur_ref, e.valeur_conv) for e in self.rapport.a_verifier]
+        self.assertIn(('EP. STAT/TS MANQUE 48V', 'G EP. STAT/TS MANQUE 4H'), valeurs)
+        self.assertIn(('', '02 B 0015B'), valeurs)
 
 
 class TestCasReelScanContrePdfFinal(unittest.TestCase):
@@ -126,9 +125,10 @@ class TestCasReelScanContrePdfFinal(unittest.TestCase):
     def test_pages_appariees(self):
         self.assertEqual(len(self.rapport.pages_appariees), 11)
 
-    def test_barriere_de_regression_sur_le_bruit(self):
-        self.assertLessEqual(len(self.rapport.a_verifier), 65)
-        self.assertGreaterEqual(self.rapport.concordance, 0.90)
+    def test_criteres_du_cahier_des_charges(self):
+        """Même couple que outils_reference/pdf_table_compare.py (mesuré : 4, 99,6 %)."""
+        self.assertLessEqual(len(self.rapport.a_verifier), 20)
+        self.assertGreaterEqual(self.rapport.concordance, 0.98)
 
 
 class TestConverterSurLeCasReel(unittest.TestCase):

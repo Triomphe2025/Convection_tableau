@@ -56,6 +56,13 @@ class TestNormaliser(unittest.TestCase):
     def test_nombre_converti_en_texte(self):
         self.assertEqual(normaliser(123), '123')
 
+    def test_ponctuation_parasite_de_l_ocr_ignoree(self):
+        self.assertEqual(normaliser('! RESERVE | CABLEE'), 'RESERVECABLEE')
+        self.assertEqual(normaliser('‘C14'), 'C14')
+
+    def test_ponctuation_utile_gardee(self):
+        self.assertEqual(normaliser('EP. STAT/TS-1'), 'EP.STAT/TS-1')
+
 
 class TestPlierConfusions(unittest.TestCase):
 
@@ -252,6 +259,29 @@ class TestClasserEcart(unittest.TestCase):
 
 
 class TestComparerCellules(unittest.TestCase):
+
+    def test_virgule_lue_pour_un_point_benigne(self):
+        ref = _ligne(['30', 'G', 'EP, STAT/TS DEFAUT', '0021B'], [92] * 4)
+        conv = _ligne(['30', 'G', 'EP. STAT/TS DEFAUT', '0021B'])
+        self.assertNotIn(A_VERIFIER, [e.classe for e in comparer_cellules(ref, conv, COLONNES)])
+
+    def test_case_non_lue_par_la_relecture_benigne(self):
+        ref = _ligne(['', '', 'RESERVE NON CABLEE', ''], [100, 100, 90, 100])
+        conv = _ligne(['22', '', 'RESERVE NON CABLEE', ''])
+        ecarts = [e for e in comparer_cellules(ref, conv, COLONNES) if e.classe != IDENTIQUE]
+        self.assertEqual([(e.classe, e.raison) for e in ecarts], [(BENIN, 'REFERENCE_VIDE')])
+
+    def test_ajout_sur_lecture_a_confiance_basse_benin(self):
+        ref = _ligne(['C5', 'N', 'RESERVE', ''], [0, 90, 90, 100])
+        conv = _ligne(['C15', 'N', 'RESERVE', ''])
+        ecarts = [e for e in comparer_cellules(ref, conv, COLONNES) if e.classe != IDENTIQUE]
+        self.assertEqual([(e.classe, e.raison) for e in ecarts], [(BENIN, 'CONFIANCE_BASSE')])
+
+    def test_ajout_sur_lecture_sure_reste_a_verifier(self):
+        ref = _ligne(['15', 'N', 'RESERVE NON', ''], [97, 90, 90, 100])
+        conv = _ligne(['15', 'N', 'RESERVE NON CABLEE', ''])
+        ecarts = [e for e in comparer_cellules(ref, conv, COLONNES) if e.classe != IDENTIQUE]
+        self.assertEqual([(e.classe, e.raison) for e in ecarts], [(A_VERIFIER, 'AJOUT_CONVERTI')])
 
     def test_ligne_identique(self):
         ligne = _ligne(['01', 'ROUGE', 'SIGNAL', '0001B'])

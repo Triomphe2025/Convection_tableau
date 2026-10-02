@@ -939,8 +939,10 @@ class Converter:
                 )
             converti = self._derniers_resultats
 
-        self._log("Vérification de la conversion — lecture indépendante du scan (Tesseract)…")
-        ref = self._charger_pivots(reference)
+        self._log("Vérification de la conversion — lecture indépendante du scan "
+                  f"(Tesseract psm {Config.VERIF_RELECTURE_PSM}, "
+                  f"{Config.VERIF_RELECTURE_DPI} DPI)…")
+        ref = self._charger_pivots(reference, relecture=True)
         self._log("  Lecture du document converti…")
         conv = self._charger_pivots(converti)
 
@@ -964,8 +966,12 @@ class Converter:
         self._progress(1.0, "Vérification terminée.")
         return rapport
 
-    def _charger_pivots(self, source) -> List[Dict]:
-        """Transforme une source (résultats, .pdf, .jsonl, .docx, dossier) en résultats pivot."""
+    def _charger_pivots(self, source, relecture: bool = False) -> List[Dict]:
+        """Transforme une source (résultats, .pdf, .jsonl, .docx, dossier) en résultats pivot.
+
+        relecture=True : un scan (.pdf, .docx, dossier d'images) est relu par
+        relecture_scan, indépendamment du moteur de conversion (ocr_processor).
+        """
         if isinstance(source, dict):
             return [source]
         if isinstance(source, (list, tuple)):
@@ -974,6 +980,8 @@ class Converter:
         if not chemin.exists():
             raise FileNotFoundError(f"Introuvable : {chemin}")
         suffixe = chemin.suffix.lower()
+        if relecture and suffixe != '.jsonl':
+            return self._relire_scan(chemin)
         with _mode_ocr_tesseract():
             if suffixe == '.pdf':
                 from pdf_extractor import PdfTableExtractor
@@ -1008,6 +1016,42 @@ class Converter:
              if f.is_file() and f.suffix.lower() in ('.jpg', '.jpeg', '.png', '.bmp')),
             key=_num,
         )
+
+    def _relire_scan(self, chemin: Path) -> List[Dict]:
+        """Relecture indépendante d'un scan (.pdf, .docx, dossier d'images)."""
+        import relecture_scan
+        colonnes = list(self.template.columns)
+        if chemin.suffix.lower() == '.pdf':
+            return relecture_scan.relire_pdf(chemin, colonnes, annule=self._est_annule)
+        if chemin.is_dir():
+            return self._relire_images(self._images_du_dossier(chemin), colonnes)
+        if chemin.suffix.lower() == '.docx':
+            with tempfile.TemporaryDirectory() as tmp:
+                for i, (donnees, ext) in enumerate(
+                        ImageExtractor(str(chemin)).extract_images(), 1):
+                    (Path(tmp) / f"bornier_{i}.{ext}").write_bytes(donnees)
+                return self._relire_images(self._images_du_dossier(Path(tmp)), colonnes)
+        raise ValueError(
+            f"Format non supporté pour la vérification : {chemin.name}\n"
+            "Formats acceptés : .pdf, .jsonl, .docx, dossier d'images."
+        )
+
+    def _relire_images(self, images: List[Path], colonnes: List[str]) -> List[Dict]:
+        """Relecture indépendante image par image (arrêt coopératif respecté)."""
+        import relecture_scan
+        from PIL import Image
+        resultats: List[Dict] = []
+        for i, image in enumerate(images):
+            if self._est_annule():
+                self._log(f"  ⏹ Lecture arrêtée — {i}/{len(images)} images lues.")
+                break
+            self._progress(0.9 * i / max(len(images), 1),
+                           f"Relecture du scan {i + 1}/{len(images)}…")
+            with Image.open(image) as img:
+                resultat = relecture_scan.relire_image(img.convert('RGB'), colonnes)
+            resultat.update(image_path=str(image))
+            resultats.append(resultat)
+        return resultats
 
     def _lire_images_tesseract(self, images: List[Path]) -> List[Dict]:
         """OCR Tesseract image par image, sans callbacks interactifs."""
