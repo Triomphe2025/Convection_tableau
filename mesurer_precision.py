@@ -181,11 +181,11 @@ def _cle_entete(texte) -> str:
 
 
 def _attacher_positions(ws, lignes_par_page: dict, colonnes: List[str]) -> None:
-    """Feuille Verite_positions → row['positions'] = {colonne: décalages des sous-champs}.
+    """Feuille Verite_positions → row['positions'] = {colonne: débuts des sous-champs}.
 
     Une ligne de la feuille : page, ligne, colonne, sous-champ (n° du mot dans la
-    cellule, à partir de 1), début (colonne du 1er caractère du sous-champ). Seuls les
-    écarts entre sous-champs comptent : l'origine du comptage de « début » est libre.
+    cellule, à partir de 1), début (colonne du 1er caractère du sous-champ, la colonne 0
+    étant le caractère le plus à gauche de cette colonne du tableau sur la page).
     Saisie humaine (jamais tirée d'un OCR) : une page, une ligne ou une colonne
     inconnue est une erreur de saisie, signalée avec sa ligne dans la feuille.
     """
@@ -213,8 +213,7 @@ def _attacher_positions(ws, lignes_par_page: dict, colonnes: List[str]) -> None:
         debuts.setdefault((id(cible), colonne), (cible, {}))[1][
             int(v[index['souschamp']])] = int(v[index['debut']])
     for (_, colonne), (cible, par_mot) in debuts.items():
-        ordonnes = [par_mot[k] for k in sorted(par_mot)]
-        cible.setdefault('positions', {})[colonne] = tuple(d - ordonnes[0] for d in ordonnes)
+        cible.setdefault('positions', {})[colonne] = tuple(par_mot[k] for k in sorted(par_mot))
 
 
 # ── Référence PDF vectoriel (couche texte reconstruite en grille) ────

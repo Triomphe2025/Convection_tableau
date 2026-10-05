@@ -69,6 +69,10 @@ class EcartPied:
 class EcartPosition:
     """Colonne de départ différente pour une cellule pourtant identique.
 
+    Début d'un mot = sa colonne, en caractères, comptée depuis le caractère le plus
+    à gauche de cette colonne du tableau sur la page (colonne 0) : le retrait
+    d'une cellule compte (« RM 03B » plus à droite que « DA 22 »).
+
     Ne survient que si la référence préserve la géométrie exacte (PDF
     vectoriel reconstruit en grille) : `page_ref['rows'][i]['exact']` est vrai,
     ou si la ligne porte une vérité des positions (`row['positions']`, feuille
@@ -147,11 +151,21 @@ def _espace(texte) -> str:
     return ' '.join((texte or '').split())
 
 
-def _decalages(texte) -> Tuple[int, ...]:
-    """Position de départ de chaque mot, relative à l'indentation de la cellule."""
-    texte = (texte or '').rstrip()
-    tete = len(texte) - len(texte.lstrip())
-    return tuple(m.start() - tete for m in re.finditer(r'\S+', texte))
+def _debuts(texte, origine: int = 0) -> Tuple[int, ...]:
+    """Colonne de début de chaque mot, comptée depuis `origine` (colonne 0 du tableau)."""
+    return tuple(m.start() - origine for m in re.finditer(r'\S+', (texte or '').rstrip()))
+
+
+def origines_colonnes(lignes: List[dict], n: int) -> List[int]:
+    """Pour chaque colonne de la page : retrait de sa cellule la plus à gauche."""
+    origines = []
+    for k in range(n):
+        retraits = [len(c) - len(c.lstrip())
+                    for c in (ligne.get('cells', [])[k] if k < len(ligne.get('cells', []))
+                              else '' for ligne in lignes)
+                    if (c or '').strip()]
+        origines.append(min(retraits, default=0))
+    return origines
 
 
 def _lignes_donnees(page: dict) -> List[dict]:
@@ -440,6 +454,8 @@ def comparer_page(
     """Compare le contenu tableau de deux pages déjà appariées."""
     lignes_ref = _lignes_donnees(page_ref)
     lignes_conv = _lignes_donnees(page_conv)
+    origine_r = origines_colonnes(lignes_ref, len(colonnes))
+    origine_c = origines_colonnes(lignes_conv, len(colonnes))
     ecarts: List[EcartCellule] = []
     positions: List[EcartPosition] = []
     orphelines: List[LigneOrpheline] = []
@@ -468,14 +484,17 @@ def comparer_page(
                 ))
             elif attendues is not None:
                 # Vérité des positions saisie à part (scans) : elle fait foi pour cette cellule.
-                if attendues != _decalages(vc):
+                obtenus = _debuts(vc, origine_c[k])
+                if attendues != obtenus:
                     positions.append(EcartPosition(
-                        num_ref, num_conv, i, j, nom_col, attendues, _decalages(vc),
+                        num_ref, num_conv, i, j, nom_col, attendues, obtenus,
                     ))
-            elif r.get('exact') and _decalages(vr) != _decalages(vc):
-                positions.append(EcartPosition(
-                    num_ref, num_conv, i, j, nom_col, _decalages(vr), _decalages(vc),
-                ))
+            elif r.get('exact'):
+                attendus, obtenus = _debuts(vr, origine_r[k]), _debuts(vc, origine_c[k])
+                if attendus != obtenus:
+                    positions.append(EcartPosition(
+                        num_ref, num_conv, i, j, nom_col, attendus, obtenus,
+                    ))
     return ecarts, positions, orphelines
 
 

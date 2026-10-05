@@ -448,15 +448,26 @@ class TestVeritePositions(unittest.TestCase):
             {'type': 'data', 'cells': ['BC', 'PH QTEL2 10', 'TEL PMS Q1', 'PH ACC/A 02']}]}]
         return mp.mesurer(verite, converti, colonnes)
 
-    # « PH  QTEL2   09 » : sous-champs aux colonnes 1, 5, 13 (comptées depuis 1).
-    CONFORMES = [(1, 1, 'TENANT', 1, 1), (1, 1, 'TENANT', 2, 5), (1, 1, 'TENANT', 3, 13)]
+    # « PH  QTEL2   09 » : sous-champs aux colonnes 0, 4, 12 (colonne 0 = caractère le
+    # plus à gauche de la colonne TENANT sur la page).
+    CONFORMES = [(1, 1, 'TENANT', 1, 0), (1, 1, 'TENANT', 2, 4), (1, 1, 'TENANT', 3, 12)]
 
     def test_positions_conformes_aucun_ecart(self):
         self.assertEqual(self._mesurer(self.CONFORMES).ecarts_positions, [])
 
-    def test_origine_du_comptage_et_ordre_des_lignes_libres(self):
-        depuis_zero = [(1, 1, 'TENANT', 3, 12), (1, 1, 'TENANT', 1, 0), (1, 1, 'TENANT', 2, 4)]
-        self.assertEqual(self._mesurer(depuis_zero).ecarts_positions, [])
+    def test_ordre_des_lignes_de_la_feuille_libre(self):
+        desordre = [(1, 1, 'TENANT', 3, 12), (1, 1, 'TENANT', 1, 0), (1, 1, 'TENANT', 2, 4)]
+        self.assertEqual(self._mesurer(desordre).ecarts_positions, [])
+
+    def test_debut_absolu_un_decalage_d_ensemble_est_un_ecart(self):
+        decale = [(1, 1, 'TENANT', 1, 1), (1, 1, 'TENANT', 2, 5), (1, 1, 'TENANT', 3, 13)]
+        self.assertEqual(len(self._mesurer(decale).ecarts_positions), 1)
+
+    def test_retrait_de_la_cellule_compte(self):
+        # La ligne 2 commence en colonne 0 : « PH  QTEL2   09 » décalé d'un espace part en 1.
+        ecarts = self._mesurer(self.CONFORMES, tenant=' PH  QTEL2   09').ecarts_positions
+        self.assertEqual([(e.decalages_ref, e.decalages_conv) for e in ecarts],
+                         [((0, 4, 12), (1, 5, 13))])
 
     def test_ecart_retrouve_a_sa_cellule(self):
         ecarts = self._mesurer(self.CONFORMES, tenant='PH QTEL2 09').ecarts_positions

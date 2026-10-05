@@ -361,6 +361,26 @@ class TestRapportMesure(unittest.TestCase):
         self.assertEqual(mp.RapportMesure().cellules_par_classe(), {})
 
 
+class TestDebutAbsolu(unittest.TestCase):
+    """Début d'un mot compté depuis le caractère le plus à gauche de la colonne sur la page."""
+
+    def test_origines_colonnes(self):
+        lignes = [_ligne(['  A', 'PH 01', '', '']), _ligne([' B', '   PH 02', '', 'X'])]
+        self.assertEqual(mp.origines_colonnes(lignes, 4), [1, 0, 0, 0])
+
+    def test_retrait_d_une_cellule_detecte(self):
+        ref = _page([_ligne(['RM 03B', 'X'], exact=True), _ligne(['DA 22', 'Y'], exact=True)])
+        conv = _page([_ligne([' RM 03B', 'X']), _ligne(['DA 22', 'Y'])])
+        _, positions, _ = mp.comparer_page(ref, conv, 0, 0, ['TENANT', 'JAR'])
+        self.assertEqual([(e.ligne_ref, e.decalages_ref, e.decalages_conv) for e in positions],
+                         [(0, (0, 3), (1, 4))])
+
+    def test_retrait_commun_a_toute_la_colonne_sans_effet(self):
+        ref = _page([_ligne(['RM 03B', 'X'], exact=True), _ligne(['DA 22', 'Y'], exact=True)])
+        conv = _page([_ligne(['  RM 03B', 'X']), _ligne(['  DA 22', 'Y'])])
+        self.assertEqual(mp.comparer_page(ref, conv, 0, 0, ['TENANT', 'JAR'])[1], [])
+
+
 class TestRemplacerPositions(unittest.TestCase):
 
     def _pos(self, page_conv):

@@ -728,3 +728,29 @@ Feuille facultative d'un Excel de vérité terrain, lue par `mesurer_precision.l
   tenir compte des accents ni de la casse (« Début », « debut »).
 - Tests : `TestVeritePositions` (vérité fabriquée) — conformité, écart à sa cellule, origine et
   ordre libres, erreurs de saisie.
+
+## Positions : début absolu, retrait compris (2026-10-05)
+
+Définition validée : le début d'un mot est sa colonne en caractères, la **colonne 0 étant le
+caractère le plus à gauche de cette colonne du tableau sur la page** ; le retrait d'une cellule
+compte (exemple de l'original : 6A23111PE133 p. 15, TENANT « RM 03B » a son 2e mot une colonne
+plus à droite que « DA 22 »). Avant : écarts entre mots d'une même cellule, retrait ignoré.
+
+- `mesure_precision.origines_colonnes` : colonne 0 de chaque colonne, par page et de chaque
+  côté (référence, sortie) ; `_debuts` remplace `_decalages`. S'applique à la grille vectorielle
+  comme aux vérités `exact`.
+- Feuille `Verite_positions` : « Début » est désormais **absolu** (colonne 0 = caractère le plus à
+  gauche de la colonne sur la page), plus seulement l'écart entre sous-champs (section du
+  2026-10-02 remplacée sur ce point).
+
+| Mesure | Avant (retrait ignoré) | Après (début absolu) |
+|--------|------------------------|----------------------|
+| PE137 TP2 contre la vérité v3 | 0 | 0 |
+| PE137 TP2 contre la grille du PDF | 0 | 0 |
+| PE137 complet (48 pages) contre la grille du PDF | 0 | 0 |
+| Extrait 223111PE011 (passage 7) contre vérité + PDF | 0 | 0 |
+
+Inchangé, et c'est attendu : PE137 n'a qu'une cellule en retrait (« AAG 22-24 »), aucune dans les
+pages TP2, et la chaîne grille → Excel la recopie à l'identique. Tests : un retrait d'une seule
+cellule est détecté ; un retrait commun à toute la colonne ne l'est pas (même colonne 0) ;
+tests dorés des étapes 3 et 4 identiques.
