@@ -881,3 +881,13 @@ la lecture (`metadata`, `PIED_BRUT` du journal Claude) reste telle qu'imprimée.
   « PAGE absent ». Si certaines pages en portent : rien n'est déduit (alertes inchangées).
 - Tests mis à jour : pied de PE137 (libellé du modèle, N° PLAN normalisé) ; étape 6, numéro
   jamais tiré du nom d'image (la page seule est numérotée « 1 »). Tests dorés identiques.
+
+## Décision B2 — logo tel qu'imprimé, vérifié sur 223111PE012 (2026-10-05)
+
+Aucun changement de code : la vérification passe telle quelle (7 tests, `tests/test_logo_pe012.py`).
+- Pages vectorielles 5, 9, 10 (SIEMENS dans la vérité) : grille → « SIEMENS » → cellule gauche de
+  l'Excel « SIEMENS », collé.
+- Pages scannées 4, 6, 7, 8 (M A T R A dans la vérité) : réponse Claude fabriquée « LOGO: M A T R A »
+  → « M A T R A » dans l'Excel ; logo vertical recopié dans le pied sans ligne LOGO → « M A T R A ».
+- Aucune forme n'est convertie en l'autre (« MATRA », « S I E M E N S » gardés tels que lus) : la
+  forme finale sur les scans dépend donc de ce que Claude recopie — à lire au passage réel.
