@@ -963,3 +963,10 @@ inchangé (aucune ligne SECTION:).
 À mesurer par un passage réel sur 223111PE012 seul (≈ 0,22 $) : attendu 3 sections sur 3,
 0 ligne manquante, rien d'autre ne bouge (949/949, 0 pied faux, alertes 0 / 0, INDICE conforme,
 positions p. 39 : 0).
+
+## Positions (espaces ramenés à un par Claude) : décision (2026-10-05)
+
+Aucune consigne d'espacement dans le prompt. Les positions seront remises par la géométrie
+(boîtes des mots Tesseract) au commit A. Ordre de l'étape 8 maintenu : correction du
+vérificateur, puis commit A. Chiffres de départ (passage réel du 2026-10-05) : 223111PE011 p. 52
+= 120 / 240 ; 6A23111PE133 p. 15 = 112 / 220 ; 223111PE012 p. 39 = 0 / 139.
