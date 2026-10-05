@@ -46,7 +46,7 @@ COLONNES_CSV = [
     'espacement', 'confusion', 'contenu_different', 'manquant', 'ajoute',
     'positions_fausses', 'pieds_faux', 'lignes_manquantes', 'lignes_en_trop',
     'pages_ref_orphelines', 'tokens_entree', 'tokens_sortie', 'cout_usd', 'duree_s',
-    'glissement', 'lignes_deplacees',
+    'glissement', 'lignes_deplacees', 'alertes_manquantes', 'fausses_alertes', 'controle_indice',
 ]
 
 
@@ -118,7 +118,8 @@ def lire_journal(chemin: Path) -> Dict:
     return bilan
 
 
-def mesurer_sortie(xlsx: Path, verite: Path, gabarit: str, pdf: Optional[Path] = None) -> Dict:
+def mesurer_sortie(xlsx: Path, verite: Path, gabarit: str, pdf: Optional[Path] = None,
+                   journal: Optional[Path] = None) -> Dict:
     """Mesure une sortie contre une vérité (.xlsx de vérité terrain ou PDF vectoriel).
 
     pdf : document source ; les positions de ses pages vectorielles sont mesurées
@@ -128,7 +129,8 @@ def mesurer_sortie(xlsx: Path, verite: Path, gabarit: str, pdf: Optional[Path] =
         AJOUTE, CONFUSION, CONTENU_DIFFERENT, ESPACEMENT, GLISSEMENT, MANQUANT, mesurer,
     )
     from mesurer_precision import (
-        lire_pdf_vectoriel, lire_verite_excel, lire_xlsx, positions_contre_pdf,
+        appliquer_attentes, lire_attentes, lire_journal_conversion, lire_pdf_vectoriel,
+        lire_verite_excel, lire_xlsx, positions_contre_pdf,
     )
     from template import TemplateManager
 
@@ -143,6 +145,8 @@ def mesurer_sortie(xlsx: Path, verite: Path, gabarit: str, pdf: Optional[Path] =
     if pdf is not None and verite.suffix.lower() != '.pdf':
         positions_contre_pdf(rapport, converti, pdf, colonnes,
                              template=TemplateManager().get(gabarit))
+    if journal is not None and verite.suffix.lower() != '.pdf':
+        appliquer_attentes(rapport, lire_attentes(verite), lire_journal_conversion(journal))
     compte = rapport.cellules_par_classe()
     orphelines = [o.cote for o in rapport.lignes_orphelines]
     return {
@@ -160,6 +164,11 @@ def mesurer_sortie(xlsx: Path, verite: Path, gabarit: str, pdf: Optional[Path] =
         'lignes_manquantes': orphelines.count('MANQUANTE'),
         'lignes_en_trop': orphelines.count('EN_TROP'),
         'pages_ref_orphelines': len(rapport.pages_ref_orphelines),
+        'alertes_manquantes': ('' if rapport.alertes_manquantes is None
+                               else len(rapport.alertes_manquantes)),
+        'fausses_alertes': '' if rapport.fausses_alertes is None else len(rapport.fausses_alertes),
+        'controle_indice': ('' if rapport.controle_indice is None
+                            else 'conforme' if rapport.controle_indice[0] else 'NON CONFORME'),
     }
 
 
@@ -196,7 +205,8 @@ def executer_passage(pdf: Path, verite: Path, gabarit: str, modele: str, effort:
     duree = time.monotonic() - debut
 
     journal = lire_journal(dossier / f"{pdf.stem}_claude.jsonl")
-    mesures = mesurer_sortie(Path(resultat['excel']), verite, gabarit, pdf=pdf)
+    mesures = mesurer_sortie(Path(resultat['excel']), verite, gabarit, pdf=pdf,
+                             journal=journal_conversion)
     return {
         'date': datetime.now().strftime('%Y-%m-%d %H:%M'),
         'commit': _version_git(),

@@ -101,6 +101,7 @@ le calibrage déjà fait sur `verificateur.py`.
 | `MESURE_NW_MAX_PAIRES` | `250000` | Au-delà, repli sur un appariement 1-pour-1 (NW trop coûteux) |
 | `MESURE_CONFUSIONS_OCR` | paires de caractères confondus | Classification "Confusion de caractère" |
 | `MESURE_CSV_PATH` | `mesures.csv` | Historique des mesures (une ligne par exécution) |
+| `MESURE_MOT_SECTION` | `NOM DU CABLE` | Ligne de section du tableau, comparée texte entier (vérité et Excel livré) |
 | `MESURE_LIBELLES_A_COMPLEMENT` | `("TYPE",)` | Libellés de pied suivis d'un complément en texte libre, comparé comme un champ à part au « Complement » d'une vérité |
 
 ## Ajouter un nouveau paramètre

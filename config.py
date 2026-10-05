@@ -288,6 +288,9 @@ class Config:
     # libre (« TYPE : 2P.279 8/10 » → TYPE 2P.279, complément 8/10), comparé
     # comme un champ à part au « Complement » d'une vérité terrain.
     MESURE_LIBELLES_A_COMPLEMENT = ("TYPE",)
+    # Début d'une ligne de section du tableau (« NOM DU CABLE : WPHR/A105 ») :
+    # comparée comme une section, texte entier, pas comme une ligne de données.
+    MESURE_MOT_SECTION = "NOM DU CABLE"
 
     # ========================================
     # 📐 PARAMÈTRES FORMATAGE EXCEL

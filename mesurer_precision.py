@@ -30,7 +30,8 @@ import openpyxl
 from config import Config
 from mesure_precision import (
     AJOUTE, CONFUSION, CONTENU_DIFFERENT, ESPACEMENT, GLISSEMENT, MANQUANT,
-    formater_rapport, mesurer, remplacer_positions,
+    comparer_alertes, extraire_pied, formater_rapport, mesurer, remplacer_positions,
+    verifier_controle_indice,
 )
 from template import TemplateManager
 
@@ -65,6 +66,14 @@ def _est_pied(valeurs: List[str]) -> bool:
     )
 
 
+def _ligne_ou_section(cellules: List[str]) -> dict:
+    """Ligne « NOM DU CABLE : … » seule dans sa 1re cellule = section, sinon donnée."""
+    if (cellules and cellules[0].strip().upper().startswith(Config.MESURE_MOT_SECTION)
+            and not any(c.strip() for c in cellules[1:])):
+        return {'type': 'section', 'text': cellules[0].strip(), 'cells': list(cellules)}
+    return {'type': 'data', 'cells': cellules, 'confidence': [100] * len(cellules)}
+
+
 def lire_xlsx(chemin: Path, feuille: Optional[str] = None) -> List[dict]:
     """Lit un classeur TriosSeconverter : une page pivot par tableau (bloc
     en-tête → données → pied), regroupement par ligne d'en-tête détectée.
@@ -93,11 +102,20 @@ def lire_xlsx(chemin: Path, feuille: Optional[str] = None) -> List[dict]:
             lignes, pied = [], []
             commence = True
             continue
+        # Section testée avant le pied : « NOM DU CABLE : … » contient « CABLE : ».
+        if commence and _ligne_ou_section(valeurs)['type'] == 'section':
+            lignes.append(_ligne_ou_section(valeurs))
+            continue
         if _est_pied(valeurs):
-            pied.append(' '.join(v for v in valeurs if v.strip()))
+            # Cellule gauche du pied = logo, sans libellé dans l'Excel livré.
+            if valeurs[0].strip() and any(v.strip() for v in valeurs[1:]):
+                pied.append(f"LOGO : {valeurs[0].strip()}")
+                pied.append(' '.join(v for v in valeurs[1:] if v.strip()))
+            else:
+                pied.append(' '.join(v for v in valeurs if v.strip()))
             continue
         if commence:
-            lignes.append({'type': 'data', 'cells': valeurs, 'confidence': [100] * len(valeurs)})
+            lignes.append(_ligne_ou_section(valeurs))
     if commence:
         _clore()
     return pages
@@ -131,15 +149,19 @@ def lire_verite_excel(chemin: Path) -> Tuple[List[dict], List[str]]:
         # Les espaces de la vérité sont gardés tels quels et `exact` active la
         # comparaison des colonnes de début des sous-champs : les positions de
         # l'original font partie du résultat attendu (« D_T       02A »).
-        lignes_par_page.setdefault(extrait, []).append({
-            'type': 'data', 'cells': cellules, 'confidence': [100] * len(cellules),
-            'exact': True, 'ligne_verite': valeurs[debut - 1],
-        })
+        ligne = _ligne_ou_section(cellules)
+        if ligne['type'] == 'data':
+            ligne['exact'] = True
+        ligne['ligne_verite'] = valeurs[debut - 1]
+        lignes_par_page.setdefault(extrait, []).append(ligne)
 
     if 'Verite_positions' in wb.sheetnames:
         _attacher_positions(wb['Verite_positions'], lignes_par_page, colonnes)
 
     pieds_par_page: dict = {}
+    pieds_lus: dict = {}
+    pieds_autres: dict = {}
+    schema = stricts = None
     if 'Verite_pieds' in wb.sheetnames:
         ws_pied = wb['Verite_pieds']
         entetes_p = [str(c.value or '') for c in next(ws_pied.iter_rows(min_row=1, max_row=1))]
@@ -148,30 +170,104 @@ def lire_verite_excel(chemin: Path) -> Tuple[List[dict], List[str]]:
         # d'identification, d'annotation et la « ligne brute » (recopie pour
         # contrôle humain) ne sont pas des libellés de pied.
         cle_page = entetes_p[0]
-        libelles = [
-            e for e in entetes_p[1:]
-            if not re.search(r'^page\s+\w|brute|verifier|valide', e, re.I)
-        ]
+        # Deux niveaux : colonnes imprimées (ce que l'appli doit LIRE) et colonnes
+        # « livré » (ce que l'Excel livré doit porter : N° PLAN normalisé, page
+        # numérotée). L'Excel est comparé au niveau livré.
+        hors_pied = r'^page\s+\w|brute|verifier|valide|remarque|pied dans|ecart|écart|autre texte'
+        livres = {e: re.sub(r'\s+livr\w*$', '', e, flags=re.I).strip()
+                  for e in entetes_p[1:] if re.search(r'livr', e, re.I)}
+        libelles = [e for e in entetes_p[1:]
+                    if e not in livres and not re.search(hors_pied, e, re.I)]
+        autres = [e for e in entetes_p[1:] if re.search(r'autre texte', e, re.I)]
+        schema = {cle for lib in libelles + list(livres.values())
+                  for cle in extraire_pied(f"{lib.upper()} : X")}
+        stricts = {cle for lib in livres.values() for cle in extraire_pied(f"{lib.upper()} : X")}
+        if 'LOGO' in schema:
+            stricts.add('LOGO')
         for row in ws_pied.iter_rows(min_row=2):
             valeurs = {entetes_p[i]: row[i].value for i in range(len(entetes_p))}
             if valeurs.get(cle_page) is None:
                 continue
             extrait = int(valeurs[cle_page])
-            texte = '  '.join(
-                f"{lib.upper()} : {valeurs[lib]}"
-                for lib in libelles if valeurs.get(lib) not in (None, '')
-            )
-            pieds_par_page.setdefault(extrait, []).append(texte)
+            imprime = {lib: valeurs[lib] for lib in libelles if valeurs.get(lib) not in (None, '')}
+            livre = dict(imprime)
+            for col, lib in livres.items():
+                if valeurs.get(col) not in (None, ''):
+                    livre[lib] = re.sub(r'\s*\(d[ée]duit\)\s*$', '', str(valeurs[col]), flags=re.I)
+            pieds_par_page.setdefault(extrait, []).append(
+                '  '.join(f"{lib.upper()} : {v}" for lib, v in livre.items()))
+            pieds_lus.setdefault(extrait, []).append(
+                '  '.join(f"{lib.upper()} : {v}" for lib, v in imprime.items()))
+            pieds_autres.setdefault(extrait, []).extend(
+                str(valeurs[a]) for a in autres if valeurs.get(a) not in (None, ''))
 
     pages = []
     for extrait in sorted(set(lignes_par_page) | set(pieds_par_page)):
-        pages.append({
+        page = {
             'success': True,
             'rows': lignes_par_page.get(extrait, []),
             'metadata': {},
             'pied_texte': pieds_par_page.get(extrait, []),
-        })
+            'pied_lu': pieds_lus.get(extrait, []),
+            'pied_autre': pieds_autres.get(extrait, []),
+        }
+        if schema is not None:
+            page['libelles_pied'] = sorted(schema)
+            page['libelles_stricts'] = sorted(stricts)
+        pages.append(page)
     return pages, colonnes
+
+
+def lire_attentes(chemin: Path) -> dict:
+    """Attentes d'une vérité terrain hors tableau : alertes, révisions de la garde, INDICE.
+
+    {'alertes': textes de « Alertes_attendues » (None si la feuille manque),
+     'revisions': indices listés dans « Verite_garde » (None si la feuille manque),
+     'indices_pages': INDICE imprimés de « Verite_pieds »}.
+    """
+    wb = openpyxl.load_workbook(str(chemin), data_only=True)
+    attentes: dict = {'alertes': None, 'revisions': None, 'indices_pages': []}
+    if 'Alertes_attendues' in wb.sheetnames:
+        lignes = list(wb['Alertes_attendues'].iter_rows(values_only=True))
+        col = next(k for k, e in enumerate(lignes[0]) if re.search(r'alerte', str(e or ''), re.I))
+        attentes['alertes'] = [str(r[col]) for r in lignes[1:] if r[col] not in (None, '')]
+    if 'Verite_garde' in wb.sheetnames:
+        lignes = list(wb['Verite_garde'].iter_rows(values_only=True))
+        col = next(k for k, e in enumerate(lignes[0])
+                   if re.search(r'indices list', str(e or ''), re.I))
+        revisions: List[str] = []
+        for r in lignes[1:]:
+            for morceau in str(r[col] or '').split(','):
+                mots = morceau.split()
+                if (mots and re.fullmatch(Config.PIED_INDICE_MOTIF, mots[0])
+                        and mots[0] not in revisions):
+                    revisions.append(mots[0])
+        attentes['revisions'] = revisions
+    if 'Verite_pieds' in wb.sheetnames:
+        lignes = list(wb['Verite_pieds'].iter_rows(values_only=True))
+        col = next((k for k, e in enumerate(lignes[0])
+                    if str(e or '').strip().upper() == 'INDICE'), None)
+        if col is not None:
+            attentes['indices_pages'] = [str(r[col]).strip() for r in lignes[1:]
+                                         if r[0] is not None and r[col] not in (None, '')]
+    return attentes
+
+
+def lire_journal_conversion(chemin: Path) -> List[str]:
+    """Lignes du journal de conversion (conversion.log) ; [] s'il n'existe pas."""
+    chemin = Path(chemin)
+    return chemin.read_text(encoding='utf-8').splitlines() if chemin.exists() else []
+
+
+def appliquer_attentes(rapport, attentes: dict, journal: List[str]) -> None:
+    """Alertes (attendues contre lignes ⚠ du journal) et contrôle INDICE dans le rapport."""
+    if attentes.get('alertes') is not None:
+        emises = [lg.split('⚠', 1)[1].strip() for lg in journal if '⚠' in lg]
+        rapport.alertes_manquantes, rapport.fausses_alertes = comparer_alertes(
+            attentes['alertes'], emises)
+    if attentes.get('revisions') is not None:
+        rapport.controle_indice = verifier_controle_indice(
+            attentes['revisions'], attentes['indices_pages'], journal)
 
 
 def _cle_entete(texte) -> str:
@@ -392,6 +488,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         '--csv', default=None, help='Chemin du fichier de mesures (défaut : config)',
     )
     parser.add_argument(
+        '--journal', default=None,
+        help="conversion.log : alertes et contrôle INDICE comparés à la vérité",
+    )
+    parser.add_argument(
         '--pdf', default=None,
         help="PDF source : positions de ses pages vectorielles mesurées contre sa grille",
     )
@@ -423,6 +523,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.pdf:
         modele = TemplateManager().get(args.modele) if args.modele else None
         positions_contre_pdf(rapport, converti, Path(args.pdf), colonnes, template=modele)
+    if args.journal and chemin_reference.suffix.lower() == '.xlsx':
+        appliquer_attentes(rapport, lire_attentes(chemin_reference),
+                           lire_journal_conversion(Path(args.journal)))
 
     print(formater_rapport(rapport, max_ecarts=args.max_ecarts))
 

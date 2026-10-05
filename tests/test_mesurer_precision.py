@@ -96,6 +96,24 @@ class TestLireXlsx(unittest.TestCase):
         chemin.unlink()
 
 
+class TestLireXlsxSectionsEtLogo(unittest.TestCase):
+
+    def test_section_avant_pied_et_logo_de_la_cellule_gauche(self):
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(['BORNE', 'COULEUR', 'SIGNAL', 'JARRETIERES'])
+        ws.append(['NOM DU CABLE : WPHR/A105'])
+        ws.append(['01', 'B', 'X', '0733B'])
+        ws.append(['SIEMENS', 'P.E.T. : SAINT PHILIBERT  BORNIER : AA'])
+        chemin = _chemin_temp('.xlsx')
+        wb.save(chemin)
+        page = mpr.lire_xlsx(chemin)[0]
+        chemin.unlink()
+        self.assertEqual([r['type'] for r in page['rows']], ['section', 'data'])
+        self.assertEqual(page['rows'][0]['text'], 'NOM DU CABLE : WPHR/A105')
+        self.assertEqual(page['pied_texte'][0], 'LOGO : SIEMENS')
+
+
 class TestLireVeriteExcel(unittest.TestCase):
 
     def _fabriquer(self, lignes_tab, lignes_pied=None):

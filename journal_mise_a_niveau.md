@@ -805,3 +805,47 @@ INDICE des pages y figurent, le journal porte « ✓ contrôle INDICE : OK, N pa
 … » ; un échec reste une alerte ⚠ (INDICE absent des révisions, ou contrôle impossible).
 Rejeu sans API de la conversion des pages de garde (réponses du 2026-10-02) :
 `✓ contrôle INDICE : OK, 2 page(s), indices lus : R, TP3`.
+
+## Nouveaux jeux d'essai 6A23111PE133 et 223111PE012 — étape A (2026-10-05, sans appel API ni changement de l'appli)
+
+### 1. Routage contre la feuille « Pages »
+
+18 pages sur 18 conformes à « Appel Claude attendu ». 223111PE012 : pages 2 et 3 tournées à 90°
+(garde scannée → Claude ; modifications vectorielles → grille) ; pages 4 et 6 à mediabox géante
+(2481 × 3505 pt, scan intégré 2481 × 3505 px, soit un A4 à 300 DPI) → scan.
+Mediabox géante : rendu du convertisseur ×3 = 7443 × 10515 px (78 Mpx, 235 Mo en mémoire,
+0,5 s + 2 s d'écriture PNG) ; image envoyée 1823 × 2576 px (≤ CLAUDE_IMAGE_MAX_PX), lisible
+(vérifié à l'œil sur la page 6). **À améliorer** : le rendu ×3 agrandit inutilement un scan déjà
+à 300 DPI ; un rendu borné à la résolution du scan suffirait.
+
+### 2. Lecture des vérités par le banc
+
+- Colonnes du tableau : en-tête de `Verite_tableaux` (inchangé).
+- Lignes « NOM DU CABLE : … » : sections (vérité et Excel livré), comparées texte entier ;
+  dans l'Excel, la section est reconnue avant le pied (elle contient « CABLE : »).
+- `Verite_pieds` sur deux niveaux : colonnes LOGO à PAGE = pied lu (`pied_lu`) ; colonnes
+  « livré » = ce que l'Excel doit porter (`pied_texte`, « (déduit) » retiré). Libellés comparés =
+  ceux de la vérité (schéma) ; stricts (espaces compris) : N° PLAN et PAGE livrés, LOGO. Texte
+  fixe « Autre texte » (JARRETIERAGE) retiré des valeurs lues. Colonnes de remarque ignorées.
+  Ancienne vérité 223111PE011 : mêmes chiffres qu'avant (19 pieds faux sur v1.7).
+- `Alertes_attendues` contre les lignes ⚠ du journal de conversion (`--journal`, campagne :
+  automatique) : alertes manquantes et fausses alertes comptées.
+- `Verite_garde` : indices de révision ; contrôle INDICE jugé contre la ligne « ✓ contrôle
+  INDICE : OK … » du journal et les INDICE de `Verite_pieds`.
+
+### 3. Pages vectorielles (grille → Excel livré → mesure)
+
+| Document | Pages | Cellules | Écarts de contenu | Sections | Positions (PDF) | Pieds faux |
+|----------|-------|----------|-------------------|----------|-----------------|------------|
+| 6A23111PE133 | 7, 8 | 268/272 | 4 : D3T O1A, D3T O1B, D6T O1B, D62T O1A (décision 3) | — | 0 | 2 |
+| 223111PE012 | 5, 9, 10 | 358/358 | 0 | 6/6 | 0 | 6 |
+
+Pieds faux restants :
+- **N° PLAN « 6A23111PE 133 » / « 223111PE 012 » au lieu de « 6A23111 PE 133 » / « 223111 PE
+  012 »** : défaut de la lecture en grille. Le pied est en police proportionnelle ; les mots
+  suivants d'un span sont placés au pas moyen de la page, « PE » retombe contre le mot précédent
+  et l'espace disparaît (le PDF contient bien « 6A23111 PE 133 »). À corriger dans l'appli.
+- PAGE livrée de 223111PE012 (aucun numéro imprimé) : décision B1.
+Journal de ces conversions partielles : « BORNIER absent de tout le document » (modèle
+REPARTITEUR), « numéro de page illisible » × 3 et « PAGE absent de tout le document » (PE012),
+« contrôle INDICE impossible » (pas de garde dans ces pages) : à juger sur le passage complet.

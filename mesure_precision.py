@@ -16,6 +16,7 @@ sur un document client quelconque.
 """
 
 import re
+import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
@@ -124,6 +125,12 @@ class RapportMesure:
     # (page de la référence de positions, page convertie) : pages dont les positions
     # ont été mesurées contre une référence géométrique (grille d'un PDF vectoriel).
     pages_positions_geometriques: List[Tuple[int, int]] = field(default_factory=list)
+    # Alertes (vérité terrain « Alertes_attendues » contre lignes ⚠ du journal) :
+    # None = non mesurées (pas de journal ou pas d'attentes).
+    alertes_manquantes: Optional[List[str]] = None
+    fausses_alertes: Optional[List[str]] = None
+    # Contrôle INDICE (« Verite_garde ») : None = non mesuré, sinon (conforme, détail).
+    controle_indice: Optional[Tuple[bool, str]] = None
     nb_cellules_comparees: int = 0
     nb_cellules_identiques: int = 0
 
@@ -385,7 +392,8 @@ def classer_cellule(valeur_ref, valeur_conv) -> str:
 # ── Pieds de page : paires LIBELLÉ : valeur, sans liste figée ─────────
 
 _LABEL_PIED_RE = re.compile(
-    r"((?:N°|NO)\s*PLAN|P\.?E\.?T\.?|\bCABLE|\bTYPE|INDICE|BORNIER|REF\s+CE|COMPL[EÉ]MENT)\s*:\s*"
+    r"((?:N°|NO)\s*PLAN|P\.?E\.?T\.?|\bCABLE|\bTYPE|INDICE|BORNIER|REF\s+CE|COMPL[EÉ]MENT"
+    r"|\bLOGO)\s*:\s*"
     r"|(PAGE)\s*:?\s*(?=\w)",
     re.IGNORECASE,
 )
@@ -438,12 +446,99 @@ def comparer_pieds(
 ) -> List[EcartPied]:
     """Compare toutes les paires LIBELLÉ : valeur des pieds de page de deux pages appariées."""
     pied_ref, pied_conv = _pied_page(page_ref), _pied_page(page_conv)
+    # Texte fixe du document lu à la suite d'une valeur (« SAINT MAURICE JARRETIERAGE ») :
+    # la vérité le donne à part (« Autre texte »), il n'appartient à aucune valeur.
+    for decor in page_ref.get('pied_autre') or []:
+        for libelle, valeur in pied_conv.items():
+            pied_conv[libelle] = _espace(re.sub(rf'(?<!\S){re.escape(decor)}(?!\S)', ' ', valeur))
+    schema = page_ref.get('libelles_pied')
+    if schema is not None:
+        libelles = set(schema)
+    else:
+        # Référence sans schéma (PDF vectoriel) : elle n'a pas de logo libellé.
+        libelles = (set(pied_ref) | set(pied_conv)) - {'LOGO'}
+    stricts = set(page_ref.get('libelles_stricts') or ())
     ecarts = []
-    for libelle in sorted(set(pied_ref) | set(pied_conv)):
+    for libelle in sorted(libelles):
         a, b = _espace(pied_ref.get(libelle, '')), _espace(pied_conv.get(libelle, ''))
-        if a.replace(' ', '') != b.replace(' ', ''):
+        # Libellé strict (logo, N° PLAN et PAGE livrés) : l'espacement fait partie de la valeur.
+        egaux = a == b if libelle in stricts else a.replace(' ', '') == b.replace(' ', '')
+        if not egaux:
             ecarts.append(EcartPied(num_ref, num_conv, libelle, a, b))
     return ecarts
+
+
+# ── Sections du tableau (« NOM DU CABLE : … ») ─────────────────────────
+
+def _sections(page: dict) -> List[str]:
+    return [_espace(r.get('text', '')) for r in page.get('rows', []) if r.get('type') == 'section']
+
+
+def comparer_sections(page_ref: dict, page_conv: dict, num_ref: int, num_conv: int):
+    """Sections dans l'ordre : (écarts de texte, sections absentes ou en trop)."""
+    ref, conv = _sections(page_ref), _sections(page_conv)
+    ecarts: List[EcartCellule] = []
+    orphelines: List[LigneOrpheline] = []
+    for op, i1, i2, j1, j2 in SequenceMatcher(None, ref, conv, autojunk=False).get_opcodes():
+        if op == 'equal':
+            continue
+        for k in range(max(i2 - i1, j2 - j1)):
+            i, j = i1 + k, j1 + k
+            if i < i2 and j < j2:
+                ecarts.append(EcartCellule(num_ref, num_conv, i, j, 'SECTION', ref[i], conv[j],
+                                           classer_cellule(ref[i], conv[j])))
+            elif i < i2:
+                orphelines.append(LigneOrpheline(_LIGNE_MANQUANTE, num_ref, i,
+                                                 'SECTION ' + ref[i]))
+            else:
+                orphelines.append(LigneOrpheline(_LIGNE_EN_TROP, num_conv, j,
+                                                 'SECTION ' + conv[j]))
+    return ecarts, orphelines
+
+
+# ── Alertes et contrôle INDICE ────────────────────────────────────────
+
+def _texte_alerte(texte: str) -> str:
+    sans_accents = ''.join(c for c in unicodedata.normalize('NFKD', str(texte or ''))
+                           if not unicodedata.combining(c))
+    return re.sub(r'[^a-z0-9→>]+', '', sans_accents.lower().replace('->', '→'))
+
+
+def comparer_alertes(attendues: List[str], emises: List[str]) -> Tuple[List[str], List[str]]:
+    """(alertes attendues non émises, alertes émises non attendues = fausses alertes).
+
+    Une alerte attendue est émise si son texte (sans accents, ponctuation ni espaces)
+    figure dans une ligne ⚠ du journal ; chaque ligne n'en couvre qu'une.
+    """
+    restantes = list(emises)
+    manquantes = []
+    for attendue in attendues:
+        cle = _texte_alerte(attendue)
+        trouvee = next((e for e in restantes if cle and cle in _texte_alerte(e)), None)
+        if trouvee is None:
+            manquantes.append(attendue)
+        else:
+            restantes.remove(trouvee)
+    return manquantes, restantes
+
+
+def verifier_controle_indice(revisions: List[str], indices_pages: List[str],
+                             journal: List[str]) -> Tuple[bool, str]:
+    """Contrôle INDICE de la conversion contre Verite_garde et les INDICE des pieds."""
+    attendu_ok = bool(revisions) and all(i in revisions for i in indices_pages)
+    ok = [lg for lg in journal if 'contrôle INDICE : OK' in lg]
+    if attendu_ok and not ok:
+        return False, "ligne « contrôle INDICE : OK » attendue, absente du journal"
+    if not attendu_ok and ok:
+        return False, ("« contrôle INDICE : OK » émis alors que la vérité l'exclut : "
+                       f"{ok[0].strip()}")
+    if ok:
+        lus = ok[0].split('indices lus :', 1)[-1]
+        lus = {x.strip() for x in lus.split(',') if x.strip()}
+        if lus != set(indices_pages):
+            return False, f"indices lus {sorted(lus)}, attendus {sorted(set(indices_pages))}"
+        return True, f"OK, indices {sorted(lus)} tous dans les révisions de la garde"
+    return True, "contrôle non conclu OK, comme attendu"
 
 
 # ── Comparaison d'une paire de pages ──────────────────────────────────
@@ -548,6 +643,10 @@ def mesurer(reference: List[dict], converti: List[dict], colonnes: List[str]) ->
         ecarts, positions, orphelines = comparer_page(
             reference[num_ref], converti[num_conv], num_ref, num_conv, colonnes,
         )
+        ecarts_sec, orph_sec = comparer_sections(
+            reference[num_ref], converti[num_conv], num_ref, num_conv)
+        ecarts = ecarts + ecarts_sec
+        orphelines = orphelines + orph_sec
         orphelines, deplacees = apparier_deplacees(orphelines, num_ref, num_conv)
         rapport.ecarts_cellules.extend(ecarts)
         rapport.ecarts_positions.extend(positions)
@@ -556,7 +655,8 @@ def mesurer(reference: List[dict], converti: List[dict], colonnes: List[str]) ->
         rapport.ecarts_pieds.extend(
             comparer_pieds(reference[num_ref], converti[num_conv], num_ref, num_conv),
         )
-        nb_comparees = len(_lignes_donnees(reference[num_ref])) * len(colonnes)
+        nb_comparees = (len(_lignes_donnees(reference[num_ref])) * len(colonnes)
+                        + len(_sections(reference[num_ref])))
         rapport.nb_cellules_comparees += nb_comparees
         rapport.nb_cellules_identiques += nb_comparees - len(ecarts)
     return rapport
@@ -589,6 +689,15 @@ def formater_rapport(rapport: RapportMesure, max_ecarts: Optional[int] = None) -
         lignes.append(f"Lignes orphelines     : {len(rapport.lignes_orphelines)}")
     if rapport.lignes_deplacees:
         lignes.append(f"Lignes déplacées      : {len(rapport.lignes_deplacees)}")
+    if rapport.alertes_manquantes is not None:
+        lignes.append(f"Alertes manquantes    : {len(rapport.alertes_manquantes)}")
+        lignes.extend(f"    manquante : {a}" for a in rapport.alertes_manquantes)
+        lignes.append(f"Fausses alertes       : {len(rapport.fausses_alertes)}")
+        lignes.extend(f"    fausse : {a.strip()}" for a in rapport.fausses_alertes)
+    if rapport.controle_indice is not None:
+        conforme, detail = rapport.controle_indice
+        lignes.append(f"Contrôle INDICE       : {'conforme' if conforme else 'NON CONFORME'} "
+                      f"({detail})")
     lignes.append('-' * 60)
     a_afficher = rapport.ecarts_cellules[:max_ecarts] if max_ecarts else rapport.ecarts_cellules
     for e in a_afficher:

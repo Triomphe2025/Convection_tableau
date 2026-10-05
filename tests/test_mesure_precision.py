@@ -381,6 +381,79 @@ class TestDebutAbsolu(unittest.TestCase):
         self.assertEqual(mp.comparer_page(ref, conv, 0, 0, ['TENANT', 'JAR'])[1], [])
 
 
+class TestComparerSections(unittest.TestCase):
+
+    def _p(self, *textes):
+        return _page([{'type': 'section', 'text': t} for t in textes])
+
+    def test_identiques_espaces_reduits(self):
+        self.assertEqual(mp.comparer_sections(self._p('NOM DU CABLE : A'),
+                                              self._p('NOM DU CABLE :  A'), 0, 0), ([], []))
+
+    def test_texte_different_et_section_absente(self):
+        ecarts, orph = mp.comparer_sections(self._p('NOM DU CABLE : A', 'NOM DU CABLE : B'),
+                                            self._p('NOM DU CABLE: A'), 0, 0)
+        self.assertEqual([(e.colonne, e.classe) for e in ecarts], [('SECTION', 'ESPACEMENT')])
+        self.assertEqual([(o.cote, o.contenu) for o in orph],
+                         [('MANQUANTE', 'SECTION NOM DU CABLE : B')])
+
+
+class TestComparerAlertes(unittest.TestCase):
+
+    def test_attendue_trouvee_sans_accents_ni_ponctuation(self):
+        manquantes, fausses = mp.comparer_alertes(
+            ["Corrigé O → 0 : l'original porte « D3T O1A »"],
+            ["page 18 l.3 TENANT : corrige O -> 0 : l'original porte D3T O1A"])
+        self.assertEqual((manquantes, fausses), ([], []))
+
+    def test_manquante_et_fausse(self):
+        manquantes, fausses = mp.comparer_alertes(['PAGE non imprimée'], ['BORNIER absent'])
+        self.assertEqual((manquantes, fausses), (['PAGE non imprimée'], ['BORNIER absent']))
+
+    def test_une_ligne_ne_couvre_qu_une_attente(self):
+        manquantes, _ = mp.comparer_alertes(['O1A', 'O1A'], ['porte O1A'])
+        self.assertEqual(manquantes, ['O1A'])
+
+
+class TestVerifierControleIndice(unittest.TestCase):
+
+    def test_ok_attendu_et_emis_avec_les_bons_indices(self):
+        conforme, _ = mp.verifier_controle_indice(
+            ['R', 'TP2', '03'], ['R', 'TP2', '03'],
+            ['  ✓ contrôle INDICE : OK, 3 page(s), indices lus : R, TP2, 03'])
+        self.assertTrue(conforme)
+
+    def test_ok_attendu_absent(self):
+        journal = ['⚠ contrôle INDICE impossible']
+        self.assertFalse(mp.verifier_controle_indice(['R'], ['R'], journal)[0])
+
+    def test_indices_lus_differents(self):
+        conforme, detail = mp.verifier_controle_indice(
+            ['R', 'R4'], ['R', 'R4'], ['✓ contrôle INDICE : OK, 1 page(s), indices lus : R'])
+        self.assertFalse(conforme)
+        self.assertIn('R4', detail)
+
+
+class TestComparerPiedsStrictsEtSchema(unittest.TestCase):
+
+    def test_libelle_strict_espaces_comptent(self):
+        ref = _page([], pied=['N° PLAN : 223111PE012  LOGO : SIEMENS'])
+        ref.update(libelles_pied=['LOGO', 'N° PLAN'], libelles_stricts=['LOGO', 'N° PLAN'])
+        conv = _page([], pied=['LOGO : S I E M E N S', 'N° PLAN : 223 111 PE 012'])
+        self.assertEqual(sorted(e.libelle for e in mp.comparer_pieds(ref, conv, 0, 0)),
+                         ['LOGO', 'N° PLAN'])
+
+    def test_texte_fixe_retire_et_libelle_hors_schema_ignore(self):
+        ref = _page([], pied=['P.E.T. : SAINT MAURICE'])
+        ref.update(libelles_pied=['PET'], libelles_stricts=[], pied_autre=['JARRETIERAGE'])
+        conv = _page([], pied=['P.E.T. : SAINT MAURICE JARRETIERAGE  BORNIER : X'])
+        self.assertEqual(mp.comparer_pieds(ref, conv, 0, 0), [])
+
+    def test_reference_sans_schema_ignore_le_logo(self):
+        conv = _page([], pied=['LOGO : MATRA', 'PAGE : 3'])
+        self.assertEqual(mp.comparer_pieds(_page([], pied=['PAGE : 3']), conv, 0, 0), [])
+
+
 class TestRemplacerPositions(unittest.TestCase):
 
     def _pos(self, page_conv):
