@@ -216,7 +216,10 @@ def _build_prompt(template) -> str:
         "- Si une cellule contient plusieurs sous-parties visuelles,"
         " concatène-les avec un espace\n"
         f"- Ne pas inclure l'en-tête ni les lignes de pied de page ({footer_kws_str})\n"
-        f"- Ne pas inclure les lignes de séparation '{section_kw}'\n\n"
+        f"- Une ligne de séparation « {section_kw} : … » (elle traverse le tableau) :"
+        " recopie-la telle qu'imprimée, à sa place parmi les lignes de données, sur une"
+        f" ligne précédée de SECTION: et sans barre verticale (ex : SECTION: {section_kw}"
+        " : WPHR/A105)\n\n"
         f"Après TOUTES les lignes de données, ajoute une ligne :\n"
         f"META: {{{meta_json}}}\n"
         "avec les valeurs trouvées dans le pied de page.\n"
@@ -316,6 +319,12 @@ def _parse_pipe_response(raw: str, template, column_mapping: dict = None) -> tup
             continue
         if line.upper().startswith('REVISIONS:'):
             revisions = line[len('REVISIONS:'):].split()
+            continue
+        # Avant le filtre de pied : « NOM DU CABLE : X » contient le marqueur « CABLE : ».
+        if line.upper().startswith('SECTION:'):
+            texte = line[len('SECTION:'):].strip()
+            if texte:
+                rows.append({'type': 'section', 'text': texte})
             continue
         # Ligne métadonnées
         if line.upper().startswith('META:'):

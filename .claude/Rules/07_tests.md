@@ -68,6 +68,7 @@ tests/
   test_non_regression_xlsx.py        → Le .xlsx du pipeline reste identique à l'instantané d'avant
   test_mesure_precision.py           → mesure_precision.py, une classe par fonction publique, dicts fabriqués
   test_mesurer_precision.py          → mesurer_precision.py (lecture xlsx/vérité/PDF, CSV, CLI), fichiers fabriqués
+  test_sections_claude.py            → Lignes « NOM DU CABLE : … » des pages lues par Claude : demandées par le prompt (SECTION:), lignes 'section' du format pivot à leur place, rejeu du journal, Excel livré comme la vérité de 223111PE012
   test_emplacement_pied.py           → Texte sans libellé à l'emplacement d'un champ (JARRETIERAGE à la place de BORNIER) : champ remplacé, pas d'alerte, texte gardé à sa place dans le pied livré de 6A23111PE133 ; BORNIER de 223111PE012 inchangé
   test_coquille_o.py                 → Décision B3 : coquille O/0 du numéro de borne (2e mot de TENANT, ABOUTISSANT, BORNE), 4 cellules de 6A23111PE133 p. 8, cas inchangés, cellule orange, alertes attendues
   test_logo_pe012.py                 → Décision B2 : logo tel qu'imprimé sur 223111PE012, « SIEMENS » collé (grille), « M A T R A » espacé (réponses Claude fabriquées), jusqu'à l'Excel
@@ -86,7 +87,7 @@ tests/
   test_claude_opus5.py               → claude_ocr sur Opus 5 / 5.5 : table de capacités, paramètres envoyés, refus avec catégorie, bloc de réflexion, effort refusé, images PNG ≤ 2576 px
 ```
 
-**955 tests passent** (`pytest tests\`, relevé le 2026-10-05), aucun échec attendu, plus 1 test lent
+**962 tests passent** (`pytest tests\`, relevé le 2026-10-05), aucun échec attendu, plus 1 test lent
 facultatif (`VERIF_TEST_LENT=1`, relecture du scan de 15 pages, ~30 s). Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.
 

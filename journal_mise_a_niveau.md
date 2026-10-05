@@ -949,3 +949,17 @@ Décision : le champ n'est pas absent, il est remplacé. Règle générale, pas 
   **0 fausse** (1 avant), cellules et pieds inchangés.
 - 223400PE137 : ses 48 pieds portent aussi JARRETIERAGE ; l'alerte « BORNIER absent de tout le
   document » disparaît (test mis à jour). 223111PE012 : BORNIER lu avec son libellé, inchangé.
+
+## Lignes de section sur les pages lues par Claude (2026-10-05)
+
+Cause des 3 lignes manquantes de 223111PE012 (scans p. 8, 18, 39) : le prompt disait « Ne pas
+inclure les lignes de séparation 'NOM DU CABLE' ». Il demande maintenant de les recopier telles
+qu'imprimées, à leur place parmi les lignes de données, sur une ligne `SECTION: NOM DU CABLE : …`
+(mot de section du modèle) ; `_parse_pipe_response` en fait une ligne `{'type': 'section', 'text'}`
+du format pivot, avant le filtre de pied (« CABLE : » est un marqueur de pied). Modes claude et
+agent (prompt partagé) ; le mode hybride garde son propre prompt. Rejeu des anciens journaux
+inchangé (aucune ligne SECTION:).
+
+À mesurer par un passage réel sur 223111PE012 seul (≈ 0,22 $) : attendu 3 sections sur 3,
+0 ligne manquante, rien d'autre ne bouge (949/949, 0 pied faux, alertes 0 / 0, INDICE conforme,
+positions p. 39 : 0).
