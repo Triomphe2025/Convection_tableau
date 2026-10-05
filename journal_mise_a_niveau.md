@@ -904,3 +904,32 @@ les modes (la coquille est dans l'original, pas dans la lecture).
   de la feuille Alertes_attendues émises ; pages vectorielles PE133 : **0 écart** (4 avant).
 - Inchangés : « OC21-37 », « QG 09 », « 0VG (EAS) », un O ailleurs qu'en 2e mot, en SIGNAL ou JAR.
 - Instantané de non-régression et tests dorés identiques ; 941 tests passent.
+
+## Passage réel du 2026-10-05 (commit 2c40424) et corrections de vérité
+
+Opus 5.5, effort medium, 1 passage par extrait — 0,77 $ en tout.
+
+| | PE011 | PE133 | PE012 |
+|---|---|---|---|
+| Cellules fausses | 2 / 664 (O/C d'Opus, connu) | 1 / 892 (« TRANS. » lu sur une tache) | 0 / 949 |
+| Pieds faux, glissements, lignes déplacées | 0 | 0 | 0 |
+| Lignes manquantes | 0 | 0 | 3 (sections « NOM DU CABLE » des scans) |
+| Logo des scans | 8 × M A T R A | 3 × M A T R A | 4 × M A T R A |
+| Coût | 0,333 $ | 0,217 $ | 0,217 $ |
+
+Positions fausses : PE011 p. 52 = 120 / 240 (référence du commit A : 120, inchangé) ; PE133 p. 15 =
+**112 / 220** (1re mesure : TENANT 56, ABOUTISSANT 56, espaces multiples ramenés à un) ; PE012
+p. 39 = **0 / 139** (1re mesure ; original à un espace ; la 140e cellule est la section manquante).
+Réponses de Claude au mauvais nombre de colonnes : **0 ligne sur 454**.
+
+Vérités corrigées (seules cellules autorisées, toutes les autres valeurs vérifiées identiques) :
+- 223111PE012, Alertes_attendues E2 : le texte du journal seul (la case portait aussi la consigne
+  « Une seule ligne au journal : « … » », que le banc cherchait mot pour mot).
+- 223111PE011 : feuille Alertes_attendues ajoutée (format de PE133) — « champ TYPE absent du pied,
+  laissé vide : page(s) 104 » et « contrôle INDICE impossible : aucune liste de révisions lue sur
+  une page de garde ».
+- 6A23111PE133 p. 15, RC 20 : vérité **inchangée** (« TRANS » sans point). Preuve par Verite_positions :
+  « C200 » en colonne 7 sur les lignes 37 à 40 (point tapé), en colonne 6 sur 41 à 48 dont RC 20 ;
+  la marque n'occupe pas de colonne, c'est une tache. L'écart reste compté.
+
+Remesure : alertes PE011 0 manquante / 0 fausse ; PE012 0 / 0 ; PE133 0 / 1 (BORNIER, point 2).

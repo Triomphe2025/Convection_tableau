@@ -110,8 +110,20 @@ class TestLectureDesVerites(unittest.TestCase):
         self.assertEqual(attentes['revisions'][:3], ['R', 'R1', 'R2'])
         self.assertIn('TP4', attentes['revisions'])
 
-    def test_ancienne_verite_sans_ces_feuilles(self):
+    def test_alerte_de_223111pe012_ecrite_comme_au_journal(self):
+        from generer_classeur import ALERTE_PAGE_NUMEROTEE
+        self.assertEqual(lire_attentes(_verite('223111PE012'))['alertes'],
+                         [ALERTE_PAGE_NUMEROTEE])
+
+    def test_attentes_223111pe011_sans_page_de_garde(self):
         attentes = lire_attentes(FIX / '223111PE011_extrait_verite.xlsx')
+        self.assertEqual(attentes['alertes'], [
+            "champ TYPE absent du pied, laissé vide : page(s) 104",
+            "contrôle INDICE impossible : aucune liste de révisions lue sur une page de garde"])
+        self.assertIsNone(attentes['revisions'])
+
+    def test_ancienne_verite_sans_ces_feuilles(self):
+        attentes = lire_attentes(FIX / '223400PE137_TP2_verite.xlsx')
         self.assertIsNone(attentes['alertes'])
         self.assertIsNone(attentes['revisions'])
 
