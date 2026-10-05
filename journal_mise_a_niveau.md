@@ -979,3 +979,16 @@ nombre de colonnes du modèle. Les points 2 et 3 du message « plus de colonnes 
 réponses brutes (hors TYPE_PAGE, META, PIED_BRUT, LOGO, REVISIONS, SECTION) dont le nombre de
 segments diffère du modèle ; colonnes `lignes_tableau_brutes` et `lignes_hors_colonnes` du CSV
 (ancien en-tête réécrit), 5 premiers exemples affichés (image, segments, ligne brute).
+
+## Passage réel 223111PE012 après le prompt des sections (2026-10-05, commit 5c23711)
+
+Opus 5.5, effort medium, passage 2 — 0,219 $ ; 5 réponses, identifiants neufs (aucun commun au
+passage 1).
+- Sections : **3 / 3** recopiées par Claude (`SECTION: NOM DU CABLE : WPHR/A107` p. 8,
+  `BRPH01/PH01` p. 18, `WPHR/A105` p. 39) ; les 9 sections de l'extrait livrées comme la vérité.
+- Lignes manquantes **0** (3 au passage 1). Inchangés : 949 / 949 cellules, 0 pied faux,
+  0 glissement, 0 ligne déplacée, alertes 0 manquante / 0 fausse, INDICE conforme, positions p. 39
+  **0 / 140** (section comprise), lignes hors colonnes 0 / 147, logos 4 × M A T R A.
+- Seule autre différence dans l'Excel livré : pied de la p. 39, Claude recopie cette fois
+  « NO PLAN : 223111PE012 INDICE : R4 » sans le trait vertical « | » avant INDICE (variation de
+  recopie, non comptée comme pied faux).
