@@ -140,6 +140,9 @@ def lire_verite_excel(chemin: Path) -> Tuple[List[dict], List[str]]:
     colonnes = entetes[debut:fin]
 
     lignes_par_page: dict = {}
+    # Une vérité qui a sa feuille Verite_positions saisit Verite_tableaux à un espace :
+    # ses positions sont dans cette feuille seule (vérités des extraits de 2026-10).
+    espaces_d_origine = 'Verite_positions' not in wb.sheetnames
     for row in ws_tab.iter_rows(min_row=2):
         valeurs = [c.value for c in row]
         if valeurs[0] is None:
@@ -150,7 +153,7 @@ def lire_verite_excel(chemin: Path) -> Tuple[List[dict], List[str]]:
         # comparaison des colonnes de début des sous-champs : les positions de
         # l'original font partie du résultat attendu (« D_T       02A »).
         ligne = _ligne_ou_section(cellules)
-        if ligne['type'] == 'data':
+        if ligne['type'] == 'data' and espaces_d_origine:
             ligne['exact'] = True
         ligne['ligne_verite'] = valeurs[debut - 1]
         lignes_par_page.setdefault(extrait, []).append(ligne)

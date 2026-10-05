@@ -255,6 +255,39 @@ class Config:
     VERIF_MOTS_PIED = ("P.E.T", "PET", "NO PLAN", "N° PLAN", "INDICE", "BORNIER", "PAGE")
 
     # ========================================
+    # 📐 POSITIONS D'ORIGINE (pages scannées, positions_scan.py)
+    # ========================================
+    # Claude ramène les blancs à un : chaque mot reprend la colonne de son jumeau
+    # lu par Tesseract (boîtes des mots) sur une grille de caractères par page.
+    # False = comportement d'avant (espaces de Claude, police par défaut).
+    POSITIONS_ORIGINALES = True
+    # Lecture séparée de VERIF_RELECTURE_* : le calibrage du vérificateur n'en dépend pas.
+    POSITIONS_DPI = 300
+    # Grand côté d'un A4 (pt) : une page plus grande est rendue au même nombre de pixels.
+    POSITIONS_COTE_A4_PT = 842
+    POSITIONS_PSM = "6"
+    POSITIONS_TOL_LIGNE = 12
+    # Pas cherché à ± cette part du pas estimé (pente largeur / nombre de caractères, à
+    # quelques % du vrai pas) : un pas voisin peut aligner par hasard les quelques
+    # colonnes où commencent la plupart des mots (223111PE012 p. 6 : 22,98 au lieu de 28,6).
+    POSITIONS_MARGE_PAS = 0.05
+    POSITIONS_PRECISION_PAS = 0.001
+    # Confusions repliées pour reconnaître le jumeau d'un mot (le mot écrit reste celui lu) ;
+    # « l » minuscule : Tesseract lit « Al04 » pour « A104 » (famille I/1).
+    POSITIONS_REPLIS = {"O": "0", "I": "1", "l": "1"}
+    # Ressemblance minimale (texte replié) pour apparier une ligne lue à une ligne Tesseract
+    # hors des blocs identiques.
+    POSITIONS_SEUIL_LIGNE = 0.5
+    # Caractères que Tesseract lit à la place d'un trait vertical du cadre (« 0815B/|RM »).
+    POSITIONS_CARACTERES_TRAIT = "|/\\!"
+    # Un mot n'est déplacé vers la colonne de gauche que si son jumeau finit à au moins N
+    # caractères du trait : un texte imprimé à cheval sur le trait appartient à sa colonne.
+    POSITIONS_MARGE_DEBORDEMENT = 1.0
+    # Police des cellules de données : chasse fixe, sinon les colonnes ne s'alignent pas.
+    POSITIONS_POLICE = "Courier New"
+    POSITIONS_TAILLE_POLICE = 11
+
+    # ========================================
     # 📏 MESURE DE PRÉCISION (outil de QA sur jeu de test connu)
     # ========================================
     # Compare une sortie .xlsx à une référence organisée à l'avance (PDF

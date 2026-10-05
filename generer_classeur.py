@@ -17,7 +17,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from openpyxl import Workbook
 from openpyxl.comments import Comment
-from openpyxl.styles import PatternFill
+from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.page import PageMargins
 from openpyxl.worksheet.pagebreak import Break
@@ -398,6 +398,55 @@ def marquer_corrections_o(ws, ligne_debut: int, resultat: Dict, couleur: str) ->
     return n
 
 
+def texte_aux_positions(texte: str, debuts: List[int]) -> str:
+    """Mots du texte posés à leur colonne de début, complétés par des espaces.
+
+    Les mots ne changent jamais ; un nombre de débuts différent laisse le texte tel quel.
+    """
+    mots = (texte or '').split()
+    if len(mots) != len(debuts):
+        return texte
+    sortie = ''
+    for mot, debut in zip(mots, debuts):
+        blancs = debut - len(sortie)
+        sortie += ' ' * max(blancs, 1 if sortie else 0) + mot
+    return sortie
+
+
+def appliquer_positions(valides: List[Dict]) -> List[Dict]:
+    """Cellules et sections réécrites à leurs positions d'origine (row['debuts'])."""
+    resultats = []
+    for r in valides:
+        lignes = []
+        for row in r.get('rows') or []:
+            debuts = row.get('debuts')
+            if not debuts:
+                lignes.append(row)
+            elif row.get('type') == 'section':
+                lignes.append(dict(row, text=texte_aux_positions(row.get('text', ''),
+                                                                 debuts.get(0, []))))
+            else:
+                cellules = [texte_aux_positions(c, debuts[k]) if k in debuts else c
+                            for k, c in enumerate(row.get('cells') or [])]
+                lignes.append(dict(row, cells=cellules))
+        resultats.append(dict(r, rows=lignes))
+    return resultats
+
+
+def police_donnees(ws, ligne_debut: int, resultat: Dict, n_colonnes: int) -> None:
+    """Police à chasse fixe sur les cellules de données et de section du bloc."""
+    ligne = ligne_debut + 1
+    for row in resultat.get('rows') or []:
+        if row.get('type') == 'blank':
+            ligne += row.get('count', 1)
+            continue
+        for k in range(1, n_colonnes + 1):
+            cellule = ws.cell(row=ligne, column=k)
+            cellule.font = Font(name=Config.POSITIONS_POLICE, size=Config.POSITIONS_TAILLE_POLICE,
+                                bold=cellule.font.bold, italic=cellule.font.italic)
+        ligne += 1
+
+
 def marquer_deduits(ws, ligne_fin: int, meta: Dict, couleur: str) -> int:
     """Colore et commente les lignes de pied (2 dernières du bloc) portant une valeur déduite."""
     n = 0
@@ -546,6 +595,8 @@ def generer_excel(
     valides, alertes_coquilles = corriger_coquilles_o(valides, Config.CORRECTION_O_COLONNES)
     for alerte in alertes_coquilles:
         log(f"  ⚠ {alerte}")
+    if Config.POSITIONS_ORIGINALES:
+        valides = appliquer_positions(valides)
 
     total = len(valides)
 
@@ -593,6 +644,8 @@ def generer_excel(
 
         marquer_deduits(ws, next_row, result.get('metadata', {}), Config.COULEUR_DEDUIT)
         marquer_corrections_o(ws, current_row, result, Config.COULEUR_CORRIGE)
+        if Config.POSITIONS_ORIGINALES:
+            police_donnees(ws, current_row, result, len(extractor._tpl.columns))
 
         if i < total - 1:
             ws.row_breaks.append(Break(id=next_row - 1))

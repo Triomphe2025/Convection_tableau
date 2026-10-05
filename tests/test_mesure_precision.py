@@ -398,6 +398,39 @@ class TestComparerSections(unittest.TestCase):
                          [('MANQUANTE', 'SECTION NOM DU CABLE : B')])
 
 
+class TestPositionsSections(unittest.TestCase):
+    """Section dont la vérité donne les positions : mesurée depuis la colonne 0 du tableau."""
+
+    TEXTE = 'NOM DU CABLE : WPHR/A105'
+
+    def _ref(self):
+        return _page([{'type': 'section', 'text': self.TEXTE, 'cells': [self.TEXTE, '', '', ''],
+                       'positions': {'FIL': (0, 4, 7, 13, 18)}}, _ligne(['01', 'X', '', ''])])
+
+    def _conv(self, brut):
+        return _page([{'type': 'section', 'text': brut.strip(), 'cells': [brut, '', '', '']},
+                      _ligne(['01', 'X', '', ''])])
+
+    def test_espaces_ecrases_signales(self):
+        positions = mp.positions_sections(self._ref(), self._conv(self.TEXTE), 0, 0, COLONNES)
+        self.assertEqual([(e.colonne, e.decalages_ref, e.decalages_conv) for e in positions],
+                         [('FIL', (0, 4, 7, 13, 18), (0, 4, 7, 13, 15))])
+
+    def test_positions_d_origine_conformes(self):
+        brut = 'NOM DU CABLE :    WPHR/A105'
+        self.assertEqual(mp.positions_sections(self._ref(), self._conv(brut), 0, 0, COLONNES), [])
+
+    def test_texte_different_ou_sans_verite_non_mesure(self):
+        sans = _page([{'type': 'section', 'text': self.TEXTE, 'cells': [self.TEXTE]}])
+        self.assertEqual(mp.positions_sections(sans, self._conv(self.TEXTE), 0, 0, COLONNES), [])
+        autre = self._conv('NOM DU CABLE : WPHR/A107')
+        self.assertEqual(mp.positions_sections(self._ref(), autre, 0, 0, COLONNES), [])
+
+    def test_compte_dans_la_mesure(self):
+        rapport = mp.mesurer([self._ref()], [self._conv(self.TEXTE)], COLONNES)
+        self.assertEqual(len(rapport.ecarts_positions), 1)
+
+
 class TestComparerAlertes(unittest.TestCase):
 
     def test_attendue_trouvee_sans_accents_ni_ponctuation(self):

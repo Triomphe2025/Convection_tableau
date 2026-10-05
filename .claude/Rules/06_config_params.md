@@ -114,6 +114,23 @@ le calibrage déjà fait sur `verificateur.py`.
 | `CORRECTION_O_MOTIF` | `O\d{1,2}[A-Z]?` | Forme d'une coquille : le O initial devient 0 |
 | `COULEUR_CORRIGE` | `F8CBAD` | Fond orange de la cellule corrigée (commentaire « corrigé : l'original porte O1A ») |
 
+## Positions d'origine des pages scannées (commit A, section « POSITIONS D'ORIGINE »)
+
+| Paramètre | Valeur défaut | Rôle |
+|-----------|--------------|------|
+| `POSITIONS_ORIGINALES` | `True` | Mots lus remis à leur colonne d'origine, cellules en Courier New 11 ; `False` = comportement d'avant |
+| `POSITIONS_DPI` | `300` | Rendu de la page pour Tesseract (séparé de `VERIF_RELECTURE_DPI`) |
+| `POSITIONS_COTE_A4_PT` | `842` | Une page plus grande qu'un A4 est rendue au même nombre de pixels (PE012 p. 4 et 6 : 72 DPI) |
+| `POSITIONS_PSM` | `6` | Mode de segmentation Tesseract |
+| `POSITIONS_TOL_LIGNE` | `12` | Écart vertical (pixels) sous lequel deux mots sont sur la même ligne |
+| `POSITIONS_MARGE_PAS` | `0.05` | Pas cherché à ± cette part du pas estimé (pente largeur / nombre de caractères) |
+| `POSITIONS_PRECISION_PAS` | `0.001` | Pas de la recherche (part du pas estimé) |
+| `POSITIONS_REPLIS` | `O→0, I→1, l→1` | Confusions repliées pour reconnaître un jumeau (le mot écrit reste celui lu) |
+| `POSITIONS_SEUIL_LIGNE` | `0.5` | Ressemblance minimale pour apparier une ligne lue à une ligne Tesseract |
+| `POSITIONS_CARACTERES_TRAIT` | `\|/\\!` | Caractères lus à la place d'un trait vertical du cadre |
+| `POSITIONS_MARGE_DEBORDEMENT` | `1.0` | Déplacement vers la gauche seulement si le jumeau finit à au moins N caractères du trait |
+| `POSITIONS_POLICE` / `POSITIONS_TAILLE_POLICE` | `Courier New` / `11` | Police des cellules de données (chasse fixe) |
+
 ## Ajouter un nouveau paramètre
 
 1. Ajouter dans `Config` (class dans config.py) avec valeur par défaut

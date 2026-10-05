@@ -15,9 +15,11 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import openpyxl
 
+from config import Config
 from generer_classeur import generer_excel
 from ocr_processor import BornierTableExtractor
 from template import DEFAULT_TEMPLATE
@@ -108,9 +110,15 @@ def dump_classeur(path):
     return json.loads(json.dumps(out, default=str))
 
 
-def generer_instantane():
+def generer_instantane(positions_originales: bool = False):
+    """Classeur des données fabriquées ; positions d'origine coupées par défaut.
+
+    POSITIONS_ORIGINALES = False est le comportement d'avant le commit A : l'instantané
+    le fige. Avec True, seule la police des cellules de données change (Courier New 11).
+    """
     extractor = BornierTableExtractor(template=DEFAULT_TEMPLATE)
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory() as tmp, \
+            patch.object(Config, 'POSITIONS_ORIGINALES', positions_originales):
         cible = Path(tmp) / 'sortie.xlsx'
         generer_excel(resultats_synthetiques(), extractor, cible)
         return dump_classeur(cible)
@@ -133,6 +141,16 @@ class TestXlsxInchange(unittest.TestCase):
                 if cur['cells'].get(coord) != ref['cells'].get(coord)
             ]
             self.assertEqual(diff, [], f"{feuille} : cellules différentes {diff[:10]}")
+
+    def test_positions_originales_seule_la_police_change(self):
+        def sans_taille(feuille):
+            return {k: {c: v for c, v in info.items() if c != 'sz'}
+                    for k, info in feuille['cells'].items()}
+        attendu = json.loads(BASELINE.read_text(encoding='utf-8'))['Borniers']
+        obtenu = generer_instantane(positions_originales=True)['Borniers']
+        self.assertEqual(sans_taille(obtenu), sans_taille(attendu))
+        for cle in ('merged', 'row_heights', 'col_widths', 'page_breaks'):
+            self.assertEqual(obtenu[cle], attendu[cle], cle)
 
     def test_instantane_contient_du_contenu(self):
         attendu = json.loads(BASELINE.read_text(encoding='utf-8'))

@@ -992,3 +992,55 @@ passage 1).
 - Seule autre différence dans l'Excel livré : pied de la p. 39, Claude recopie cette fois
   « NO PLAN : 223111PE012 INDICE : R4 » sans le trait vertical « | » avant INDICE (variation de
   recopie, non comptée comme pied faux).
+
+## Commit A — positions d'origine des pages scannées (2026-10-05)
+
+`positions_scan.py` (nouveau) : sur chaque page passée par Claude, mots bruts de Tesseract
+(`image_to_data`, psm 6, page rendue à l'échelle d'un A4 à 300 DPI), une grille de caractères
+par page, mots coupés aux traits du cadre, lignes appariées (difflib, texte replié O/0, I/1,
+l/1), chaque mot lu prend la colonne de son jumeau. Le contenu ne change jamais ; Excel en
+Courier New 11, sous-champs complétés par des espaces (`generer_classeur.appliquer_positions`).
+Lecture Tesseract gardée en mémoire et dans `<document>_tesseract.json` (double lecture et
+contrôle de conservation du commit B, sans 2e OCR).
+
+Ajustements trouvés à la mesure (tests d'abord pour chacun) :
+- Grille : le pas estimé par largeur / nombre de caractères est biaisé (boîte du dernier
+  caractère plus étroite) et la recherche à ±20 % calait PE012 p. 6 sur 22,98 au lieu de 28,6
+  (les débuts se répètent sur quelques colonnes). Pas estimé = pente largeur selon le nombre de
+  caractères (à quelques % du vrai pas sur les 15 pages de tableau), recherche à ±5 %.
+- Pages géantes (PE012 p. 4 et 6, 2481 × 3505 pt) : rendues à 72 DPI (même nombre de pixels
+  qu'un A4 à 300 DPI) ; 118 s → 2 s par page.
+- Regroupement en lignes propre au module : un trait isolé lu « | » (3 px) coupait la ligne 1
+  de PE011 p. 52 en trois (`relecture_scan` inchangé, le vérificateur est calibré dessus).
+- Trait lu sur deux caractères (« 0815B/|RM », PE133 p. 15 ligne 31) : les caractères du trait
+  sont retirés, la partie droite commence à la colonne qui suit le trait.
+- Jumeau cherché d'abord dans la cellule (exact puis par rang) : sur PE011 p. 7, « PH » de fin
+  de SIGNAL lu « FH » s'appariait au « PH » d'ABOUTISSANT et changeait de cellule (3 lignes).
+- Déplacement vers la gauche refusé si le jumeau touche le trait (`POSITIONS_MARGE_DEBORDEMENT`) :
+  PE011 p. 4 ligne 1, « PH » de TENANT imprimé à cheval sur le trait.
+- Écriture du cache refusée (chemin de plus de 260 caractères sous Windows) : journalisée,
+  la conversion continue.
+
+Banc (mesure_precision / mesurer_precision) :
+- Sections mesurées en position (`positions_sections`), depuis la colonne 0 de la 1re colonne.
+- Une vérité qui a sa feuille Verite_positions saisit Verite_tableaux à un espace (0 cellule à
+  blancs multiples sur 520 / 341 / 662) : ses lignes ne sont plus `exact`, les positions ne sont
+  comparées que là où elles ont été saisies. Avant, ces comparaisons donnaient 0 par coïncidence
+  (Claude aussi à un espace). Vérité TP2 de PE137 (sans feuille, espaces d'origine) inchangée.
+- Chiffres dorés identiques ; instantané Excel identique avec `POSITIONS_ORIGINALES = False`,
+  seule la police change avec True.
+
+Mesure sans appel API (rejeu complet des réponses enregistrées, Tesseract local) :
+
+| Extrait | Positions fausses avant → après | Cellules fausses | Glissements | Déplacés | Temps ajouté / page scannée |
+|---|---|---|---|---|---|
+| 223111PE011 | 120 → **4** (p. 52) | 2 → 2 | 0 → 0 | 0 | 1,4 à 4,4 s |
+| 6A23111PE133 | 112 → **0** (p. 15) | 1 → 1 | 0 → 0 | 0 | 2,6 à 2,9 s |
+| 223111PE012 | 1 → **0** (p. 39, section) | 0 → 0 | 0 → 0 | 0 | 1,7 à 2,6 s |
+
+Restes : PE011 p. 52 lignes 18 et 32 (TENANT, ABOUTISSANT) — Tesseract n'y lit aucun mot,
+aucune position n'est inventée, la cellule garde les espaces de Claude. PE011 p. 10 :
+« colonnes du cadre non trouvées », positions non recalculées (journal). Aucun déplacement sur
+les 3 extraits : le mécanisme n'est éprouvé que par les tests fabriqués.
+`TriosSeconverter.spec` reçoit `positions_scan` et `relecture_scan` (import à la demande) ;
+l'exe est à retester avant livraison (règle 08).

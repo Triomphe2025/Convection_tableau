@@ -496,6 +496,38 @@ def comparer_sections(page_ref: dict, page_conv: dict, num_ref: int, num_conv: i
     return ecarts, orphelines
 
 
+def positions_sections(page_ref: dict, page_conv: dict, num_ref: int, num_conv: int,
+                       colonnes: List[str]) -> List[EcartPosition]:
+    """Débuts des mots des sections de même texte dont la vérité donne les positions.
+
+    La section traverse le tableau : comptée depuis la colonne 0 de la 1re colonne.
+    """
+    def sections(page):
+        return [r for r in page.get('rows', []) if r.get('type') == 'section']
+
+    ref, conv = sections(page_ref), sections(page_conv)
+    if not colonnes or not any(r.get('positions') for r in ref):
+        return []
+    origine_c = origines_colonnes(_lignes_donnees(page_conv), 1)[0]
+    ecarts: List[EcartPosition] = []
+    textes_r, textes_c = [_espace(r.get('text', '')) for r in ref], [_espace(r.get('text', ''))
+                                                                     for r in conv]
+    for op, i1, i2, j1, _ in SequenceMatcher(None, textes_r, textes_c,
+                                             autojunk=False).get_opcodes():
+        if op != 'equal':
+            continue
+        for i, j in zip(range(i1, i2), range(j1, j1 + i2 - i1)):
+            attendus = (ref[i].get('positions') or {}).get(colonnes[0])
+            if attendus is None:
+                continue
+            brut = (conv[j].get('cells') or [conv[j].get('text', '')])[0]
+            obtenus = _debuts(brut, origine_c)
+            if tuple(attendus) != obtenus:
+                ecarts.append(EcartPosition(num_ref, num_conv, i, j, colonnes[0],
+                                            tuple(attendus), obtenus))
+    return ecarts
+
+
 # ── Alertes et contrôle INDICE ────────────────────────────────────────
 
 def _texte_alerte(texte: str) -> str:
@@ -646,6 +678,8 @@ def mesurer(reference: List[dict], converti: List[dict], colonnes: List[str]) ->
         ecarts_sec, orph_sec = comparer_sections(
             reference[num_ref], converti[num_conv], num_ref, num_conv)
         ecarts = ecarts + ecarts_sec
+        positions = positions + positions_sections(
+            reference[num_ref], converti[num_conv], num_ref, num_conv, colonnes)
         orphelines = orphelines + orph_sec
         orphelines, deplacees = apparier_deplacees(orphelines, num_ref, num_conv)
         rapport.ecarts_cellules.extend(ecarts)

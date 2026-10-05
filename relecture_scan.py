@@ -27,12 +27,13 @@ def normaliser_cle(texte: str) -> str:
     return re.sub(r'[^A-Z0-9]', '', t)
 
 
-def mots_tesseract(image) -> List[Mot]:
-    """Mots lus par Tesseract (psm VERIF_RELECTURE_PSM) avec boîte et confiance."""
+def mots_tesseract(image, psm: Optional[str] = None) -> List[Mot]:
+    """Mots lus par Tesseract (psm VERIF_RELECTURE_PSM par défaut) avec boîte et confiance."""
     import pytesseract
     pytesseract.pytesseract.tesseract_cmd = Config.TESSERACT_PATH
+    psm = Config.VERIF_RELECTURE_PSM if psm is None else psm
     data = pytesseract.image_to_data(
-        image, lang=Config.OCR_LANGUAGE, config=f"--psm {Config.VERIF_RELECTURE_PSM}",
+        image, lang=Config.OCR_LANGUAGE, config=f"--psm {psm}",
         output_type=pytesseract.Output.DICT,
     )
     mots = []

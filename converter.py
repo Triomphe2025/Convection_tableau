@@ -102,6 +102,9 @@ class Converter:
         self._on_column_mapping = on_column_mapping  # None = mapping auto standard
         self._on_wide_template_confirm = on_wide_template_confirm  # None = pas de confirmation
         self._cancel_event = cancel_event  # None = pas d'annulation possible
+        # Lecture Tesseract de chaque page scannée (positions d'origine), gardée pour
+        # la double lecture et le contrôle de conservation sans 2e OCR.
+        self._lectures_tesseract: Dict[int, object] = {}
         self._derniers_resultats: Optional[List[Dict]] = None  # lus par verifier_conversion
 
     # ── Apprentissage depuis les résultats validés ─────────────────────
@@ -224,6 +227,10 @@ class Converter:
 
         ok = sum(1 for r in ocr_results if r.get('success'))
         self._derniers_resultats = ocr_results
+        if getattr(Config, 'POSITIONS_ORIGINALES', False) and source_ext != '.pdf':
+            raison = ("rejeu sans le PDF" if source_ext == '.jsonl'
+                      else "source Word ou images, sans page PDF à relire")
+            self._log(f"  positions d'origine non recalculées : {raison}")
 
         if self._est_annule():
             self._log(
@@ -446,11 +453,61 @@ class Converter:
                 raise RuntimeError(f"OCR échoué : {exc}") from exc
             # Même ordre que _extraire_avec_progres : images triées par numéro de page.
             par_page.update(zip(pages_image, results_ocr))
+            self._placer_positions_originales(pages_image, results_ocr)
 
         results = [par_page[i] for i in sorted(par_page)]
         # generer_excel a besoin d'un extracteur même si aucune page n'est
         # passée par l'OCR ; PdfTableExtractor délègue la mise en forme.
         return results, extractor or lecteur_grille
+
+    def _placer_positions_originales(self, pages: List[int], resultats: List[Dict]) -> None:
+        """Positions d'origine des mots lus sur les pages scannées (Tesseract en cache)."""
+        if not getattr(Config, 'POSITIONS_ORIGINALES', False) or not pages:
+            return
+        import json
+        import time
+
+        import fitz
+
+        from positions_scan import lire_page, placer_page
+        colonnes = list(self.template.columns)
+        with fitz.open(str(self.word_file)) as doc:
+            for page, resultat in zip(pages, resultats):
+                if self._est_annule() or not resultat.get('success'):
+                    continue
+                debut = time.monotonic()
+                try:
+                    if page not in self._lectures_tesseract:
+                        self._lectures_tesseract[page] = lire_page(doc[page - 1])
+                    rows, bilan = placer_page(resultat.get('rows', []), colonnes,
+                                              self._lectures_tesseract[page])
+                except Exception as exc:
+                    self._log(f"  ⚠ positions d'origine p. {page} non recalculées : {exc}")
+                    continue
+                if bilan['raison']:
+                    self._log(f"  positions d'origine p. {page} non recalculées : "
+                              f"{bilan['raison']}")
+                    continue
+                resultat['rows'] = rows
+                self._log(
+                    f"  positions d'origine p. {page} : {bilan['exacts']} mot(s) au jumeau "
+                    f"exact, {bilan['par_rang']} par rang, {bilan['sans_jumeau']} sans jumeau, "
+                    f"{len(bilan['deplaces'])} déplacé(s), {bilan['lignes_sans_partenaire']} "
+                    f"ligne(s) non lue(s) par Tesseract ({time.monotonic() - debut:.1f} s)"
+                )
+                for d in bilan['deplaces']:
+                    self._log(f"    p. {page} ligne {d['ligne']} : « {d['mot']} » passé de "
+                              f"{d['de']} à {d['vers']} (lu dans {d['vers']} sur le scan)")
+        if self._lectures_tesseract:
+            cache = self.output_dir / f"{self.word_file.stem}_tesseract.json"
+            try:
+                cache.write_text(json.dumps({str(p): lecture.vers_dict() for p, lecture in
+                                             self._lectures_tesseract.items()}),
+                                 encoding='utf-8')
+            except OSError as exc:
+                # Chemin trop long (Windows, 260 caractères) ou disque : la conversion
+                # continue, la lecture reste en mémoire pour cette conversion.
+                self._log(f"  ⚠ lecture Tesseract non enregistrée ({cache.name}) : {exc}")
 
     # ── Extraction depuis PDF (couche texte vectorielle) ──────────────
 

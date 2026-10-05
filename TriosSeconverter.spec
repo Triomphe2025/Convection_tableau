@@ -42,8 +42,11 @@ a = Analysis(
         'numpy',
         'lxml',
         'lxml.etree',
-        # Modules du projet importés à la demande (vérification de conversion)
+        # Modules du projet importés à la demande (vérification de conversion,
+        # positions d'origine des pages scannées)
         'verificateur',
+        'relecture_scan',
+        'positions_scan',
     ],
     hookspath=[],
     hooksconfig={},

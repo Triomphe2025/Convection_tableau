@@ -475,6 +475,18 @@ class TestVeritePositions(unittest.TestCase):
     def test_positions_conformes_aucun_ecart(self):
         self.assertEqual(self._mesurer(self.CONFORMES).ecarts_positions, [])
 
+    def test_cellule_sans_position_saisie_non_mesuree(self):
+        # Avec une feuille Verite_positions, Verite_tableaux est saisie à un espace : son
+        # espacement n'est pas une position (« PH ACC/A 01 » contre l'original aligné).
+        import mesure_precision as mp
+        with tempfile.TemporaryDirectory() as tmp:
+            verite, colonnes = mpr.lire_verite_excel(self._verite(tmp, self.CONFORMES))
+        self.assertFalse(any(r.get('exact') for p in verite for r in p['rows']))
+        converti = [{'success': True, 'metadata': {}, 'pied_texte': [], 'rows': [
+            {'type': 'data', 'cells': ['G', 'PH  QTEL2   09', 'TEL PMS Q1', 'PH    ACC/A 01']},
+            {'type': 'data', 'cells': ['BC', 'PH QTEL2 10', 'TEL PMS Q1', 'PH ACC/A 02']}]}]
+        self.assertEqual(mp.mesurer(verite, converti, colonnes).ecarts_positions, [])
+
     def test_ordre_des_lignes_de_la_feuille_libre(self):
         desordre = [(1, 1, 'TENANT', 3, 12), (1, 1, 'TENANT', 1, 0), (1, 1, 'TENANT', 2, 4)]
         self.assertEqual(self._mesurer(desordre).ecarts_positions, [])
