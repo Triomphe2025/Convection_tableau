@@ -100,7 +100,8 @@ class TestAnalyserPied(unittest.TestCase):
 
     def test_decor_du_modele_ni_valeur_ni_complement(self):
         meta = analyser_pied(['P.E.T. : GRAND-BUT      JARRETIERAGE'], decor={'JARRETIERAGE'})
-        self.assertEqual(meta, {'PET': 'GRAND-BUT'})
+        # Posé à l'emplacement de BORNIER : le champ est remplacé, pas absent.
+        self.assertEqual(meta, {'PET': 'GRAND-BUT', 'EMPLACEMENT_BORNIER': 'JARRETIERAGE'})
 
     def test_libelle_vide_absent(self):
         self.assertEqual(analyser_pied(['TYPE       :']), {})
@@ -194,10 +195,11 @@ class TestPE137PiedsIdentiquesALOriginal(unittest.TestCase):
             attendu = resultat['metadata']['PIED_BRUT'][-1].replace('N° PLAN', 'NO PLAN')
             self.assertEqual(pied, re.sub(r'223400 PE 137', '223400PE137', attendu))
 
-    def test_bornier_absent_une_ligne_et_non_48(self):
-        lignes = [m for m in self.messages if 'BORNIER' in m]
-        self.assertEqual([m.strip() for m in lignes],
-                         ["⚠ BORNIER absent de tout le document : vérifier le modèle"])
+    def test_jarretierage_a_l_emplacement_bornier_aucune_alerte(self):
+        # Les 48 pieds portent « JARRETIERAGE » à la place de « BORNIER : … » : remplacé.
+        self.assertFalse([m for m in self.messages if 'BORNIER' in m])
+        self.assertTrue(all(r['metadata'].get('EMPLACEMENT_BORNIER') == 'JARRETIERAGE'
+                            for r in self.resultats if r.get('metadata', {}).get('PET')))
 
     def test_indices_trouves_dans_les_revisions_des_gardes(self):
         self.assertFalse([m for m in self.messages if 'INDICE' in m and '⚠' in m])

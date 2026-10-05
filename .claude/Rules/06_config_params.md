@@ -31,6 +31,8 @@ Config.TESSERACT_PATH   # référencer uniquement
 | `CHAMPS_CONSTANTS_DEFAUT` | `("PET",)` | Champs constants d'un document (case vide reprise des autres pages si elles sont unanimes) |
 | `CHAMPS_CONSTANTS_PAR_MODELE` | `{}` | Par nom de modèle de tableau : sa propre liste (ex. `{"REPARTITEUR": ("PET", "NO_PLAN")}`) |
 | `PIED_CHAMPS_JAMAIS_DEDUITS` | `INDICE, PAGE, TYPE, CABLE` | Varient d'une page à l'autre : jamais repris, même listés |
+| `PIED_EMPLACEMENTS` | `{"BORNIER": "PET"}` | Emplacement d'un champ = fin de la ligne du champ cité, après sa valeur ; un texte sans libellé posé là remplace le champ (`EMPLACEMENT_<champ>`, pas d'alerte « absent ») |
+| `PIED_ECART_EMPLACEMENT` | `3` | Blancs qui séparent la valeur d'un texte posé à l'emplacement (pages vectorielles) ; à un seul blanc (Claude), seul un mot fixe du modèle est reconnu |
 | `COULEUR_DEDUIT` | `DDEBF7` | Fond d'une case de pied reprise des autres pages (commentaire « déduit des autres pages du document ») |
 | `PIED_INDICE_MOTIF` | `[A-Z]{0,2}\d{1,2}\|[A-Z]` | Forme d'un indice de révision (A, R, 00, R10, TP2) |
 | `IMAGES_FOLDER_NAME` | `VD23111 PE 162` | Nom du dossier de sortie des images |

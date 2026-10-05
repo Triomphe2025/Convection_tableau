@@ -123,16 +123,38 @@ def mots_decor(formats: Iterable[str]) -> Set[str]:
     return decor
 
 
+def _texte_a_l_emplacement(segment: str, decor: Set[str]):
+    """(mots de la valeur, texte posé après elle) d'un segment en fin de ligne.
+
+    Le texte posé suit un grand blanc, ou est fait des mots fixes du modèle qui
+    terminent le segment (Claude ramène les blancs à un).
+    """
+    morceaux = re.split(r'\s{%d,}' % Config.PIED_ECART_EMPLACEMENT, segment.strip())
+    if len(morceaux) > 1:
+        return morceaux[0].split(), ' '.join(' '.join(morceaux[1:]).split())
+    mots = segment.split()
+    k = len(mots)
+    while k and mots[k - 1].upper() in decor:
+        k -= 1
+    return mots[:k], ' '.join(mots[k:])
+
+
 def analyser_pied(lignes: Iterable[str],
                   libelles_un_mot: Optional[Iterable[str]] = None,
                   libelles_compteur: Optional[Iterable[str]] = None,
-                  decor: Iterable[str] = ()) -> Dict[str, str]:
+                  decor: Iterable[str] = (),
+                  emplacements: Optional[Dict[str, str]] = None) -> Dict[str, str]:
     """Toutes les paires LIBELLÉ : valeur des lignes, plus COMPLEMENT (texte libre).
 
     Les mots de decor (texte fixe imprimé par le modèle) ne sont ni une valeur
-    ni un complément ; ils restent visibles dans les lignes brutes.
+    ni un complément ; ils restent visibles dans les lignes brutes. Un texte sans
+    libellé à l'emplacement d'un champ non imprimé (PIED_EMPLACEMENTS) est rendu
+    sous EMPLACEMENT_<champ>.
     """
     decor = {d.upper() for d in decor}
+    emplacements = Config.PIED_EMPLACEMENTS if emplacements is None else emplacements
+    champ_apres = {cle_libelle(avant): champ for champ, avant in emplacements.items()}
+    poses: Dict[str, str] = {}
     un_mot = {cle_libelle(x) for x in (
         Config.PIED_LIBELLES_UN_MOT if libelles_un_mot is None else libelles_un_mot)}
     compteur = {cle_libelle(x) for x in (
@@ -159,7 +181,14 @@ def analyser_pied(lignes: Iterable[str],
         for k, m in enumerate(trouves):
             fin = trouves[k + 1].start() if k + 1 < len(trouves) else len(texte)
             cle = cle_libelle(m.group(1))
-            mots = [x for x in texte[m.end():fin].split() if x.upper() not in decor]
+            segment = texte[m.end():fin]
+            if cle in champ_apres and k == len(trouves) - 1 and cle not in un_mot:
+                mots, pose = _texte_a_l_emplacement(segment, decor)
+                if pose:
+                    poses.setdefault(champ_apres[cle], pose)
+            else:
+                mots = segment.split()
+            mots = [x for x in mots if x.upper() not in decor]
             if cle in un_mot:
                 valeur, reste = mots[:1], mots[1:]
             else:
@@ -172,6 +201,11 @@ def analyser_pied(lignes: Iterable[str],
             if valeur and cle not in meta:
                 meta[cle] = ' '.join(valeur)
             complement.extend(reste)
+    for champ, pose in poses.items():
+        if champ in meta:
+            complement.append(pose)
+        else:
+            meta[f'EMPLACEMENT_{champ}'] = pose
     if complement:
         meta['COMPLEMENT'] = ' '.join(complement)
     return meta

@@ -141,6 +141,13 @@ class Config:
     CHAMPS_CONSTANTS_PAR_MODELE = {}
     # Champs qui varient d'une page à l'autre : jamais repris, même listés ci-dessus.
     PIED_CHAMPS_JAMAIS_DEDUITS = ("INDICE", "PAGE", "TYPE", "CABLE")
+    # Emplacement d'un champ = fin de la ligne du champ cité, après sa valeur. Un texte
+    # sans libellé à cet emplacement (« JARRETIERAGE » à la place de « BORNIER : … »)
+    # remplace le champ : il n'est pas absent (EMPLACEMENT_<champ>, aucune alerte).
+    PIED_EMPLACEMENTS = {"BORNIER": "PET"}
+    # Blancs qui séparent la valeur d'un texte posé à l'emplacement (pages vectorielles) ;
+    # Claude ramène les blancs à un : seul un mot fixe du modèle y est alors reconnu.
+    PIED_ECART_EMPLACEMENT = 3
     # Fond d'une case de pied complétée depuis les autres pages du document
     # (bleu clair, distinct du jaune « confiance basse » et du rouge « ?? »).
     COULEUR_DEDUIT = "DDEBF7"

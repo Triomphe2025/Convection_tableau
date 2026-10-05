@@ -442,8 +442,10 @@ def alertes_pied(tous: List[Dict], valides: List[Dict], champs_attendus) -> List
             alertes.append(f"page {numero_page(r)} : {alerte}")
 
     for cle in champs_attendus:
+        # Emplacement occupé par un texte sans libellé : champ remplacé, pas absent.
         manquantes = [numero_page(r) for r in valides
-                      if not str(r.get('metadata', {}).get(cle, '')).strip()]
+                      if not str(r.get('metadata', {}).get(cle, '')).strip()
+                      and not r.get('metadata', {}).get(f'EMPLACEMENT_{cle}')]
         if not manquantes:
             continue
         # Absent partout = le modèle ne correspond pas au document : une ligne, pas

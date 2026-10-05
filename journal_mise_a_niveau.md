@@ -933,3 +933,19 @@ Vérités corrigées (seules cellules autorisées, toutes les autres valeurs vé
   la marque n'occupe pas de colonne, c'est une tache. L'écart reste compté.
 
 Remesure : alertes PE011 0 manquante / 0 fausse ; PE012 0 / 0 ; PE133 0 / 1 (BORNIER, point 2).
+
+## Emplacement BORNIER occupé par un texte sans libellé (2026-10-05)
+
+Décision : le champ n'est pas absent, il est remplacé. Règle générale, pas un cas JARRETIERAGE.
+- `config.PIED_EMPLACEMENTS = {"BORNIER": "PET"}` : l'emplacement de BORNIER est la fin de la ligne
+  qui porte P.E.T., après sa valeur. Le texte qui y est posé est reconnu s'il suit un grand blanc
+  (≥ `PIED_ECART_EMPLACEMENT` = 3, pages vectorielles) ou s'il est fait des mots fixes du modèle
+  (réponses Claude, à un seul blanc). Il va dans `EMPLACEMENT_BORNIER`, jamais dans P.E.T. ni
+  COMPLEMENT ; `alertes_pied` ne compte plus la page comme « BORNIER absent ».
+- Limite : à un seul blanc et sans mot fixe du modèle, rien n'est deviné (P.E.T. garde tout le
+  segment, l'alerte reste) — Claude écrase les blancs (cf. positions, commit A).
+- Pied livré : inchangé, il recopiait déjà le texte à sa place. Rejeu sans API du passage réel
+  de 6A23111PE133 : 5 pieds « P.E.T. : SAINT MAURICE … JARRETIERAGE », alertes 0 manquante /
+  **0 fausse** (1 avant), cellules et pieds inchangés.
+- 223400PE137 : ses 48 pieds portent aussi JARRETIERAGE ; l'alerte « BORNIER absent de tout le
+  document » disparaît (test mis à jour). 223111PE012 : BORNIER lu avec son libellé, inchangé.
