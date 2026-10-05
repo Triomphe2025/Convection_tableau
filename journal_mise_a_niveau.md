@@ -849,3 +849,15 @@ Pieds faux restants :
 Journal de ces conversions partielles : « BORNIER absent de tout le document » (modèle
 REPARTITEUR), « numéro de page illisible » × 3 et « PAGE absent de tout le document » (PE012),
 « contrôle INDICE impossible » (pas de garde dans ces pages) : à juger sur le passage complet.
+
+## Grille : espace entre deux mots d'un même span toujours gardé (2026-10-05)
+
+Défaut trouvé à l'étape A : en police proportionnelle (pieds « N° PLAN : 6A23111 PE 133 »),
+l'espace du texte source est plus étroit qu'un demi-pas de page ; la garde « au moins un
+espace » ne jouait qu'au-delà d'un demi-pas, et « PE » se collait au mot précédent. Deux mots
+d'un même span ont toujours été séparés par un espace dans le texte (c'est là qu'ils sont
+coupés) : ils en gardent désormais au moins un. Entre spans différents, règle inchangée.
+Effets : pages de garde et de modifications enfin lisibles (« Voir détail historique des
+modifs » au lieu de « Voirdétailhistoriquedesmodifs ») ; pieds vectoriels de PE133 : 2 → 0
+pieds faux ; PE012 : N° PLAN lu « 223111 PE 012 » comme imprimé. Pages de tableau : tests dorés
+identiques (PE137 TP2, extrait), 907 tests verts.

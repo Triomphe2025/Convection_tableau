@@ -156,3 +156,18 @@ class TestPagesVectorielles(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestGrillePoliceProportionnelle(unittest.TestCase):
+    """Pied en police proportionnelle : l'espace entre deux mots d'un même span est gardé."""
+
+    def _ligne_plan(self, pdf, page):
+        from pdf_extractor import grille_page
+        with fitz.open(str(pdf)) as doc:
+            return next(lg for lg in grille_page(doc[page]) if 'PLAN' in lg)
+
+    def test_numero_de_plan_de_6a23111pe133(self):
+        self.assertIn('N° PLAN : 6A23111 PE 133', ' '.join(self._ligne_plan(PE133[1], 6).split()))
+
+    def test_numero_de_plan_de_223111pe012(self):
+        self.assertIn('223111 PE 012', ' '.join(self._ligne_plan(PE012[1], 4).split()))

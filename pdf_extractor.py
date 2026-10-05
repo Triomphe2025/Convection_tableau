@@ -207,18 +207,21 @@ def grille_page(page) -> List[str]:
     for groupe in groupes:
         ligne: List[str] = []
         debut_span: Dict[int, int] = {}
-        fin_prec, x_der_prec = None, None
+        fin_prec, x_der_prec, span_prec = None, None, None
         for x, x_der, texte, span, x_span in sorted(groupe):
             if span not in debut_span:
                 debut_span[span] = round((x_span - x0) / pas_page)
             k = debut_span[span] + round((x - x_span) / pas_page)
             if fin_prec is not None:
                 vide = (x - (x_der_prec + pas_page)) / pas_page
-                k = max(k, fin_prec + (2 if vide >= 0.5 else 1))
+                # Deux mots d'un même span étaient séparés par un espace dans le texte :
+                # en police proportionnelle (pieds « N° PLAN : 6A23111 PE 133 »), cet
+                # espace est plus étroit qu'un demi-pas de page et serait sinon perdu.
+                k = max(k, fin_prec + (2 if vide >= 0.5 or span == span_prec else 1))
             if len(ligne) < k:
                 ligne += [' '] * (k - len(ligne))
             ligne[k:k + len(texte)] = list(texte)
-            fin_prec, x_der_prec = k + len(texte) - 1, x_der
+            fin_prec, x_der_prec, span_prec = k + len(texte) - 1, x_der, span
         sortie.append(''.join(ligne).rstrip())
     return sortie
 
