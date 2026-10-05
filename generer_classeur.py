@@ -303,6 +303,22 @@ def marquer_deduits(ws, ligne_fin: int, meta: Dict, couleur: str) -> int:
     return n
 
 
+def bilan_controle_indice(tous: List[Dict], valides: List[Dict]) -> Optional[str]:
+    """Ligne de journal d'un contrôle INDICE réussi, ou None (échec : voir alertes_pied).
+
+    Un succès doit se voir autant qu'un échec : sans cette ligne, seule l'absence
+    d'alerte disait que le contrôle avait eu lieu.
+    """
+    revisions = {_compact(x) for r in tous
+                 for x in (r.get('metadata') or {}).get('REVISIONS') or []}
+    lus = [str(r.get('metadata', {}).get('INDICE')).strip() for r in valides
+           if r.get('metadata', {}).get('INDICE')]
+    if not revisions or not lus or any(_compact(i) not in revisions for i in lus):
+        return None
+    return (f"contrôle INDICE : OK, {len(lus)} page(s), indices lus : "
+            f"{', '.join(dict.fromkeys(lus))}")
+
+
 def alertes_pied(tous: List[Dict], valides: List[Dict], champs_attendus) -> List[str]:
     """Contrôles du pied, en alerte seulement : aucune valeur n'est complétée ni corrigée."""
     alertes = []
@@ -403,6 +419,9 @@ def generer_excel(
         log(f"  ⚠ {alerte}")
     for alerte in alertes_pied(results, valides, champs_attendus):
         log(f"  ⚠ {alerte}")
+    bilan_indice = bilan_controle_indice(results, valides)
+    if bilan_indice:
+        log(f"  ✓ {bilan_indice}")
 
     total = len(valides)
 

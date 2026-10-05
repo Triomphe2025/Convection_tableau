@@ -797,3 +797,11 @@ Positions fausses sur les pages à vérité des positions, sortie actuelle.
 colonnes 0, 6 et 16 (TENANT) ou 0, 6, 16 (ABOUTISSANT, 2e mot une colonne plus loin dans la
 sortie : (0, 3, 9)). Les autres pages de l'extrait : 0 écart (pages vectorielles 104 et 122a
 mesurées contre la grille du PDF).
+
+## Contrôle INDICE réussi visible au journal (2026-10-05)
+
+`generer_classeur.bilan_controle_indice` : quand des révisions ont été lues et que tous les
+INDICE des pages y figurent, le journal porte « ✓ contrôle INDICE : OK, N page(s), indices lus :
+… » ; un échec reste une alerte ⚠ (INDICE absent des révisions, ou contrôle impossible).
+Rejeu sans API de la conversion des pages de garde (réponses du 2026-10-02) :
+`✓ contrôle INDICE : OK, 2 page(s), indices lus : R, TP3`.

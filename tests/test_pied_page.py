@@ -360,6 +360,36 @@ class TestAlertesPied(unittest.TestCase):
                          ["page 5 : INDICE : désaccord"])
 
 
+class TestBilanControleIndice(unittest.TestCase):
+
+    def _page(self, page, indice):
+        return _page({'PAGE': page, 'INDICE': indice})
+
+    def test_succes_une_ligne_avec_les_indices_lus(self):
+        from generer_classeur import bilan_controle_indice
+        garde = {'success': False, 'metadata': {'REVISIONS': ['01', 'R', 'TP3']}}
+        pages = [self._page('1', 'R'), self._page('14', 'TP3'), self._page('15', 'TP3')]
+        self.assertEqual(bilan_controle_indice([garde] + pages, pages),
+                         "contrôle INDICE : OK, 3 page(s), indices lus : R, TP3")
+
+    def test_echec_pas_de_ligne_de_succes(self):
+        from generer_classeur import bilan_controle_indice
+        garde = {'success': False, 'metadata': {'REVISIONS': ['R']}}
+        pages = [self._page('1', 'R'), self._page('2', 'R7')]
+        self.assertIsNone(bilan_controle_indice([garde] + pages, pages))
+
+    def test_sans_revisions_pas_de_ligne_de_succes(self):
+        from generer_classeur import bilan_controle_indice
+        pages = [self._page('1', 'R')]
+        self.assertIsNone(bilan_controle_indice(pages, pages))
+
+    def test_ligne_ecrite_au_journal(self):
+        tpl = _tpl()
+        garde = {'success': False, 'error': 'non-listing', 'metadata': {'REVISIONS': ['R']}}
+        messages, _ = _excel([garde, self._page('1', 'R')], tpl)
+        self.assertIn('  ✓ contrôle INDICE : OK, 1 page(s), indices lus : R', messages)
+
+
 class TestRenduPiedBrut(unittest.TestCase):
 
     def test_lignes_brutes_dans_les_deux_lignes_du_pied(self):
@@ -495,4 +525,5 @@ class TestGarde223111PE011(unittest.TestCase):
 
     def test_indice_de_la_page_14_dans_les_revisions_sans_alerte(self):
         self.assertEqual(self.page_14['metadata']['INDICE'], 'TP3')
-        self.assertFalse([m for m in self.messages if 'INDICE' in m])
+        self.assertFalse([m for m in self.messages if 'INDICE' in m and '⚠' in m])
+        self.assertIn('  ✓ contrôle INDICE : OK, 1 page(s), indices lus : TP3', self.messages)
