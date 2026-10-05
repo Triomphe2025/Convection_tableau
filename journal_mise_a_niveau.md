@@ -970,3 +970,12 @@ Aucune consigne d'espacement dans le prompt. Les positions seront remises par la
 (boîtes des mots Tesseract) au commit A. Ordre de l'étape 8 maintenu : correction du
 vérificateur, puis commit A. Chiffres de départ (passage réel du 2026-10-05) : 223111PE011 p. 52
 = 120 / 240 ; 6A23111PE133 p. 15 = 112 / 220 ; 223111PE012 p. 39 = 0 / 139.
+
+## Colonnes en trop : compteur gardé dans la campagne (2026-10-05)
+
+Mesure prévue avant le commit A : 0 ligne sur 454 (152 PE011, 155 PE133, 147 PE012) n'a pas le
+nombre de colonnes du modèle. Les points 2 et 3 du message « plus de colonnes » sont en attente.
+`campagne_mesure.lignes_hors_colonnes` compte, à chaque passage, les lignes de tableau des
+réponses brutes (hors TYPE_PAGE, META, PIED_BRUT, LOGO, REVISIONS, SECTION) dont le nombre de
+segments diffère du modèle ; colonnes `lignes_tableau_brutes` et `lignes_hors_colonnes` du CSV
+(ancien en-tête réécrit), 5 premiers exemples affichés (image, segments, ligne brute).

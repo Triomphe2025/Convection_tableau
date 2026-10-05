@@ -47,7 +47,11 @@ COLONNES_CSV = [
     'positions_fausses', 'pieds_faux', 'lignes_manquantes', 'lignes_en_trop',
     'pages_ref_orphelines', 'tokens_entree', 'tokens_sortie', 'cout_usd', 'duree_s',
     'glissement', 'lignes_deplacees', 'alertes_manquantes', 'fausses_alertes', 'controle_indice',
+    'lignes_tableau_brutes', 'lignes_hors_colonnes',
 ]
+# Lignes de la réponse qui ne sont pas des lignes du tableau, même avec un « | ».
+_PREFIXES_HORS_TABLEAU = ('TYPE_PAGE:', 'META:', 'PIED_BRUT:', 'LOGO:', 'REVISIONS:', 'SECTION:')
+_EXEMPLES_HORS_COLONNES = 5
 
 
 def cle_api() -> str:
@@ -115,6 +119,32 @@ def lire_journal(chemin: Path) -> Dict:
         # « non-listing » (page de garde) n'est pas une erreur de conversion.
         if not entree.get('success') and entree.get('error') not in (None, 'non-listing'):
             bilan['erreurs'].append(f"{entree['image']}: {entree['error']}")
+    return bilan
+
+
+def lignes_hors_colonnes(chemin: Path, n_colonnes: int) -> Dict:
+    """Lignes de tableau des réponses brutes au nombre de segments différent du modèle.
+
+    Mesure ce que le parseur doit répartir ou compléter (règle des segments en trop) :
+    exemples = (image, nombre de segments, ligne brute), les premiers rencontrés.
+    """
+    bilan = {'lignes_tableau_brutes': 0, 'lignes_hors_colonnes': 0, 'exemples': []}
+    if not chemin.exists():
+        return bilan
+    for texte in chemin.read_text(encoding='utf-8').splitlines():
+        if not texte.strip():
+            continue
+        entree = json.loads(texte)
+        for ligne in (entree.get('raw') or '').splitlines():
+            ligne = ligne.strip()
+            if '|' not in ligne or ligne.upper().startswith(_PREFIXES_HORS_TABLEAU):
+                continue
+            bilan['lignes_tableau_brutes'] += 1
+            segments = len(ligne.split('|'))
+            if segments != n_colonnes:
+                bilan['lignes_hors_colonnes'] += 1
+                if len(bilan['exemples']) < _EXEMPLES_HORS_COLONNES:
+                    bilan['exemples'].append((entree.get('image', ''), segments, ligne))
     return bilan
 
 
@@ -205,6 +235,8 @@ def executer_passage(pdf: Path, verite: Path, gabarit: str, modele: str, effort:
     duree = time.monotonic() - debut
 
     journal = lire_journal(dossier / f"{pdf.stem}_claude.jsonl")
+    colonnes = lignes_hors_colonnes(dossier / f"{pdf.stem}_claude.jsonl",
+                                    len(TemplateManager().get(gabarit).columns))
     mesures = mesurer_sortie(Path(resultat['excel']), verite, gabarit, pdf=pdf,
                              journal=journal_conversion)
     return {
@@ -222,7 +254,10 @@ def executer_passage(pdf: Path, verite: Path, gabarit: str, modele: str, effort:
         'tokens_sortie': journal['tokens_sortie'],
         'cout_usd': round(cout_usd(modele, journal['tokens_entree'], journal['tokens_sortie']), 4),
         'duree_s': round(duree, 1),
+        'lignes_tableau_brutes': colonnes['lignes_tableau_brutes'],
+        'lignes_hors_colonnes': colonnes['lignes_hors_colonnes'],
         '_ids': journal['ids'],
+        '_exemples_hors_colonnes': colonnes['exemples'],
     }
 
 
@@ -311,6 +346,10 @@ def lancer_campagne(modele: str, effort: str, passages: int, pdf: Path, verite: 
             f"cellule(s) fausse(s), {ligne['cout_usd']:.4f} $, {ligne['duree_s']} s"
             + (f", ERREURS : {ligne['erreurs']}" if ligne['erreurs'] else '')
         )
+        afficher(f"  → lignes de tableau brutes : {ligne['lignes_tableau_brutes']}, au mauvais "
+                 f"nombre de colonnes : {ligne['lignes_hors_colonnes']}")
+        for image, segments, brute in ligne['_exemples_hors_colonnes']:
+            afficher(f"     {image} — {segments} segments : {brute}")
     return lignes
 
 

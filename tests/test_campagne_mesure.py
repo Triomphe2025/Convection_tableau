@@ -38,6 +38,7 @@ class FauxAnthropic:
 
     requetes = []
     identifiant_fixe = None
+    texte = TEXTE_FAUX
 
     def __init__(self, api_key=None):
         self.messages = SimpleNamespace(create=self._create)
@@ -47,7 +48,7 @@ class FauxAnthropic:
         ident = FauxAnthropic.identifiant_fixe or f"msg_faux_{len(FauxAnthropic.requetes)}"
         return SimpleNamespace(
             id=ident,
-            content=[SimpleNamespace(type='text', text=TEXTE_FAUX)],
+            content=[SimpleNamespace(type='text', text=FauxAnthropic.texte)],
             stop_reason='end_turn', model=kwargs['model'],
             usage=SimpleNamespace(input_tokens=1000, output_tokens=500,
                                   cache_read_input_tokens=0, cache_creation_input_tokens=0),
@@ -70,6 +71,7 @@ class _BaseCampagne(unittest.TestCase):
     def setUp(self):
         FauxAnthropic.requetes = []
         FauxAnthropic.identifiant_fixe = None
+        FauxAnthropic.texte = TEXTE_FAUX
         self._tmp = tempfile.TemporaryDirectory()
         self.dossier = Path(self._tmp.name)
         self.pdf = _pdf_deux_pages(self.dossier)
@@ -107,6 +109,18 @@ class TestLancerCampagne(_BaseCampagne):
         for colonne in ('cellules_fausses', 'positions_fausses', 'pieds_faux',
                         'lignes_manquantes', 'lignes_en_trop', 'duree_s'):
             float(ligne[colonne])
+
+    def test_compteur_de_colonnes_a_zero(self):
+        ligne = self._campagne()[0]
+        self.assertEqual((ligne['lignes_tableau_brutes'], ligne['lignes_hors_colonnes']), (1, 0))
+
+    def test_ligne_a_5_segments_comptee_et_citee(self):
+        FauxAnthropic.texte = TEXTE_FAUX.replace('| PH ACC/A 01', '| PH ACC | A 01')
+        ligne = self._campagne()[0]
+        self.assertEqual(ligne['lignes_hors_colonnes'], 1)
+        self.assertTrue(any('5 segments' in m and 'PH ACC | A 01' in m for m in self.messages))
+        with open(self.racine / cm.NOM_CSV, encoding='utf-8') as f:
+            self.assertEqual(next(csv.DictReader(f))['lignes_hors_colonnes'], '1')
 
     def test_passage_range_dans_son_dossier(self):
         self._campagne(passages=2)
@@ -229,6 +243,40 @@ class TestLireJournal(unittest.TestCase):
 
     def test_journal_absent(self):
         self.assertEqual(cm.lire_journal(Path('absent.jsonl'))['pages_envoyees'], 0)
+
+
+class TestLignesHorsColonnes(unittest.TestCase):
+
+    def _journal(self, *entrees):
+        import json
+        self._tmp = tempfile.TemporaryDirectory()
+        chemin = Path(self._tmp.name) / 'x_claude.jsonl'
+        chemin.write_text(''.join(json.dumps(e) + '\n' for e in entrees), encoding='utf-8')
+        return chemin
+
+    def tearDown(self):
+        if hasattr(self, '_tmp'):
+            self._tmp.cleanup()
+
+    def test_compte_et_exemples(self):
+        brut = '\n'.join(['TYPE_PAGE: listing', 'A | B | C | D', 'A | B | C', 'A | B | C | D | E',
+                          'SECTION: NOM DU CABLE : X', 'META: {"PAGE": "1"}',
+                          'PIED_BRUT: NO PLAN : P | INDICE : R | PAGE : 1', 'LOGO: M A T R A'])
+        bilan = cm.lignes_hors_colonnes(self._journal({'image': 'p1.png', 'raw': brut}), 4)
+        self.assertEqual((bilan['lignes_tableau_brutes'], bilan['lignes_hors_colonnes']), (3, 2))
+        self.assertEqual(bilan['exemples'], [('p1.png', 3, 'A | B | C'),
+                                             ('p1.png', 5, 'A | B | C | D | E')])
+
+    def test_cinq_exemples_au_plus(self):
+        brut = '\n'.join(['X | Y'] * 8)
+        bilan = cm.lignes_hors_colonnes(self._journal({'image': 'p.png', 'raw': brut}), 4)
+        self.assertEqual((bilan['lignes_hors_colonnes'], len(bilan['exemples'])), (8, 5))
+
+    def test_journal_absent_ou_sans_reponse(self):
+        self.assertEqual(cm.lignes_hors_colonnes(Path('absent.jsonl'), 4)['lignes_tableau_brutes'],
+                         0)
+        bilan = cm.lignes_hors_colonnes(self._journal({'image': 'p.png', 'error': 'x'}), 4)
+        self.assertEqual(bilan['lignes_tableau_brutes'], 0)
 
 
 class TestAjouterLigneCsv(unittest.TestCase):
