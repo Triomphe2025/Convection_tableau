@@ -362,9 +362,11 @@ class TestPositionsContrePdf(unittest.TestCase):
         rapport = mp.mesurer(verite, converti, colonnes)
         mpr.positions_contre_pdf(rapport, converti, self.FIX / '223111PE011_extrait_10pages.pdf',
                                  colonnes)
-        # v1.7 a perdu la page 104 : seule 122a (page 9 du PDF) est appariée.
+        # v1.7 a perdu la page 104 : seule 122a (page 9 du PDF) est appariée, sans écart.
         self.assertEqual(rapport.pages_positions_geometriques, [(8, 7)])
-        self.assertEqual(rapport.ecarts_positions, [])
+        self.assertEqual([e for e in rapport.ecarts_positions if e.page_conv == 7], [])
+        # Page 52 (scan) : mesurée contre la feuille Verite_positions, pas contre le PDF.
+        self.assertEqual({e.page_ref for e in rapport.ecarts_positions}, {4})
 
     def test_pe137_chaine_complete_puis_espace_retire_retrouve(self):
         import contextlib
@@ -489,7 +491,38 @@ class TestVeritePositions(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, self.assertRaises(ValueError):
             mpr.lire_verite_excel(self._verite(tmp, [(1, 9, 'TENANT', 1, 1)]))
 
+    def test_mot_de_controle_conforme(self):
+        avec_mot = [(1, '7', 1, 'TENANT', 2, 4, 'QTEL2')]
+        with tempfile.TemporaryDirectory() as tmp:
+            chemin = self._verite(tmp, avec_mot, entete=('Page extrait', 'Page document', 'Ligne',
+                                                         'Colonne', 'Sous-champ', 'Debut',
+                                                         'Mot (controle)'))
+            verite, _ = mpr.lire_verite_excel(chemin)
+        self.assertEqual(verite[0]['rows'][0]['positions'], {'TENANT': (4,)})
+
+    def test_mot_de_controle_different_signale_comme_erreur_de_saisie(self):
+        mauvais = [(1, '7', 1, 'TENANT', 2, 4, 'QTEL2'), (1, '7', 2, 'TENANT', 3, 12, '09')]
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaises(ValueError) as erreur:
+            mpr.lire_verite_excel(self._verite(tmp, mauvais, entete=(
+                'Page extrait', 'Page document', 'Ligne', 'Colonne', 'Sous-champ', 'Debut',
+                'Mot (controle)')))
+        self.assertIn("ligne 3", str(erreur.exception))
+        self.assertIn("Mot '09', Verite_tableaux '10'", str(erreur.exception))
+
     def test_colonne_de_feuille_manquante(self):
         with tempfile.TemporaryDirectory() as tmp, self.assertRaises(ValueError) as erreur:
             mpr.lire_verite_excel(self._verite(tmp, [], entete=('Page', 'Ligne', 'Colonne')))
         self.assertIn('sous-champ', str(erreur.exception))
+
+
+class TestVeritePositionsExtrait223111PE011(unittest.TestCase):
+    """Feuille Verite_positions de la vérité validée : page 52, saisie contrôlée par « Mot »."""
+
+    def test_page_52_lue_mots_de_controle_conformes(self):
+        verite, colonnes = mpr.lire_verite_excel(
+            Path(__file__).parent / 'fixtures' / '223111PE011_extrait_verite.xlsx')
+        avec = [k for k, p in enumerate(verite) if any(r.get('positions') for r in p['rows'])]
+        self.assertEqual(avec, [4])
+        lignes = [r for r in verite[4]['rows'] if r.get('positions')]
+        self.assertEqual(len(lignes), 60)
+        self.assertEqual(lignes[0]['positions']['TENANT'], (0, 6, 16))

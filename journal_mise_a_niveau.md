@@ -754,3 +754,30 @@ Inchangé, et c'est attendu : PE137 n'a qu'une cellule en retrait (« AAG 22-24 
 pages TP2, et la chaîne grille → Excel la recopie à l'identique. Tests : un retrait d'une seule
 cellule est détecté ; un retrait commun à toute la colonne ne l'est pas (même colonne 0) ;
 tests dorés des étapes 3 et 4 identiques.
+
+## Vérités des positions copiées dans les vérités validées (2026-10-05)
+
+Source : `tests/fixtures/*_extrait_verite_positions.xlsx` (fournis). Feuille `Verite_positions`
+copiée telle quelle (valeurs, largeurs, en-tête) dans la vérité validée de chaque extrait ;
+empreinte des autres feuilles (valeurs, couleurs, commentaires, fusions, largeurs, validations,
+mises en forme conditionnelles, images) identique avant / après ; copie refaite à l'identique
+ligne à ligne.
+
+| Extrait | Page | Positions | Cellules | Contrôle « Mot » |
+|---------|------|-----------|----------|------------------|
+| 223111PE011 | 52 | 549 | 240 (60 lignes) | 0 désaccord |
+| 6A23111PE133 | 15 | 467 | 220 (56 lignes) | 0 désaccord |
+| 223111PE012 | 39 | 211 | 140 (44 lignes) | 0 désaccord |
+
+Contrôles avant copie : le mot de chaque ligne est bien le n-ième mot de la cellule visée dans
+`Verite_tableaux`, chaque cellule saisie a tous ses mots, les débuts croissent d'un sous-champ au
+suivant — aucune erreur de saisie à signaler. La lecture vérifie désormais « Mot » à chaque fois
+(désaccord = erreur de saisie, citée avec sa ligne de feuille) et prend la page dans « Page
+extrait » quand la feuille a aussi « Page document ».
+
+Les vérités de 223111PE012 et 6A23111PE133 sont modifiées sur le disque mais **non commitées** :
+elles restent hors de git avec le reste de leur jeu d'essai, en attendant leur intégration.
+
+Effets sur les tests : le thermomètre retire les positions de sa référence (il éprouve les
+fautes de contenu) ; la sortie v1.7 figée montre maintenant **120 écarts de position sur la page
+52** (lecture Tesseract à un espace), première mesure réelle sur un scan.

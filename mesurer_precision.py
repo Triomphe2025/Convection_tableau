@@ -187,7 +187,9 @@ def _attacher_positions(ws, lignes_par_page: dict, colonnes: List[str]) -> None:
     cellule, à partir de 1), début (colonne du 1er caractère du sous-champ, la colonne 0
     étant le caractère le plus à gauche de cette colonne du tableau sur la page).
     Saisie humaine (jamais tirée d'un OCR) : une page, une ligne ou une colonne
-    inconnue est une erreur de saisie, signalée avec sa ligne dans la feuille.
+    inconnue est une erreur de saisie, signalée avec sa ligne dans la feuille. Colonne
+    facultative « Mot » : le mot attendu, qui doit être le n-ième mot de la cellule visée
+    dans Verite_tableaux ; un désaccord est une erreur de saisie, pas un écart de conversion.
     """
     entetes = {_cle_entete(c.value): k for k, c in enumerate(next(ws.iter_rows(max_row=1)))}
     requis = {'page': 'page', 'ligne': 'ligne', 'colonne': 'colonne',
@@ -197,6 +199,10 @@ def _attacher_positions(ws, lignes_par_page: dict, colonnes: List[str]) -> None:
     if manquants:
         raise ValueError(f"Verite_positions : colonne(s) absente(s) : {', '.join(manquants)}")
     index = {cle: next(k for e, k in entetes.items() if e.startswith(cle)) for cle in requis}
+    # « Page extrait », comme la 1re colonne de Verite_tableaux, plutôt que « Page document ».
+    index['page'] = entetes.get('pageextrait', index['page'])
+    i_mot = next((k for e, k in entetes.items() if e.startswith('mot')), None)
+    desaccords = []
     debuts: dict = {}
     for num, row in enumerate(ws.iter_rows(min_row=2), start=2):
         v = [c.value for c in row]
@@ -210,8 +216,19 @@ def _attacher_positions(ws, lignes_par_page: dict, colonnes: List[str]) -> None:
         if cible is None:
             raise ValueError(f"Verite_positions ligne {num} : page {page} ligne {ligne} "
                              "absente de Verite_tableaux")
-        debuts.setdefault((id(cible), colonne), (cible, {}))[1][
-            int(v[index['souschamp']])] = int(v[index['debut']])
+        sous_champ = int(v[index['souschamp']])
+        if i_mot is not None and v[i_mot] not in (None, ''):
+            mots = cible['cells'][colonnes.index(colonne)].split()
+            lu = mots[sous_champ - 1] if 0 < sous_champ <= len(mots) else None
+            if str(lu) != str(v[i_mot]):
+                desaccords.append(f"ligne {num} (page {page}, ligne {ligne}, {colonne}, "
+                                  f"sous-champ {sous_champ}) : Mot {v[i_mot]!r}, "
+                                  f"Verite_tableaux {lu!r}")
+        debuts.setdefault((id(cible), colonne), (cible, {}))[1][sous_champ] = int(
+            v[index['debut']])
+    if desaccords:
+        raise ValueError("Verite_positions : erreur(s) de saisie, mot de contrôle différent "
+                         "de Verite_tableaux :\n" + '\n'.join(desaccords))
     for (_, colonne), (cible, par_mot) in debuts.items():
         cible.setdefault('positions', {})[colonne] = tuple(par_mot[k] for k in sorted(par_mot))
 

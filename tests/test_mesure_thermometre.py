@@ -105,6 +105,12 @@ class TestThermometre(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.verite, cls.colonnes = lire_verite_excel(VERITE)
+        # Le thermomètre éprouve les fautes de CONTENU : les positions saisies à la main
+        # (feuille Verite_positions, page 52) sont retirées de la référence, sinon les
+        # espacements d'origine absents de la copie seraient comptés comme des fautes.
+        for page in cls.verite:
+            for ligne in page['rows']:
+                ligne.pop('positions', None)
         avant = copy.deepcopy(cls.verite)
         cls.fautive, cls.attendu = _injecter(cls.verite, GRAINE)
         assert cls.verite == avant, "la vérité ne doit pas être modifiée"
