@@ -861,3 +861,23 @@ Effets : pages de garde et de modifications enfin lisibles (« Voir détail hist
 modifs » au lieu de « Voirdétailhistoriquedesmodifs ») ; pieds vectoriels de PE133 : 2 → 0
 pieds faux ; PE012 : N° PLAN lu « 223111 PE 012 » comme imprimé. Pages de tableau : tests dorés
 identiques (PE137 TP2, extrait), 907 tests verts.
+
+## Décision B1 — pied livré (2026-10-05)
+
+`generer_classeur.pied_livre`, après la déduction des champs constants et avant les alertes ;
+la lecture (`metadata`, `PIED_BRUT` du journal Claude) reste telle qu'imprimée.
+- Libellés du modèle de sortie, valeurs lues : « PET : » → « P.E.T. : », « N° PLAN » → libellé du
+  format du modèle (REPARTITEUR et Bornier standard : « NO PLAN » ; REPARTITEUR 2 :
+  « N° PLAN »). **À trancher** : ton exemple écrit « N°PLAN » ; aucun modèle ne l'écrit ainsi —
+  il suffit de changer le format du modèle dans l'éditeur si tu le veux.
+- N° PLAN sans espaces seulement si les pages l'impriment avec des espacements différents :
+  PE012 (« 223 111 PE 012 » / « 223111 PE 012 ») → « 223111PE012 » ; PE133 (toujours
+  « 6A23111 PE 133 ») inchangé ; **PE137 aussi normalisé** (« 223400 PE 137 » sur les pages TP2,
+  « 223400PE137 » ailleurs → « 223400PE137 »). Une ligne d'information au journal.
+- PAGE : si aucune page de tableau n'en porte, numérotation 1…n dans l'ordre, ajoutée en fin de
+  dernière ligne du pied, cellule colorée « déduit » avec le commentaire « non imprimée :
+  numérotée dans l'ordre des pages de tableau », une seule alerte « PAGE non imprimée dans tout
+  le document : pages numérotées dans l'ordre » ; plus d'alerte « numéro de page illisible » ni
+  « PAGE absent ». Si certaines pages en portent : rien n'est déduit (alertes inchangées).
+- Tests mis à jour : pied de PE137 (libellé du modèle, N° PLAN normalisé) ; étape 6, numéro
+  jamais tiré du nom d'image (la page seule est numérotée « 1 »). Tests dorés identiques.

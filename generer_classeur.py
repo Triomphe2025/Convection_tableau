@@ -287,17 +287,72 @@ def deduire_champs_constants(valides: List[Dict], champs, libelles: Dict[str, st
     return resultats, alertes
 
 
+ALERTE_PAGE_NUMEROTEE = ("PAGE non imprimée dans tout le document : "
+                         "pages numérotées dans l'ordre")
+
+
+def pied_livre(valides: List[Dict], formats) -> Tuple[List[Dict], List[str]]:
+    """Pied de l'Excel livré ; la lecture (metadata d'origine) reste telle qu'imprimée.
+
+    - libellés du modèle de sortie (« P.E.T. », « N° PLAN »), valeurs lues ;
+    - N° PLAN sans espaces si les pages l'impriment avec des espacements différents ;
+    - si AUCUNE page de tableau ne porte de numéro : pages numérotées dans l'ordre,
+      cellule « déduit », une seule ligne au journal ; sinon rien n'est déduit.
+    Renvoie (résultats, lignes de journal) ; les résultats reçus ne sont pas modifiés.
+    """
+    from pied_page import inserer_valeur, libelles_modele, remplacer_libelles, remplacer_valeur
+    libelles = libelles_modele(formats)
+    resultats = [dict(r, metadata=dict(r.get('metadata') or {})) for r in valides]
+    journal: List[str] = []
+    for r in resultats:
+        if r['metadata'].get('PIED_BRUT'):
+            r['metadata']['PIED_BRUT'] = remplacer_libelles(r['metadata']['PIED_BRUT'], libelles)
+
+    plans = [r['metadata']['NO_PLAN'] for r in resultats if r['metadata'].get('NO_PLAN')]
+    if len({_compact(p) for p in plans}) == 1 and len(set(plans)) > 1:
+        livre = _compact(plans[0])
+        for r in resultats:
+            meta = r['metadata']
+            if meta.get('NO_PLAN'):
+                meta['NO_PLAN'] = livre
+                if meta.get('PIED_BRUT'):
+                    meta['PIED_BRUT'] = remplacer_valeur(meta['PIED_BRUT'], 'NO_PLAN', livre)
+        journal.append(f"  N° PLAN livré sans espaces : {livre} (imprimé "
+                       f"{' / '.join(dict.fromkeys(plans))})")
+
+    if resultats and not any(str(r['metadata'].get('PAGE', '')).strip() for r in resultats):
+        etiquette = libelles.get('PAGE', 'PAGE')
+        for rang, r in enumerate(resultats, start=1):
+            meta = r['metadata']
+            meta['PAGE'] = str(rang)
+            meta['DEDUITS'] = list(meta.get('DEDUITS') or []) + ['PAGE']
+            meta['COMMENTAIRES_DEDUITS'] = dict(
+                meta.get('COMMENTAIRES_DEDUITS') or {},
+                PAGE=f"PAGE : {rang}, non imprimée : numérotée dans l'ordre des pages de tableau")
+            meta['REPERES_DEDUITS'] = dict(meta.get('REPERES_DEDUITS') or {},
+                                           PAGE=f"{etiquette} : {rang}")
+            if meta.get('PIED_BRUT'):
+                meta['PIED_BRUT'] = inserer_valeur(meta['PIED_BRUT'], 'PAGE', etiquette,
+                                                   str(rang), en_fin=True)
+        journal.append(f"⚠ {ALERTE_PAGE_NUMEROTEE}")
+    return resultats, journal
+
+
 def marquer_deduits(ws, ligne_fin: int, meta: Dict, couleur: str) -> int:
     """Colore et commente les lignes de pied (2 dernières du bloc) portant une valeur déduite."""
     n = 0
     for cle in meta.get('DEDUITS') or []:
         valeur = str(meta.get(cle, ''))
+        # Repère « PAGE : 3 » plutôt que « 3 », qui figure aussi dans le N° PLAN.
+        repere = (meta.get('REPERES_DEDUITS') or {}).get(cle, valeur)
+        motif = r'\s*'.join(re.escape(m) for m in repere.split())
+        commentaire = (meta.get('COMMENTAIRES_DEDUITS') or {}).get(
+            cle, f"{cle} : {valeur}, déduit des autres pages du document")
         for ligne in (ligne_fin - 2, ligne_fin - 1):
             cellule = ws.cell(row=ligne, column=2)
-            if isinstance(cellule.value, str) and valeur and valeur in cellule.value:
+            if isinstance(cellule.value, str) and motif and re.search(motif, cellule.value):
                 cellule.fill = PatternFill('solid', fgColor=couleur)
-                cellule.comment = Comment(f"{cle} : {valeur}, déduit des autres pages du "
-                                          "document", 'TriosSeconverter')
+                cellule.comment = Comment(commentaire, 'TriosSeconverter')
                 n += 1
                 break
     return n
@@ -406,16 +461,20 @@ def generer_excel(
             continue
         valides.append(r)
 
-    # Ordre du document conservé, numéros tels que lus : un tri ou un numéro
-    # tiré du nom d'image masquerait une page manquante ou mal lue.
-    for alerte in alertes_sequence_pages(valides):
-        log(f"  ⚠ {alerte}")
     champs_attendus = [fd.get('key', '') for fd in extractor._tpl.footer_extract_fields]
     libelles = {fd.get('key', '').upper(): fd.get('label', '')
                 for fd in extractor._tpl.footer_extract_fields}
     valides, alertes_deduction = deduire_champs_constants(
         valides, champs_constants(extractor._tpl.name), libelles)
     for alerte in alertes_deduction:
+        log(f"  ⚠ {alerte}")
+    valides, lignes_livre = pied_livre(
+        valides, [extractor._tpl.footer_row1_format, extractor._tpl.footer_row2_format])
+    for ligne in lignes_livre:
+        log(f"  {ligne.strip()}")
+    # Ordre du document conservé, numéros tels que lus (ou numérotés ci-dessus quand
+    # aucune page n'en porte) : un tri masquerait une page manquante ou mal lue.
+    for alerte in alertes_sequence_pages(valides):
         log(f"  ⚠ {alerte}")
     for alerte in alertes_pied(results, valides, champs_attendus):
         log(f"  ⚠ {alerte}")

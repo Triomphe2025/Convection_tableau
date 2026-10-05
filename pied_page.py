@@ -177,11 +177,54 @@ def analyser_pied(lignes: Iterable[str],
     return meta
 
 
-def inserer_valeur(lignes: List[str], cle: str, libelle: str, valeur: str) -> List[str]:
-    """Lignes du pied avec la valeur posée après son libellé vide, ou ajoutée en fin de 1re ligne.
+def libelles_modele(formats: Iterable[str]) -> Dict[str, str]:
+    """Libellé de chaque clé dans les formats de pied du modèle de sortie (« N° PLAN »)."""
+    libelles: Dict[str, str] = {}
+    for fmt in formats:
+        for m in re.finditer(r'([^\s{}|:][^{}|:]*?)\s*:\s*\{(\w+)', fmt or ''):
+            libelles.setdefault(m.group(2).upper(), ' '.join(m.group(1).split()))
+    return libelles
 
-    Sert à afficher une valeur reprise des autres pages : le reste des lignes
-    brutes est inchangé.
+
+def remplacer_libelles(lignes: List[str], libelles: Dict[str, str]) -> List[str]:
+    """Libellés imprimés remplacés par ceux du modèle de sortie ; valeurs inchangées."""
+    sortie = []
+    for ligne in lignes:
+        morceaux, debut = [], 0
+        for m in _LIBELLE_RE.finditer(ligne):
+            cle = cle_libelle(m.group(1))
+            if cle in libelles:
+                morceaux += [ligne[debut:m.start(1)], libelles[cle]]
+                debut = m.end(1)
+        sortie.append(''.join(morceaux) + ligne[debut:])
+    return sortie
+
+
+def remplacer_valeur(lignes: List[str], cle: str, valeur: str) -> List[str]:
+    """Valeur d'un libellé remplacée (jusqu'au libellé ou au « | » suivant) ; reste inchangé."""
+    sortie = list(lignes)
+    for i, ligne in enumerate(sortie):
+        trouves = list(_LIBELLE_RE.finditer(ligne))
+        for k, m in enumerate(trouves):
+            if cle_libelle(m.group(1)) != cle:
+                continue
+            fin = trouves[k + 1].start() if k + 1 < len(trouves) else len(ligne)
+            segment = ligne[m.end():fin].split('|')[0]
+            ancienne = segment.strip()
+            if ancienne:
+                depart = m.end() + segment.index(ancienne)
+                sortie[i] = ligne[:depart] + valeur + ligne[depart + len(ancienne):]
+            return sortie
+    return sortie
+
+
+def inserer_valeur(lignes: List[str], cle: str, libelle: str, valeur: str,
+                   en_fin: bool = False) -> List[str]:
+    """Lignes du pied avec la valeur posée après son libellé vide, ou ajoutée en fin de ligne.
+
+    Sert à afficher une valeur reprise ou numérotée : le reste des lignes brutes est
+    inchangé. Ajout en fin de 1re ligne, ou de la dernière avec en_fin (PAGE, qui
+    suit N° PLAN et INDICE).
     """
     lignes = list(lignes)
     for i, ligne in enumerate(lignes):
@@ -192,7 +235,8 @@ def inserer_valeur(lignes: List[str], cle: str, libelle: str, valeur: str) -> Li
     ajout = f"{libelle} : {valeur}"
     if not lignes:
         return [ajout]
-    lignes[0] = f"{lignes[0]}     {ajout}"
+    k = -1 if en_fin else 0
+    lignes[k] = f"{lignes[k]}     {ajout}"
     return lignes
 
 

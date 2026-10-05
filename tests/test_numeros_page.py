@@ -122,7 +122,10 @@ class TestGenererExcelOrdreEtNumeros(unittest.TestCase):
         pied_page = [v.split('PAGE', 1)[1] for v in valeurs if 'PAGE' in v]
         self.assertTrue(pied_page)
         self.assertFalse(any('57' in v for v in pied_page))
-        self.assertTrue(any('illisible' in m for m in messages))
+        # Décision B1 : aucune page numérotée → numérotation dans l'ordre (« 1 »), une
+        # seule ligne au journal, jamais le numéro du nom d'image.
+        self.assertTrue(any(v.split()[-1] == '1' for v in pied_page))
+        self.assertTrue(any('PAGE non imprimée dans tout le document' in m for m in messages))
 
 
 class TestLectureSuffixe(unittest.TestCase):

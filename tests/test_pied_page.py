@@ -188,8 +188,11 @@ class TestPE137PiedsIdentiquesALOriginal(unittest.TestCase):
     def test_pied_de_l_excel_recopie_du_pdf(self):
         pieds = [c for c in self.cellules if 'INDICE' in c]
         self.assertEqual(len(pieds), 48)
+        # Décision B1 : libellés du modèle de sortie (REPARTITEUR : « NO PLAN »), valeurs lues ;
+        # N° PLAN imprimé « 223400 PE 137 » (pages TP2) et « 223400PE137 » : livré sans espaces.
         for (resultat, _), pied in zip(self.pages, pieds):
-            self.assertEqual(pied, resultat['metadata']['PIED_BRUT'][-1])
+            attendu = resultat['metadata']['PIED_BRUT'][-1].replace('N° PLAN', 'NO PLAN')
+            self.assertEqual(pied, re.sub(r'223400 PE 137', '223400PE137', attendu))
 
     def test_bornier_absent_une_ligne_et_non_48(self):
         lignes = [m for m in self.messages if 'BORNIER' in m]
