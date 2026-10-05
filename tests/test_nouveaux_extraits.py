@@ -136,13 +136,10 @@ def _vectorielles(cas):
 class TestPagesVectorielles(unittest.TestCase):
     """Pages vectorielles (sans OCR) contre la vérité : contenu, sections, positions."""
 
-    def test_6a23111pe133_seules_les_4_coquilles_o1a(self):
+    def test_6a23111pe133_aucun_ecart_de_tableau(self):
+        # Décision B3 : les 4 coquilles O1A de la p. 8 sont corrigées dans l'Excel.
         rapport = _vectorielles(PE133)
-        self.assertEqual(sorted((e.colonne, e.valeur_ref, e.valeur_conv)
-                                for e in rapport.ecarts_cellules),
-                         [('ABOUTISSANT', 'D62T 01A', 'D62T O1A'),
-                          ('TENANT', 'D3T 01A', 'D3T O1A'), ('TENANT', 'D3T 01B', 'D3T O1B'),
-                          ('TENANT', 'D6T 01B', 'D6T O1B')])
+        self.assertEqual(rapport.ecarts_cellules, [])
         self.assertEqual(rapport.lignes_orphelines, [])
         self.assertEqual(rapport.ecarts_positions, [])
 

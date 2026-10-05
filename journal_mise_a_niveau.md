@@ -891,3 +891,16 @@ Aucun changement de code : la vérification passe telle quelle (7 tests, `tests/
   → « M A T R A » dans l'Excel ; logo vertical recopié dans le pied sans ligne LOGO → « M A T R A ».
 - Aucune forme n'est convertie en l'autre (« MATRA », « S I E M E N S » gardés tels que lus) : la
   forme finale sur les scans dépend donc de ce que Claude recopie — à lire au passage réel.
+
+## Décision B3 — coquille O/0 dans le numéro de borne (2026-10-05)
+
+`generer_classeur.corriger_coquilles_o`, à la génération de l'Excel (lecture et journal Claude
+inchangés, `ocr_processor.py` non modifié) : dans TENANT, ABOUTISSANT ou BORNE, une cellule de
+deux mots dont le 2e est `O\d{1,2}[A-Z]?` prend un 0 à la place du O ; cellule orange
+(`COULEUR_CORRIGE`), commentaire « corrigé : l'original porte O1A », une ligne ⚠ par cellule
+« page 18, ligne 3, TENANT : Corrigé O → 0 : l'original porte « D3T O1A » ». S'applique à tous
+les modes (la coquille est dans l'original, pas dans la lecture).
+- 6A23111PE133 p. 8 : les 4 cellules (lignes 3, 4, 8, 24) corrigées et signalées ; les 4 alertes
+  de la feuille Alertes_attendues émises ; pages vectorielles PE133 : **0 écart** (4 avant).
+- Inchangés : « OC21-37 », « QG 09 », « 0VG (EAS) », un O ailleurs qu'en 2e mot, en SIGNAL ou JAR.
+- Instantané de non-régression et tests dorés identiques ; 941 tests passent.

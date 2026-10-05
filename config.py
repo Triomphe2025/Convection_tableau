@@ -145,6 +145,14 @@ class Config:
     # (bleu clair, distinct du jaune « confiance basse » et du rouge « ?? »).
     COULEUR_DEDUIT = "DDEBF7"
 
+    # Coquille de l'original (lettre O tapée pour un zéro dans « D3T O1A ») : corrigée
+    # dans l'Excel livré, seulement dans le numéro de borne (2e mot) de ces colonnes ;
+    # « OC21-37 », « 0VG (EAS) » ou un O ailleurs restent tels quels.
+    CORRECTION_O_COLONNES = ("TENANT", "ABOUTISSANT", "BORNE")
+    CORRECTION_O_MOTIF = r"O\d{1,2}[A-Z]?"
+    # Orange clair, distinct du bleu « déduit », du jaune et du rouge « ?? ».
+    COULEUR_CORRIGE = "F8CBAD"
+
     # Nombre max de colonnes de template affectées automatiquement.
     # Au-delà, l'affectation automatique par frontières pixel devient peu
     # fiable — un mapping manuel est demandé à l'utilisateur (si un callback

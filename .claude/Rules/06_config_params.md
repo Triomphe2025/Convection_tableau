@@ -104,6 +104,14 @@ le calibrage déjà fait sur `verificateur.py`.
 | `MESURE_MOT_SECTION` | `NOM DU CABLE` | Ligne de section du tableau, comparée texte entier (vérité et Excel livré) |
 | `MESURE_LIBELLES_A_COMPLEMENT` | `("TYPE",)` | Libellés de pied suivis d'un complément en texte libre, comparé comme un champ à part au « Complement » d'une vérité |
 
+## Coquille O/0 du numéro de borne (décision B3)
+
+| Paramètre | Valeur défaut | Rôle |
+|-----------|--------------|------|
+| `CORRECTION_O_COLONNES` | `("TENANT", "ABOUTISSANT", "BORNE")` | Colonnes où le 2e mot (numéro de borne) est examiné |
+| `CORRECTION_O_MOTIF` | `O\d{1,2}[A-Z]?` | Forme d'une coquille : le O initial devient 0 |
+| `COULEUR_CORRIGE` | `F8CBAD` | Fond orange de la cellule corrigée (commentaire « corrigé : l'original porte O1A ») |
+
 ## Ajouter un nouveau paramètre
 
 1. Ajouter dans `Config` (class dans config.py) avec valeur par défaut

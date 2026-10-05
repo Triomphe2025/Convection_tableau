@@ -68,6 +68,7 @@ tests/
   test_non_regression_xlsx.py        → Le .xlsx du pipeline reste identique à l'instantané d'avant
   test_mesure_precision.py           → mesure_precision.py, une classe par fonction publique, dicts fabriqués
   test_mesurer_precision.py          → mesurer_precision.py (lecture xlsx/vérité/PDF, CSV, CLI), fichiers fabriqués
+  test_coquille_o.py                 → Décision B3 : coquille O/0 du numéro de borne (2e mot de TENANT, ABOUTISSANT, BORNE), 4 cellules de 6A23111PE133 p. 8, cas inchangés, cellule orange, alertes attendues
   test_logo_pe012.py                 → Décision B2 : logo tel qu'imprimé sur 223111PE012, « SIEMENS » collé (grille), « M A T R A » espacé (réponses Claude fabriquées), jusqu'à l'Excel
   test_pied_livre.py                 → Décision B1 : N° PLAN livré sans espaces si espacements différents, pages numérotées si aucune ne l'est (« déduit », une ligne au journal), libellés du modèle de sortie
   test_nouveaux_extraits.py          → 6A23111PE133 et 223111PE012 : routage contre la feuille « Pages », image bornée (mediabox géante), lecture des vérités (sections, pied à deux niveaux, alertes, garde), pages vectorielles
@@ -84,7 +85,7 @@ tests/
   test_claude_opus5.py               → claude_ocr sur Opus 5 / 5.5 : table de capacités, paramètres envoyés, refus avec catégorie, bloc de réflexion, effort refusé, images PNG ≤ 2576 px
 ```
 
-**929 tests passent** (`pytest tests\`, relevé le 2026-10-05), aucun échec attendu, plus 1 test lent
+**941 tests passent** (`pytest tests\`, relevé le 2026-10-05), aucun échec attendu, plus 1 test lent
 facultatif (`VERIF_TEST_LENT=1`, relecture du scan de 15 pages, ~30 s). Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.
 

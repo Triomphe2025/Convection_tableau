@@ -338,6 +338,66 @@ def pied_livre(valides: List[Dict], formats) -> Tuple[List[Dict], List[str]]:
     return resultats, journal
 
 
+def corriger_numero_borne(valeur: str) -> Tuple[str, Optional[str]]:
+    """(valeur, sous-champ d'origine) avec le O du 2e mot changé en 0 si c'est une coquille.
+
+    Seul un numéro de borne en 2e et dernier mot (« D3T O1A ») est concerné ; sans
+    coquille, (valeur inchangée, None).
+    """
+    mots = list(re.finditer(r'\S+', valeur or ''))
+    if len(mots) != 2 or not re.fullmatch(Config.CORRECTION_O_MOTIF, mots[1].group()):
+        return valeur, None
+    debut = mots[1].start()
+    return valeur[:debut] + '0' + valeur[debut + 1:], mots[1].group()
+
+
+def corriger_coquilles_o(valides: List[Dict], colonnes) -> Tuple[List[Dict], List[str]]:
+    """Coquilles O/0 corrigées dans les colonnes de borne ; une alerte par cellule.
+
+    La lecture reçue n'est pas modifiée ; chaque ligne corrigée garde ses originaux
+    dans 'corrections_o' {indice de colonne: sous-champ imprimé} pour le marquage.
+    """
+    resultats, alertes = [], []
+    for r in valides:
+        entetes = [h.upper() for h in r.get('headers') or []]
+        cibles = [k for k, h in enumerate(entetes) if h in colonnes]
+        lignes, rang = [], 0
+        for row in r.get('rows') or []:
+            if row.get('type') != 'blank':
+                rang += 1
+            if row.get('type') != 'data' or not cibles:
+                lignes.append(row)
+                continue
+            cellules, origines = list(row.get('cells') or []), {}
+            for k in cibles:
+                if k >= len(cellules):
+                    continue
+                corrigee, origine = corriger_numero_borne(cellules[k])
+                if origine:
+                    alertes.append(f"page {numero_page(r)}, ligne {rang}, {entetes[k]} : Corrigé "
+                                   f"O → 0 : l'original porte « {' '.join(cellules[k].split())} »")
+                    cellules[k], origines[k] = corrigee, origine
+            lignes.append(dict(row, cells=cellules, corrections_o=origines) if origines else row)
+        resultats.append(dict(r, rows=lignes))
+    return resultats, alertes
+
+
+def marquer_corrections_o(ws, ligne_debut: int, resultat: Dict, couleur: str) -> int:
+    """Colore et commente les cellules corrigées (même placement que _fill_worksheet)."""
+    n, ligne = 0, ligne_debut + 1
+    for row in resultat.get('rows') or []:
+        if row.get('type') == 'blank':
+            ligne += row.get('count', 1)
+            continue
+        for k, origine in (row.get('corrections_o') or {}).items():
+            cellule = ws.cell(row=ligne, column=k + 1)
+            cellule.fill = PatternFill('solid', fgColor=couleur)
+            cellule.comment = Comment(f"corrigé : l'original porte {origine}", 'TriosSeconverter')
+            n += 1
+        ligne += 1
+    return n
+
+
 def marquer_deduits(ws, ligne_fin: int, meta: Dict, couleur: str) -> int:
     """Colore et commente les lignes de pied (2 dernières du bloc) portant une valeur déduite."""
     n = 0
@@ -481,6 +541,9 @@ def generer_excel(
     bilan_indice = bilan_controle_indice(results, valides)
     if bilan_indice:
         log(f"  ✓ {bilan_indice}")
+    valides, alertes_coquilles = corriger_coquilles_o(valides, Config.CORRECTION_O_COLONNES)
+    for alerte in alertes_coquilles:
+        log(f"  ⚠ {alerte}")
 
     total = len(valides)
 
@@ -527,6 +590,7 @@ def generer_excel(
         )
 
         marquer_deduits(ws, next_row, result.get('metadata', {}), Config.COULEUR_DEDUIT)
+        marquer_corrections_o(ws, current_row, result, Config.COULEUR_CORRIGE)
 
         if i < total - 1:
             ws.row_breaks.append(Break(id=next_row - 1))
