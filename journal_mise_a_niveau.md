@@ -781,3 +781,19 @@ elles restent hors de git avec le reste de leur jeu d'essai, en attendant leur i
 Effets sur les tests : le thermomètre retire les positions de sa référence (il éprouve les
 fautes de contenu) ; la sortie v1.7 figée montre maintenant **120 écarts de position sur la page
 52** (lecture Tesseract à un espace), première mesure réelle sur un scan.
+
+## Chiffres de référence des positions pour le commit A (2026-10-05)
+
+Positions fausses sur les pages à vérité des positions, sortie actuelle.
+
+| Extrait | Page | Sortie mesurée | Cellules à vérité de position | Positions fausses |
+|---------|------|----------------|-------------------------------|-------------------|
+| 223111PE011 | 52 | rejeu (sans API) du passage réel 7, code au commit 58cb2d4 | 240 | **120** (TENANT 60, ABOUTISSANT 60 ; FIL, SIGNAL 0) |
+| 6A23111PE133 | 15 | à mesurer après le 1er passage réel du nouvel extrait | 220 | — |
+| 223111PE012 | 39 | à mesurer après le 1er passage réel du nouvel extrait | 140 | — |
+
+223111PE011 page 52 : 0 cellule fausse en contenu ; la sortie n'a **aucun double espace** sur
+240 cellules — Claude recopie « PH A104 01 » à un espace là où l'original aligne les mots en
+colonnes 0, 6 et 16 (TENANT) ou 0, 6, 16 (ABOUTISSANT, 2e mot une colonne plus loin dans la
+sortie : (0, 3, 9)). Les autres pages de l'extrait : 0 écart (pages vectorielles 104 et 122a
+mesurées contre la grille du PDF).
