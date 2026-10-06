@@ -1,7 +1,8 @@
 """
 Commit A dans le convertisseur : positions d'origine posées sur les pages lues par
 Claude (faux client, réponse enregistrée, Tesseract en local), lecture Tesseract gardée
-en cache (<document>_tesseract.json) ; sans PDF (rejeu d'un journal), une ligne au journal.
+dans le cache de l'appli (jamais à côté des fichiers de l'utilisateur), réutilisée sans
+2e OCR ; sans PDF (rejeu d'un journal), une ligne au journal.
 
 Lancement :
     env\\Scripts\\python.exe -m pytest tests/test_positions_converter.py -v
@@ -20,6 +21,7 @@ import openpyxl
 
 from config import Config
 from converter import Converter
+import positions_scan
 from positions_scan import LecturePage
 from template import TemplateManager
 
@@ -57,20 +59,26 @@ def _mode_claude():
 class TestConversionPdf(unittest.TestCase):
 
     @classmethod
+    def _convertir(cls, sortie):
+        journal = []
+        with _mode_claude(), patch('anthropic.Anthropic', _FauxClient), \
+                patch.object(Config, 'POSITIONS_CACHE_DOSSIER', cls.cache), \
+                contextlib.redirect_stdout(io.StringIO()):
+            resultat = Converter(word_file=cls.pdf, output_dir=cls.dossier / sortie,
+                                 template=TemplateManager().get('REPARTITEUR'),
+                                 on_log=journal.append).run()
+        return resultat, journal
+
+    @classmethod
     def setUpClass(cls):
         cls._tmp = tempfile.TemporaryDirectory()
-        dossier = Path(cls._tmp.name)
-        pdf = dossier / 'pe133_p15.pdf'
+        cls.dossier = Path(cls._tmp.name)
+        cls.cache = cls.dossier / 'cache_appli'
+        cls.pdf = cls.dossier / 'pe133_p15.pdf'
         with fitz.open(str(FIX / '6A23111PE133_extrait_8pages.pdf')) as src, fitz.open() as un:
             un.insert_pdf(src, from_page=5, to_page=5)
-            un.save(str(pdf))
-        cls.journal = []
-        with _mode_claude(), patch('anthropic.Anthropic', _FauxClient), \
-                contextlib.redirect_stdout(io.StringIO()):
-            cls.resultat = Converter(word_file=pdf, output_dir=dossier / 'sortie',
-                                     template=TemplateManager().get('REPARTITEUR'),
-                                     on_log=cls.journal.append).run()
-        cls.cache = dossier / 'sortie' / 'pe133_p15_tesseract.json'
+            un.save(str(cls.pdf))
+        cls.resultat, cls.journal = cls._convertir('sortie')
         ws = openpyxl.load_workbook(cls.resultat['excel']).worksheets[0]
         cls.tenants = [ws.cell(row=r, column=1).value for r in range(2, 58)]
 
@@ -87,10 +95,19 @@ class TestConversionPdf(unittest.TestCase):
         self.assertIn('P111TC    26', self.tenants)
         self.assertIn('RM         03B', self.tenants)
 
-    def test_lecture_tesseract_en_cache(self):
-        donnees = json.loads(self.cache.read_text('utf-8'))
-        self.assertEqual(list(donnees), ['1'])
-        self.assertGreater(len(LecturePage.depuis_dict(donnees['1']).mots), 100)
+    def test_lecture_dans_le_cache_de_l_appli_pas_a_cote_des_fichiers(self):
+        fichiers = list(self.cache.glob('*.json'))
+        self.assertEqual(len(fichiers), 1)
+        donnees = json.loads(fichiers[0].read_text('utf-8'))
+        self.assertGreater(len(LecturePage.depuis_dict(donnees).mots), 100)
+        self.assertEqual(list((self.dossier / 'sortie').rglob('*.json')), [])
+
+    def test_deuxieme_conversion_sans_deuxieme_ocr(self):
+        with patch.object(positions_scan, 'lire_page',
+                          side_effect=AssertionError('2e OCR')) as lire:
+            _, journal = self._convertir('sortie_2')
+        lire.assert_not_called()
+        self.assertTrue([m for m in journal if "positions d'origine p. 1 :" in m])
 
 
 class TestRejeuSansPdf(unittest.TestCase):

@@ -4,6 +4,7 @@ Fichier de configuration pour le script d'extraction d'images.
 Modifiez ce fichier pour personnaliser le comportement sans toucher au code principal.
 """
 
+import os
 from pathlib import Path
 
 
@@ -284,6 +285,17 @@ class Config:
     # caractères du trait : un texte imprimé à cheval sur le trait appartient à sa colonne.
     POSITIONS_MARGE_DEBORDEMENT = 1.0
     # Police des cellules de données : chasse fixe, sinon les colonnes ne s'alignent pas.
+    # Lectures Tesseract gardées pour la double lecture et le contrôle de conservation, sans
+    # 2e OCR : dans un dossier de l'appli, jamais à côté des fichiers de l'utilisateur (et
+    # loin des 260 caractères de chemin de Windows). Clé = empreinte du PDF + page + réglages.
+    POSITIONS_CACHE_DOSSIER = (
+        Path(os.environ.get('LOCALAPPDATA') or Path.home() / 'AppData' / 'Local')
+        / 'TriosSeconverter' / 'cache'
+    )
+    # Purge à chaque écriture : plus vieux que N jours, puis les plus anciens tant que le
+    # dossier dépasse la taille maximale.
+    POSITIONS_CACHE_AGE_MAX_JOURS = 30
+    POSITIONS_CACHE_TAILLE_MAX_MO = 200
     POSITIONS_POLICE = "Courier New"
     POSITIONS_TAILLE_POLICE = 11
 

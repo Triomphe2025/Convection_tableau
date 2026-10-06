@@ -464,23 +464,22 @@ class Converter:
         """Positions d'origine des mots lus sur les pages scannées (Tesseract en cache)."""
         if not getattr(Config, 'POSITIONS_ORIGINALES', False) or not pages:
             return
-        import json
         import time
 
         import fitz
 
-        from positions_scan import lire_page, placer_page
+        from cache_lectures import empreinte_fichier
+        from positions_scan import placer_page
         colonnes = list(self.template.columns)
+        empreinte = empreinte_fichier(self.word_file)
         with fitz.open(str(self.word_file)) as doc:
             for page, resultat in zip(pages, resultats):
                 if self._est_annule() or not resultat.get('success'):
                     continue
                 debut = time.monotonic()
                 try:
-                    if page not in self._lectures_tesseract:
-                        self._lectures_tesseract[page] = lire_page(doc[page - 1])
                     rows, bilan = placer_page(resultat.get('rows', []), colonnes,
-                                              self._lectures_tesseract[page])
+                                              self._lecture_tesseract(doc, page, empreinte))
                 except Exception as exc:
                     self._log(f"  ⚠ positions d'origine p. {page} non recalculées : {exc}")
                     continue
@@ -498,16 +497,26 @@ class Converter:
                 for d in bilan['deplaces']:
                     self._log(f"    p. {page} ligne {d['ligne']} : « {d['mot']} » passé de "
                               f"{d['de']} à {d['vers']} (lu dans {d['vers']} sur le scan)")
-        if self._lectures_tesseract:
-            cache = self.output_dir / f"{self.word_file.stem}_tesseract.json"
+
+    def _lecture_tesseract(self, doc, page: int, empreinte: str):
+        """Lecture Tesseract de la page : en mémoire, sinon dans le cache de l'appli, sinon OCR."""
+        import cache_lectures
+        from positions_scan import LecturePage, lire_page
+        if page in self._lectures_tesseract:
+            return self._lectures_tesseract[page]
+        gardee = cache_lectures.lire(empreinte, page)
+        if gardee is not None:
+            lecture = LecturePage.depuis_dict(gardee)
+        else:
+            lecture = lire_page(doc[page - 1])
             try:
-                cache.write_text(json.dumps({str(p): lecture.vers_dict() for p, lecture in
-                                             self._lectures_tesseract.items()}),
-                                 encoding='utf-8')
+                cache_lectures.ecrire(empreinte, page, lecture.vers_dict())
             except OSError as exc:
-                # Chemin trop long (Windows, 260 caractères) ou disque : la conversion
-                # continue, la lecture reste en mémoire pour cette conversion.
-                self._log(f"  ⚠ lecture Tesseract non enregistrée ({cache.name}) : {exc}")
+                # Disque plein ou dossier interdit : la lecture reste en mémoire pour
+                # cette conversion, la conversion continue.
+                self._log(f"  ⚠ lecture Tesseract p. {page} non gardée en cache : {exc}")
+        self._lectures_tesseract[page] = lecture
+        return lecture
 
     # ── Extraction depuis PDF (couche texte vectorielle) ──────────────
 

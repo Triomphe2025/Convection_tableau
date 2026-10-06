@@ -1067,3 +1067,21 @@ du journal de conversion).
 Mesure sans API (rejeu) : page 123 placée (69 jumeaux exacts, 15 par rang, 24 sans jumeau,
 0 déplacé) ; chiffres du commit A inchangés (PE011 p. 52 : 4, PE133 p. 15 : 0, PE012 p. 39 : 0) ;
 cellules, glissements identiques ; pages sans positions : 0 sur les 3 extraits.
+
+## Cache des lectures Tesseract hors des fichiers de l'utilisateur (2026-10-06)
+
+Avant : `<document>_tesseract.json` écrit dans le dossier de sortie de la conversion (à côté
+de l'Excel), avec un échec possible au-delà de 260 caractères de chemin.
+
+`cache_lectures.py` (nouveau, module pur) : une lecture par fichier JSON dans
+`Config.POSITIONS_CACHE_DOSSIER` = `%LOCALAPPDATA%\TriosSeconverter\cache`. Clé = SHA-256 du
+contenu du PDF (un PDF renommé ou déplacé est retrouvé) + page + DPI + psm (un réglage changé
+force une nouvelle lecture) ; nom de fichier de 37 caractères. Purge à chaque écriture : plus de
+`POSITIONS_CACHE_AGE_MAX_JOURS` (30) jours, puis les plus anciennes au-delà de
+`POSITIONS_CACHE_TAILLE_MAX_MO` (200 Mo). Écriture impossible : une ligne ⚠ au journal, la
+conversion continue (lecture gardée en mémoire).
+
+Converter : lecture prise en mémoire, sinon dans le cache, sinon OCR puis écrite au cache ; une
+2e conversion du même PDF ne relance pas Tesseract (test). `tests/conftest.py` redirige le cache
+vers un dossier temporaire : la suite de tests ne remplit pas `%LOCALAPPDATA%`.
+`TriosSeconverter.spec` reçoit `cache_lectures` (import à la demande).

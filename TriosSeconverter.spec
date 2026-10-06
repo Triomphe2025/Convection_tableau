@@ -47,6 +47,7 @@ a = Analysis(
         'verificateur',
         'relecture_scan',
         'positions_scan',
+        'cache_lectures',
     ],
     hookspath=[],
     hooksconfig={},

@@ -129,6 +129,9 @@ le calibrage déjà fait sur `verificateur.py`.
 | `POSITIONS_SEUIL_LIGNE` | `0.5` | Ressemblance minimale pour apparier une ligne lue à une ligne Tesseract |
 | `POSITIONS_CARACTERES_TRAIT` | `\|/\\!` | Caractères lus à la place d'un trait vertical du cadre |
 | `POSITIONS_MARGE_DEBORDEMENT` | `1.0` | Déplacement vers la gauche seulement si le jumeau finit à au moins N caractères du trait |
+| `POSITIONS_CACHE_DOSSIER` | `%LOCALAPPDATA%\TriosSeconverter\cache` | Lectures Tesseract gardées (clé = empreinte du PDF + page + DPI + psm) ; les tests le redirigent vers un dossier temporaire (`tests/conftest.py`) |
+| `POSITIONS_CACHE_AGE_MAX_JOURS` | `30` | Purge : lectures plus vieilles supprimées à chaque écriture |
+| `POSITIONS_CACHE_TAILLE_MAX_MO` | `200` | Purge : au-delà, les plus anciennes d'abord |
 | `POSITIONS_POLICE` / `POSITIONS_TAILLE_POLICE` | `Courier New` / `11` | Police des cellules de données (chasse fixe) |
 
 ## Ajouter un nouveau paramètre
