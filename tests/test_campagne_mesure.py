@@ -279,6 +279,24 @@ class TestLignesHorsColonnes(unittest.TestCase):
         self.assertEqual(bilan['lignes_tableau_brutes'], 0)
 
 
+class TestPagesSansPositions(unittest.TestCase):
+
+    def test_pages_non_recalculees_comptees(self):
+        journal = [
+            "  positions d'origine p. 5 : 420 mot(s) au jumeau exact, 106 par rang",
+            "  positions d'origine p. 10 non recalculées : colonnes du cadre non trouvées",
+            "  ⚠ positions d'origine p. 11 non recalculées : Tesseract absent",
+            "  positions d'origine non recalculées : source Word ou images, sans page PDF",
+        ]
+        self.assertEqual(cm.pages_sans_positions(journal), 2)
+
+    def test_journal_vide(self):
+        self.assertEqual(cm.pages_sans_positions([]), 0)
+
+    def test_colonne_du_csv(self):
+        self.assertIn('pages_sans_positions', cm.COLONNES_CSV)
+
+
 class TestAjouterLigneCsv(unittest.TestCase):
 
     def test_ancien_entete_reecrit_valeurs_a_leur_place(self):

@@ -1044,3 +1044,26 @@ aucune position n'est inventée, la cellule garde les espaces de Claude. PE011 p
 les 3 extraits : le mécanisme n'est éprouvé que par les tests fabriqués.
 `TriosSeconverter.spec` reçoit `positions_scan` et `relecture_scan` (import à la demande) ;
 l'exe est à retester avant livraison (règle 08).
+
+## Positions : page 123 de 223111PE011, cadre ouvert à droite (2026-10-06)
+
+Cause : la page n'a pas de bord droit de cadre (tableau ouvert à droite). On trouvait le bord
+gauche et les 3 séparateurs, 4 traits, alors que la règle en exige colonnes + 1 = 5. Le cadre
+n'est ni pâle ni interrompu.
+
+Repli par les libellés de l'en-tête : il existe déjà (`relecture_scan.bornes_entete`), mais
+Tesseract ne lit **aucun** libellé d'en-tête sur ces scans (ni p. 123 ni p. 52 : police de
+l'en-tête différente) ; il ne peut rien donner ici et n'a pas été étendu.
+
+Correction (`positions_scan.bornes_page`, `relecture_scan` inchangé) : avec un trait de moins
+que colonnes + 1, le bord absent est pris au bord de l'image, du côté où le plus de mots sortent
+des traits. Une première version (« un mot à gauche du 1er trait = bord gauche absent ») se
+trompait sur la p. 123 à cause des lettres du logo vertical M A T R A dans la marge : 4 mots
+déplacés à tort, vus au test réel avant tout commit.
+
+Campagne : colonne `pages_sans_positions` (lignes « positions d'origine p. N non recalculées »
+du journal de conversion).
+
+Mesure sans API (rejeu) : page 123 placée (69 jumeaux exacts, 15 par rang, 24 sans jumeau,
+0 déplacé) ; chiffres du commit A inchangés (PE011 p. 52 : 4, PE133 p. 15 : 0, PE012 p. 39 : 0) ;
+cellules, glissements identiques ; pages sans positions : 0 sur les 3 extraits.

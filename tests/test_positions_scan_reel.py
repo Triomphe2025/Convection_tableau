@@ -132,6 +132,26 @@ class TestPE012Page39(unittest.TestCase):
 
 
 @unittest.skipUnless(TESSERACT, "Tesseract absent")
+class TestPE011Page123CadreOuvertADroite(unittest.TestCase):
+    """Page sans bord droit de cadre : les positions sont posées (avant : non recalculées)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tpl, cls.lus, cls.resultat, cls.bilan = _placer(
+            '223111PE011_extrait_10pages.pdf', 10, 'REPARTITEUR 2')
+
+    def test_positions_posees(self):
+        self.assertIsNone(self.bilan['raison'])
+        self.assertEqual(self.bilan['deplaces'], [])
+
+    def test_tenant_et_aboutissant_comme_les_autres_pages(self):
+        premiere = next(r for r in self.resultat['rows'] if r['type'] == 'data')
+        self.assertEqual(premiere['cells'][1], 'PH PG 01')
+        self.assertEqual(premiere['debuts'][1], [0, 6, 16])
+        self.assertEqual(premiere['debuts'][3][:3], [0, 6, 16])
+
+
+@unittest.skipUnless(TESSERACT, "Tesseract absent")
 class TestPE011Page1AucunDeplacementATort(unittest.TestCase):
 
     @classmethod

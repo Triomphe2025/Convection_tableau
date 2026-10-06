@@ -21,7 +21,7 @@ from config import Config
 from generer_classeur import generer_excel, texte_aux_positions
 from pdf_extractor import PdfTableExtractor
 from positions_scan import (LecturePage, ajuster_grille, colonne_caractere, couper_aux_traits,
-                            dpi_de_rendu, pas_initial, placer_page, replier)
+                            bornes_page, dpi_de_rendu, pas_initial, placer_page, replier)
 from template import TemplateManager
 
 PAS, PHASE = 10.0, 5.0
@@ -101,6 +101,36 @@ class TestDpiDeRendu(unittest.TestCase):
         dpi = dpi_de_rendu(2481, 3505)
         self.assertEqual(dpi, 72)
         self.assertAlmostEqual(3505 * dpi / 72, 842 * 300 / 72, delta=30)
+
+
+class TestBornesPage(unittest.TestCase):
+    """Bornes des colonnes : traits du cadre, un bord absent remplacé par le bord de l'image."""
+
+    MOTS = [_mot(1, 1, 'A1'), _mot(31, 1, 'PH'), _mot(61, 1, 'SIG'), _mot(91, 1, 'PH')]
+
+    def test_cadre_complet(self):
+        self.assertEqual(bornes_page(TRAITS, self.MOTS, COLONNES, 1300), TRAITS)
+
+    def test_bord_droit_absent(self):
+        # 223111PE011 p. 10 (page 123) : tableau ouvert à droite, 4 traits pour 4 colonnes.
+        self.assertEqual(bornes_page(TRAITS[:-1], self.MOTS, COLONNES, 1300),
+                         TRAITS[:-1] + [1300.0])
+
+    def test_bord_droit_absent_malgre_le_logo_dans_la_marge(self):
+        # Page 123 : lettres du logo vertical M A T R A à gauche du cadre ; c'est pourtant à
+        # droite que des mots dépassent (colonne ABOUTISSANT ouverte).
+        logo = [(-40, 100 * k, -30, 100 * k + 30, lettre, 90) for k, lettre in enumerate('MATRA')]
+        colonne = [_mot(col, ligne, texte) for ligne in range(2, 9)
+                   for col, texte in ((91, 'PH'), (97, 'MIC/TELEC'), (107, '01'))]
+        mots = self.MOTS + logo + colonne
+        self.assertEqual(bornes_page(TRAITS[:-1], mots, COLONNES, 1300), TRAITS[:-1] + [1300.0])
+
+    def test_bord_gauche_absent(self):
+        self.assertEqual(bornes_page(TRAITS[1:], self.MOTS, COLONNES, 1300),
+                         [0.0] + TRAITS[1:])
+
+    def test_trop_peu_de_traits_sans_en_tete(self):
+        self.assertIsNone(bornes_page(TRAITS[1:-1], self.MOTS, COLONNES, 1300))
 
 
 class TestCouperAuxTraits(unittest.TestCase):

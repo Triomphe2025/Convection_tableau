@@ -100,6 +100,26 @@ def ajuster_grille(debuts: List[float], pas_estime: float) -> Tuple[float, float
     return meilleur[1], float(meilleur[2])
 
 
+def bornes_page(traits: Optional[List[float]], mots: List[Mot], colonnes: List[str],
+                largeur: float) -> Optional[List[float]]:
+    """Bornes des colonnes : traits du cadre ; un bord absent pris au bord de l'image.
+
+    223111PE011 p. 10 (page 123) : tableau ouvert à droite, seuls le bord gauche et les
+    séparateurs sont tracés (un trait de moins que colonnes + 1). Le bord absent est du
+    côté où le plus de mots sortent des traits (une colonne entière, contre les quelques
+    lettres d'un logo dans la marge). Sinon, repli sur l'en-tête lu.
+    """
+    n = len(colonnes)
+    if traits and len(traits) == n:
+        vrais = [m for m in mots if m[4].strip('|')]
+        a_gauche = sum(1 for m in vrais if m[2] <= traits[0])
+        a_droite = sum(1 for m in vrais if m[0] >= traits[-1])
+        if a_gauche > a_droite:
+            return [0.0] + list(traits)
+        return list(traits) + [float(largeur)]
+    return bornes_colonnes(traits, mots, colonnes)
+
+
 def colonne_caractere(x: float, pas: float, phase: float) -> int:
     """Colonne de la grille où tombe l'abscisse x."""
     return int(round((x - phase) / pas))
@@ -359,7 +379,8 @@ def placer_page(rows: List[Dict], colonnes: List[str],
              'lignes_sans_partenaire': 0, 'pas': None, 'raison': None}
     sortie = [dict(r) for r in rows]
     pas0 = pas_initial(lecture.mots)
-    bornes = bornes_colonnes(lecture.traits, lecture.mots, colonnes) if lecture.mots else None
+    bornes = (bornes_page(lecture.traits, lecture.mots, colonnes, lecture.taille[0])
+              if lecture.mots else None)
     if pas0 is None or bornes is None:
         bilan['raison'] = ("aucun mot lu par Tesseract" if pas0 is None
                            else "colonnes du cadre non trouvées")

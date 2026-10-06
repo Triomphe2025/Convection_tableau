@@ -47,7 +47,7 @@ COLONNES_CSV = [
     'positions_fausses', 'pieds_faux', 'lignes_manquantes', 'lignes_en_trop',
     'pages_ref_orphelines', 'tokens_entree', 'tokens_sortie', 'cout_usd', 'duree_s',
     'glissement', 'lignes_deplacees', 'alertes_manquantes', 'fausses_alertes', 'controle_indice',
-    'lignes_tableau_brutes', 'lignes_hors_colonnes',
+    'lignes_tableau_brutes', 'lignes_hors_colonnes', 'pages_sans_positions',
 ]
 # Lignes de la réponse qui ne sont pas des lignes du tableau, même avec un « | ».
 _PREFIXES_HORS_TABLEAU = ('TYPE_PAGE:', 'META:', 'PIED_BRUT:', 'LOGO:', 'REVISIONS:', 'SECTION:')
@@ -146,6 +146,12 @@ def lignes_hors_colonnes(chemin: Path, n_colonnes: int) -> Dict:
                 if len(bilan['exemples']) < _EXEMPLES_HORS_COLONNES:
                     bilan['exemples'].append((entree.get('image', ''), segments, ligne))
     return bilan
+
+
+def pages_sans_positions(journal: List[str]) -> int:
+    """Pages scannées dont les positions d'origine n'ont pas été recalculées (journal)."""
+    return sum(1 for ligne in journal
+               if "positions d'origine p." in ligne and 'non recalculées' in ligne)
 
 
 def mesurer_sortie(xlsx: Path, verite: Path, gabarit: str, pdf: Optional[Path] = None,
@@ -256,6 +262,8 @@ def executer_passage(pdf: Path, verite: Path, gabarit: str, modele: str, effort:
         'duree_s': round(duree, 1),
         'lignes_tableau_brutes': colonnes['lignes_tableau_brutes'],
         'lignes_hors_colonnes': colonnes['lignes_hors_colonnes'],
+        'pages_sans_positions': pages_sans_positions(
+            journal_conversion.read_text(encoding='utf-8').splitlines()),
         '_ids': journal['ids'],
         '_exemples_hors_colonnes': colonnes['exemples'],
     }

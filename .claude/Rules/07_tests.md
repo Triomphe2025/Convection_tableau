@@ -69,7 +69,7 @@ tests/
   test_mesure_precision.py           → mesure_precision.py, une classe par fonction publique, dicts fabriqués
   test_mesurer_precision.py          → mesurer_precision.py (lecture xlsx/vérité/PDF, CSV, CLI), fichiers fabriqués
   test_positions_scan.py             → positions_scan.py sur lectures fabriquées : grille (pente, pas, phase, demi-pas), coupe aux traits (« 0815B/|RM »), jumeaux exacts / par rang / sans jumeau, déplacement (bord, débordement), sections ; rendu Excel (espaces, Courier New 11, False = avant)
-  test_positions_scan_reel.py        → Réponses enregistrées (positions_reponses_claude.jsonl) + Tesseract local : PE011 p. 52 (0, 6, 16 ; restes nommés lignes 18 et 32), PE133 p. 15 (10 / 11), PE012 p. 39 (section 0, 4, 7, 13, 18), PE011 p. 1 sans déplacement
+  test_positions_scan_reel.py        → Réponses enregistrées (positions_reponses_claude.jsonl) + Tesseract local : PE011 p. 52 (0, 6, 16 ; restes nommés lignes 18 et 32), PE133 p. 15 (10 / 11), PE012 p. 39 (section 0, 4, 7, 13, 18), PE011 p. 1 sans déplacement, PE011 page 123 (cadre ouvert à droite)
   test_positions_converter.py        → Converter : bilan au journal, positions dans l'Excel, lecture Tesseract en cache ; rejeu sans PDF = une ligne au journal
   test_sections_claude.py            → Lignes « NOM DU CABLE : … » des pages lues par Claude : demandées par le prompt (SECTION:), lignes 'section' du format pivot à leur place, rejeu du journal, Excel livré comme la vérité de 223111PE012
   test_emplacement_pied.py           → Texte sans libellé à l'emplacement d'un champ (JARRETIERAGE à la place de BORNIER) : champ remplacé, pas d'alerte, texte gardé à sa place dans le pied livré de 6A23111PE133 ; BORNIER de 223111PE012 inchangé
@@ -81,7 +81,7 @@ tests/
   test_mesurer_precision_golden.py   → Sortie v1.7 figée 223111PE011 contre la vérité terrain (écarts nommés, sans pipeline)
   test_mesurer_precision_tp2_golden.py → Pages TP2 de 223400PE137 (grille → Excel → relecture) contre la vérité v3 : 0 écart, positions comprises
   test_routage_pdf.py                → Routage PDF par page, tous modes : classement, grille, sections, scan en bandes, pages ignorées
-  test_campagne_mesure.py            → campagne_mesure.py avec un faux client : colonnes CSV, plafond, config.py intact, clé jamais écrite, compteur des lignes brutes au mauvais nombre de colonnes
+  test_campagne_mesure.py            → campagne_mesure.py avec un faux client : colonnes CSV, plafond, config.py intact, clé jamais écrite, compteur des lignes brutes au mauvais nombre de colonnes, pages scannées sans positions
   test_pages_ignorees.py             → Pages écartées du classeur (raison au journal), tableau vide CABLE : RESERVE conservé
   test_numeros_page.py               → Numéros de page : suffixe lettre (122a, 44B), ordre du document conservé, alerte si non croissant
   test_pied_page.py                  → pied_page.py, grille (PE137 : 48 pieds = texte du PDF ; 122a), PIED_BRUT de Claude, aucune valeur inventée, alertes
@@ -90,7 +90,7 @@ tests/
   test_claude_opus5.py               → claude_ocr sur Opus 5 / 5.5 : table de capacités, paramètres envoyés, refus avec catégorie, bloc de réflexion, effort refusé, images PNG ≤ 2576 px
 ```
 
-**1024 tests passent** (`pytest tests\`, relevé le 2026-10-05), aucun échec attendu, plus 1 test lent
+**1034 tests passent** (`pytest tests\`, relevé le 2026-10-05), aucun échec attendu, plus 1 test lent
 facultatif (`VERIF_TEST_LENT=1`, relecture du scan de 15 pages, ~30 s). Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.
 
