@@ -1085,3 +1085,24 @@ Converter : lecture prise en mémoire, sinon dans le cache, sinon OCR puis écri
 2e conversion du même PDF ne relance pas Tesseract (test). `tests/conftest.py` redirige le cache
 vers un dossier temporaire : la suite de tests ne remplit pas `%LOCALAPPDATA%`.
 `TriosSeconverter.spec` reçoit `cache_lectures` (import à la demande).
+
+## Tesseract pendant Claude (2026-10-06)
+
+Estimation, sur les passages réels : Claude met 6 à 34 s par page (médiane ≈ 14 s), Tesseract
+1,3 à 4,0 s (≈ 2,3 s). Tesseract est toujours plus court : lancé dès la rastérisation, dans un
+fil à part, tout son temps est caché derrière Claude. Gain attendu ≈ temps Tesseract entier :
+PE011 ≈ 18 s (8 scans, ≈ 12 %), PE133 ≈ 8 s, PE012 ≈ 9 s ; document complet 223111PE011
+(104 scans) ≈ 4 min sur ≈ 25.
+
+Code (simple, 30 lignes) : `Converter._lancer_lectures_tesseract` démarre un fil unique
+(`ThreadPoolExecutor`, nom « tesseract ») qui lit chaque page scannée (mémoire, cache de
+l'appli, sinon OCR) avec son propre document PyMuPDF ; le placement attend sa fin, puis place.
+Une erreur de lecture d'une page est rendue par le fil et journalisée au placement ; l'arrêt
+demandé par l'utilisateur est vérifié entre deux pages. Le temps affiché par page au journal
+ne compte plus que le placement.
+
+Mesure (rejeu PE011, faux client à 4 s par page, Tesseract local, cache vide) : 57,4 s en série
+→ 38,7 s en parallèle, **18,7 s gagnées**. Test : la lecture se fait dans le fil « tesseract »,
+finit avant la réponse de Claude, et l'Excel est identique.
+Limite : les pages de garde scannées sont lues par Tesseract même si Claude les écarte ensuite
+(≈ 2 s chacune, dans le temps caché).

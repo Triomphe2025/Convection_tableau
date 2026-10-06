@@ -444,6 +444,9 @@ class Converter:
                 f"Étape 2 — OCR ({self.template.name}) sur chaque page…"
             )
             self._progress(0.28, "OCR en cours…")
+            # Tesseract lit les pages (positions d'origine) pendant que le moteur vision
+            # les lit : une page Tesseract (1 à 4 s) est plus courte qu'une page Claude.
+            lectures = self._lancer_lectures_tesseract(pages_image)
             self._activer_log_claude()
             try:
                 results_ocr, extractor = self._extraire_avec_progres(
@@ -453,17 +456,46 @@ class Converter:
                 raise RuntimeError(f"OCR échoué : {exc}") from exc
             # Même ordre que _extraire_avec_progres : images triées par numéro de page.
             par_page.update(zip(pages_image, results_ocr))
-            self._placer_positions_originales(pages_image, results_ocr)
+            self._placer_positions_originales(pages_image, results_ocr, lectures)
 
         results = [par_page[i] for i in sorted(par_page)]
         # generer_excel a besoin d'un extracteur même si aucune page n'est
         # passée par l'OCR ; PdfTableExtractor délègue la mise en forme.
         return results, extractor or lecteur_grille
 
-    def _placer_positions_originales(self, pages: List[int], resultats: List[Dict]) -> None:
+    def _lancer_lectures_tesseract(self, pages: List[int]):
+        """Lectures Tesseract des pages dans un fil à part ; Future, ou None sans positions."""
+        if not getattr(Config, 'POSITIONS_ORIGINALES', False) or not pages:
+            return None
+        from concurrent.futures import ThreadPoolExecutor
+        executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='tesseract')
+        lectures = executor.submit(self._lire_pages_tesseract, list(pages))
+        executor.shutdown(wait=False)
+        return lectures
+
+    def _lire_pages_tesseract(self, pages: List[int]) -> Dict[int, str]:
+        """Lit les pages (mémoire, cache ou OCR) ; erreurs par page, journalisées au placement."""
+        import fitz
+
+        from cache_lectures import empreinte_fichier
+        erreurs: Dict[int, str] = {}
+        empreinte = empreinte_fichier(self.word_file)
+        with fitz.open(str(self.word_file)) as doc:
+            for page in pages:
+                if self._est_annule():
+                    break
+                try:
+                    self._lecture_tesseract(doc, page, empreinte)
+                except Exception as exc:
+                    erreurs[page] = str(exc)
+        return erreurs
+
+    def _placer_positions_originales(self, pages: List[int], resultats: List[Dict],
+                                     lectures=None) -> None:
         """Positions d'origine des mots lus sur les pages scannées (Tesseract en cache)."""
         if not getattr(Config, 'POSITIONS_ORIGINALES', False) or not pages:
             return
+        erreurs = lectures.result() if lectures is not None else {}
         import time
 
         import fitz
@@ -475,6 +507,10 @@ class Converter:
         with fitz.open(str(self.word_file)) as doc:
             for page, resultat in zip(pages, resultats):
                 if self._est_annule() or not resultat.get('success'):
+                    continue
+                if page in erreurs:
+                    self._log(f"  ⚠ positions d'origine p. {page} non recalculées : "
+                              f"{erreurs[page]}")
                     continue
                 debut = time.monotonic()
                 try:

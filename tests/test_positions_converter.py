@@ -110,6 +110,52 @@ class TestConversionPdf(unittest.TestCase):
         self.assertTrue([m for m in journal if "positions d'origine p. 1 :" in m])
 
 
+@unittest.skipUnless(Path(Config.TESSERACT_PATH).exists(), "Tesseract absent")
+class TestTesseractPendantClaude(unittest.TestCase):
+    """Tesseract lit les pages scannées dans un fil à part pendant que Claude les lit."""
+
+    def test_lecture_dans_un_fil_a_part_meme_excel(self):
+        import threading
+        import time
+        evenements = []
+        vraie_lecture = positions_scan.lire_page
+
+        def lecture_suivie(page):
+            evenements.append(('tesseract_debut', threading.current_thread().name))
+            resultat = vraie_lecture(page)
+            evenements.append(('tesseract_fin', None))
+            return resultat
+
+        class ClaudeLent(_FauxClient):
+            def _create(self, **kwargs):
+                evenements.append(('claude_debut', None))
+                time.sleep(3)          # plus long que la lecture Tesseract de la page
+                evenements.append(('claude_fin', None))
+                return super()._create(**kwargs)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            dossier = Path(tmp)
+            pdf = dossier / 'p15.pdf'
+            with fitz.open(str(FIX / '6A23111PE133_extrait_8pages.pdf')) as src, \
+                    fitz.open() as un:
+                un.insert_pdf(src, from_page=5, to_page=5)
+                un.save(str(pdf))
+            with _mode_claude(), patch('anthropic.Anthropic', ClaudeLent), \
+                    patch.object(positions_scan, 'lire_page', lecture_suivie), \
+                    patch.object(Config, 'POSITIONS_CACHE_DOSSIER', dossier / 'cache'), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                resultat = Converter(word_file=pdf, output_dir=dossier / 'sortie',
+                                     template=TemplateManager().get('REPARTITEUR'),
+                                     on_log=lambda m: None).run()
+            ws = openpyxl.load_workbook(resultat['excel']).worksheets[0]
+            tenants = [ws.cell(row=r, column=1).value for r in range(2, 58)]
+        noms = [e[0] for e in evenements]
+        self.assertTrue(evenements[noms.index('tesseract_debut')][1].startswith('tesseract'))
+        # Tesseract a fini avant que Claude ait rendu la page : sa lecture est cachée.
+        self.assertLess(noms.index('tesseract_fin'), noms.index('claude_fin'))
+        self.assertIn('P111TC    26', tenants)
+
+
 class TestRejeuSansPdf(unittest.TestCase):
 
     def test_une_ligne_au_journal(self):
