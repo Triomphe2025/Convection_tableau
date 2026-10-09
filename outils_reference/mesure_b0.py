@@ -155,12 +155,9 @@ def aligner(rows, lignes, n):
     {(r, k, i): (mot Tesseract, égal une fois replié)}, mots Tesseract libres de la zone
     du tableau {(ligne, indice)} et la part des mots Claude appariés.
     """
-    a_placer = [i for i, r in enumerate(rows) if r.get('type') in ('data', 'section')
-                and mots_rang(r)]
-    cles_c = [ps.replier(''.join(mots_rang(rows[i]))) for i in a_placer]
-    cles_t = [ps.replier(''.join(w['texte'] for w in lg)) for lg in lignes]
-    rang_paires = ps.apparier_lignes(cles_c, cles_t)
-    paires = {a_placer[r]: li for r, li in rang_paires.items()}
+    # Même appariement des lignes que l'appli (ancrage sur la clé de 1re colonne compris).
+    vue = [([(w['texte'], w['col'], w['k']) for w in lg], None) for lg in lignes]
+    _, paires = ps.apparier_rangs(rows, vue)
     apparies, total = {}, 0
     pris = set()
     for r, li in paires.items():

@@ -68,8 +68,8 @@ tests/
   test_non_regression_xlsx.py        → Le .xlsx du pipeline reste identique à l'instantané d'avant
   test_mesure_precision.py           → mesure_precision.py, une classe par fonction publique, dicts fabriqués
   test_mesurer_precision.py          → mesurer_precision.py (lecture xlsx/vérité/PDF, CSV, CLI), fichiers fabriqués
-  test_positions_scan.py             → positions_scan.py sur lectures fabriquées : grille (pente, pas, phase, demi-pas), coupe aux traits (« 0815B/|RM »), jumeaux exacts / par rang / sans jumeau, déplacement (bord, débordement), sections ; rendu Excel (espaces, Courier New 11, False = avant)
-  test_positions_scan_reel.py        → Réponses enregistrées (positions_reponses_claude.jsonl) + Tesseract local : PE011 p. 52 (0, 6, 16 ; restes nommés lignes 18 et 32), PE133 p. 15 (10 / 11), PE012 p. 39 (section 0, 4, 7, 13, 18), PE011 p. 1 sans déplacement, PE011 page 123 (cadre ouvert à droite)
+  test_positions_scan.py             → positions_scan.py sur lectures fabriquées : grille (pente, pas, phase, demi-pas), coupe aux traits (« 0815B/|RM »), jumeaux exacts / par rang / sans jumeau, déplacement (bord, débordement), sections, ancrage des lignes (ligne mal lue tenue par sa clé, clé en double, ancres croisées) ; rendu Excel (espaces, Courier New 11, False = avant)
+  test_positions_scan_reel.py        → Réponses enregistrées (positions_reponses_claude.jsonl) + Tesseract local : PE011 p. 52 (0, 6, 16 ; restes nommés lignes 18 et 32), PE133 p. 15 (10 / 11), PE012 p. 39 (section 0, 4, 7, 13, 18), PE011 p. 1 sans déplacement, PE011 page 123 (cadre ouvert à droite), PE011 p. 52 ligne retirée sans glissement des voisines
   test_controle_conservation.py      → controle_conservation.py : taux de divergence (lecture identique, mots lus autrement, O/0 compté), seuil PAGE_DEGRADEE, page sans cadre ; pages réelles PE011 p. 52 dégradée, PE133 p. 15 et PE012 p. 39 propres ; conservation : mot omis, confiance < 60 ignorée, mots recollés, ligne manquante entre deux lignes, page dégradée, contrôle désactivé, pages réelles propres sans alerte
   test_a_verifier.py                 → Feuille A VERIFIER : colonnes, une ligne par page dégradée, synthèse + pages triées si majorité, pages vectorielles hors du compte, lien cliquable vers le bloc, pas de feuille sans entrée ; alertes de cellule (lien vers la cellule, couleur, commentaire, valeur gardée), ligne manquante commentée sur la ligne suivante
   test_cache_lectures.py             → cache_lectures.py : empreinte du contenu, aller-retour, clé changée par DPI / psm, fichier illisible, nom court, purge par âge et par taille, dossier par défaut sous %LOCALAPPDATA%
@@ -93,7 +93,7 @@ tests/
   test_claude_opus5.py               → claude_ocr sur Opus 5 / 5.5 : table de capacités, paramètres envoyés, refus avec catégorie, bloc de réflexion, effort refusé, images PNG ≤ 2576 px
 ```
 
-**1084 tests passent** (`pytest tests\`, relevé le 2026-10-05), aucun échec attendu, plus 1 test lent
+**1089 tests passent** (`pytest tests\`, relevé le 2026-10-05), aucun échec attendu, plus 1 test lent
 facultatif (`VERIF_TEST_LENT=1`, relecture du scan de 15 pages, ~30 s). Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.
 

@@ -152,6 +152,26 @@ class TestPE011Page123CadreOuvertADroite(unittest.TestCase):
 
 
 @unittest.skipUnless(TESSERACT, "Tesseract absent")
+class TestPE011Page52LigneRetiree(unittest.TestCase):
+    """Lignes presque identiques : une ligne retirée ne fait plus glisser l'appariement."""
+
+    def test_ligne_de_tesseract_du_trou_reste_libre(self):
+        from positions_scan import apparier_rangs, lignes_page
+        tpl = TemplateManager().get('REPARTITEUR 2')
+        rows, _, _ = _parse_pipe_response(
+            REPONSES[('223111PE011_extrait_10pages.pdf', 5)], tpl)
+        with fitz.open(str(FIX / '223111PE011_extrait_10pages.pdf')) as doc:
+            lignes = lignes_page(lire_page(doc[4]), list(tpl.columns))['lignes']
+        _, avant = apparier_rangs(rows, lignes)
+        retiree = next(i for i, r in enumerate(rows) if r.get('cells', [''])[0] == '15B/M')
+        _, apres = apparier_rangs(rows[:retiree] + rows[retiree + 1:], lignes)
+        self.assertNotIn(avant[retiree], apres.values())
+        for i, li in avant.items():
+            if i > retiree:
+                self.assertEqual(apres.get(i - 1), li, rows[i]['cells'])
+
+
+@unittest.skipUnless(TESSERACT, "Tesseract absent")
 class TestPE011Page1AucunDeplacementATort(unittest.TestCase):
 
     @classmethod

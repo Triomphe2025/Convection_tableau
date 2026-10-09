@@ -12,6 +12,7 @@ lu, sans jamais changer un mot :
 Colonne 0 d'une colonne du tableau = son caractère le plus à gauche sur la page, comme
 dans le banc de mesure. N'importe pas ocr_processor : lecture distincte du moteur.
 """
+from collections import Counter
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from statistics import median
@@ -384,13 +385,45 @@ def lignes_page(lecture: LecturePage, colonnes: List[str]) -> Dict:
             'traits': [(b - phase) / pas for b in bornes], 'pas': pas, 'raison': None}
 
 
+def _ancres(cles_c: List[str], cles_t: List[str]) -> List[Tuple[int, int]]:
+    """(rang lu, ligne Tesseract) dont la clé est identique et unique des deux côtés.
+
+    Les ancres qui se croisent sont écartées : la plus longue suite croissante est gardée.
+    Une clé d'un seul caractère (« B ») n'ancre rien.
+    """
+    compte_c, compte_t = Counter(cles_c), Counter(cles_t)
+    position_t = {c: j for j, c in enumerate(cles_t)}
+    candidats = [(i, position_t[c]) for i, c in enumerate(cles_c)
+                 if len(c) >= 2 and compte_c[c] == 1 and compte_t.get(c) == 1]
+    meilleure: List[List[Tuple[int, int]]] = []
+    for n, (i, j) in enumerate(candidats):
+        precedentes = [meilleure[m] for m in range(n) if candidats[m][1] < j]
+        meilleure.append(max(precedentes, key=len, default=[]) + [(i, j)])
+    return max(meilleure, key=len, default=[])
+
+
 def apparier_rangs(rows: List[Dict], lignes_t) -> Tuple[List[int], Dict[int, int]]:
-    """Lignes lues à placer (données, sections) et {indice de ligne lue: ligne Tesseract}."""
+    """Lignes lues à placer (données, sections) et {indice de ligne lue: ligne Tesseract}.
+
+    Les lignes dont la clé de 1re colonne est lue à l'identique et unique (« 15B/M ») sont
+    appariées d'office ; la ressemblance n'apparie qu'entre deux ancres : sur une page aux
+    lignes presque identiques (223111PE011 p. 52), une ligne mal lue ou absente ne fait
+    plus glisser ses voisines.
+    """
     a_placer = [i for i, r in enumerate(rows) if r.get('type') in ('data', 'section')
                 and _mots_ligne(r)]
     cles_c = [replier(''.join(_mots_ligne(rows[i]))) for i in a_placer]
     cles_t = [replier(''.join(t[0] for t in coupes)) for coupes, _ in lignes_t]
-    paires = apparier_lignes(cles_c, cles_t)
+    cle0_c = [replier(''.join((rows[i].get('cells') or [''])[0].split()))
+              if rows[i].get('type') == 'data' else '' for i in a_placer]
+    cle0_t = [replier(''.join(t[0] for t in coupes if t[2] == 0)) for coupes, _ in lignes_t]
+    paires: Dict[int, int] = {}
+    bornes = [(-1, -1)] + _ancres(cle0_c, cle0_t) + [(len(a_placer), len(lignes_t))]
+    for (r0, l0), (r1, l1) in zip(bornes, bornes[1:]):
+        if r0 >= 0:
+            paires[r0] = l0
+        entre = apparier_lignes(cles_c[r0 + 1:r1], cles_t[l0 + 1:l1])
+        paires.update({r0 + 1 + a: l0 + 1 + b for a, b in entre.items()})
     return a_placer, {a_placer[rang]: li for rang, li in paires.items()}
 
 

@@ -1211,3 +1211,20 @@ lignes placées comme dans le convertisseur) :
   alertes de conservation sur la copie : **0** (max 0 par page).
 - Réponses non modifiées : **0 alerte** sur les 15 pages scannées.
 - PE011 : 8 pages dégradées (18 à 50 %), contrôle de conservation impossible.
+
+## Commit B3 — ancrage des lignes presque identiques (2026-10-09)
+
+`positions_scan.apparier_rangs` : avant la ressemblance, les lignes dont la clé de 1re colonne
+(« 15B/M ») est lue à l'identique (repliée, sans espaces) et unique des deux côtés sont
+appariées d'office ; ancres croisées écartées (plus longue suite croissante), clé d'un seul
+caractère ignorée. `apparier_lignes` ne travaille plus qu'entre deux ancres. Sert au commit A
+(positions) et au contrôle de conservation ; le script B0 appelle la même fonction.
+
+Effet mesuré : positions du commit A identiques (PE011 p. 52 : 4, PE133 p. 15 : 0, PE012 p. 39 :
+0), cellules identiques, rapport B0 identique mot pour mot, section « Commit B » comprise.
+Gain démontré seulement par le test fabriqué (ligne mal lue tenue par sa clé). PE011 p. 52 :
+une ligne retirée seule ne faisait déjà pas glisser ses voisines (test). La ligne non retrouvée
+de la mesure B0 (« 15B/M ») tient à deux lignes voisines sans clé exploitable dans la copie
+(« 17B/N » supprimé par la mesure, « 16BC » lu « 168 » par Tesseract) : entre deux ancres, des
+lignes qui ne diffèrent que par leur numéro restent indiscernables. Page dégradée : le contrôle
+de conservation y est de toute façon coupé.

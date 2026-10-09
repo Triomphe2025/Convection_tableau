@@ -347,3 +347,39 @@ class TestExcel(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestAncrageDesLignes(unittest.TestCase):
+    """Clé de 1re colonne lue à l'identique, unique des deux côtés : appariées d'office."""
+
+    def _lignes(self, *mots):
+        from positions_scan import lignes_page
+        return lignes_page(_lecture(*mots), COLONNES)['lignes']
+
+    def test_ligne_mal_lue_ancree_par_sa_cle(self):
+        from positions_scan import apparier_rangs
+        rows = [_ligne('A1', 'PH A104 01', 'SIG', ''), _ligne('A2', 'PH A104 02', 'SIGNAL', ''),
+                _ligne('A3', 'PH A104 03', 'SIG', '')]
+        lignes = self._lignes(
+            _mot(1, 1, 'A1'), _mot(31, 1, 'PH'), _mot(37, 1, 'A104'), _mot(47, 1, '01'),
+            _mot(61, 1, 'SIG'),
+            _mot(1, 2, 'A2'), _mot(31, 2, 'XQ'), _mot(37, 2, 'ZZZZ'), _mot(47, 2, 'WW'),
+            _mot(61, 2, 'KKKKKK'),
+            _mot(1, 3, 'A3'), _mot(31, 3, 'PH'), _mot(37, 3, 'A104'), _mot(47, 3, '03'),
+            _mot(61, 3, 'SIG'))
+        _, paires = apparier_rangs(rows, lignes)
+        self.assertEqual(paires, {0: 0, 1: 1, 2: 2})
+
+    def test_cle_en_double_pas_d_ancre(self):
+        from positions_scan import _ancres
+        self.assertEqual(_ancres(['A1', 'A2', 'A2', 'A4'], ['A1', 'A2', 'A2', 'A4']),
+                         [(0, 0), (3, 3)])
+
+    def test_ancres_croisees_ecartees(self):
+        from positions_scan import _ancres
+        self.assertEqual(_ancres(['A1', 'A2', 'A3', 'A4'], ['A1', 'A3', 'A2', 'A4']),
+                         [(0, 0), (1, 2), (3, 3)])
+
+    def test_cle_trop_courte_pas_d_ancre(self):
+        from positions_scan import _ancres
+        self.assertEqual(_ancres(['B', 'A2'], ['B', 'A2']), [(1, 1)])
