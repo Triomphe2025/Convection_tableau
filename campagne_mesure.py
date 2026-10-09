@@ -48,6 +48,7 @@ COLONNES_CSV = [
     'pages_ref_orphelines', 'tokens_entree', 'tokens_sortie', 'cout_usd', 'duree_s',
     'glissement', 'lignes_deplacees', 'alertes_manquantes', 'fausses_alertes', 'controle_indice',
     'lignes_tableau_brutes', 'lignes_hors_colonnes', 'pages_sans_positions',
+    'pages_degradees',
 ]
 # Lignes de la réponse qui ne sont pas des lignes du tableau, même avec un « | ».
 _PREFIXES_HORS_TABLEAU = ('TYPE_PAGE:', 'META:', 'PIED_BRUT:', 'LOGO:', 'REVISIONS:', 'SECTION:')
@@ -152,6 +153,11 @@ def pages_sans_positions(journal: List[str]) -> int:
     """Pages scannées dont les positions d'origine n'ont pas été recalculées (journal)."""
     return sum(1 for ligne in journal
                if "positions d'origine p." in ligne and 'non recalculées' in ligne)
+
+
+def pages_degradees(journal: List[str]) -> int:
+    """Pages scannées classées « scan dégradé » (lignes ℹ du journal de conversion)."""
+    return sum(1 for ligne in journal if 'ℹ' in ligne and 'scan dégradé' in ligne)
 
 
 def mesurer_sortie(xlsx: Path, verite: Path, gabarit: str, pdf: Optional[Path] = None,
@@ -263,6 +269,8 @@ def executer_passage(pdf: Path, verite: Path, gabarit: str, modele: str, effort:
         'lignes_tableau_brutes': colonnes['lignes_tableau_brutes'],
         'lignes_hors_colonnes': colonnes['lignes_hors_colonnes'],
         'pages_sans_positions': pages_sans_positions(
+            journal_conversion.read_text(encoding='utf-8').splitlines()),
+        'pages_degradees': pages_degradees(
             journal_conversion.read_text(encoding='utf-8').splitlines()),
         '_ids': journal['ids'],
         '_exemples_hors_colonnes': colonnes['exemples'],

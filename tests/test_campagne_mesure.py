@@ -357,3 +357,13 @@ class TestMain(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestPagesDegradees(unittest.TestCase):
+
+    def test_comptees_depuis_le_journal(self):
+        journal = ["  ℹ p. 5 : scan dégradé (divergence 29 %) : à relire en priorité",
+                   "  ℹ p. 7 : scan dégradé (divergence 31 %) : à relire en priorité",
+                   "  positions d'origine p. 8 : 23 mot(s), divergence Claude / Tesseract 3 %"]
+        self.assertEqual(cm.pages_degradees(journal), 2)
+        self.assertIn('pages_degradees', cm.COLONNES_CSV)

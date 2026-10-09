@@ -134,6 +134,12 @@ le calibrage déjà fait sur `verificateur.py`.
 | `POSITIONS_CACHE_TAILLE_MAX_MO` | `200` | Purge : au-delà, les plus anciennes d'abord |
 | `POSITIONS_POLICE` / `POSITIONS_TAILLE_POLICE` | `Courier New` / `11` | Police des cellules de données (chasse fixe) |
 
+## Contrôle des pages scannées (commit B, section « CONTRÔLE DES PAGES SCANNÉES »)
+
+| Paramètre | Valeur défaut | Rôle |
+|-----------|--------------|------|
+| `PAGE_DEGRADEE` | `0.10` | Taux de divergence Claude / Tesseract (mots appariés) au-delà duquel la page est un « scan dégradé » : ligne ℹ au journal, ligne dans A VERIFIER |
+
 ## Ajouter un nouveau paramètre
 
 1. Ajouter dans `Config` (class dans config.py) avec valeur par défaut

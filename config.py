@@ -300,6 +300,14 @@ class Config:
     POSITIONS_TAILLE_POLICE = 11
 
     # ========================================
+    # 🧭 CONTRÔLE DES PAGES SCANNÉES (controle_conservation.py)
+    # ========================================
+    # Taux de divergence Claude / Tesseract parmi les mots appariés au-delà duquel la page
+    # est un « scan dégradé » : Tesseract y lit trop mal pour contrôler la lecture (mesure
+    # B0 : 18 à 50 % sur 223111PE011, 1 à 6 % sur 6A23111PE133 et 223111PE012).
+    PAGE_DEGRADEE = 0.10
+
+    # ========================================
     # 📏 MESURE DE PRÉCISION (outil de QA sur jeu de test connu)
     # ========================================
     # Compare une sortie .xlsx à une référence organisée à l'avance (PDF

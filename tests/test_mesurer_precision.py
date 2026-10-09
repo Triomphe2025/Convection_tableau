@@ -556,3 +556,30 @@ class TestVeritePositionsExtrait223111PE011(unittest.TestCase):
         lignes = [r for r in verite[4]['rows'] if r.get('positions')]
         self.assertEqual(len(lignes), 60)
         self.assertEqual(lignes[0]['positions']['TENANT'], (0, 6, 16))
+
+
+class TestInformationsDePage(unittest.TestCase):
+    """Lignes ℹ du journal (page dégradée) : listées par le banc, jamais fausses alertes."""
+
+    JOURNAL = [
+        "  positions d'origine p. 5 : 420 mot(s) au jumeau exact",
+        "  ℹ p. 5 : scan dégradé (divergence 29 %) : à relire en priorité",
+        "  ⚠ PAGE non imprimée dans tout le document : pages numérotées dans l'ordre",
+    ]
+
+    def test_listees_et_pas_comptees(self):
+        import mesure_precision as mp
+        rapport = mp.RapportMesure()
+        attentes = {'alertes': ["PAGE non imprimée dans tout le document"], 'revisions': None,
+                    'indices_pages': None}
+        mpr.appliquer_attentes(rapport, attentes, self.JOURNAL)
+        self.assertEqual(rapport.informations,
+                         ['p. 5 : scan dégradé (divergence 29 %) : à relire en priorité'])
+        self.assertEqual((rapport.alertes_manquantes, rapport.fausses_alertes), ([], []))
+        self.assertIn('scan dégradé (divergence 29 %)', mp.formater_rapport(rapport))
+
+    def test_sans_alertes_attendues_informations_listees(self):
+        import mesure_precision as mp
+        rapport = mp.RapportMesure()
+        mpr.appliquer_attentes(rapport, {'alertes': None, 'revisions': None}, self.JOURNAL)
+        self.assertEqual(len(rapport.informations), 1)

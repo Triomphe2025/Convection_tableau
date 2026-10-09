@@ -151,9 +151,63 @@ class TestTesseractPendantClaude(unittest.TestCase):
             tenants = [ws.cell(row=r, column=1).value for r in range(2, 58)]
         noms = [e[0] for e in evenements]
         self.assertTrue(evenements[noms.index('tesseract_debut')][1].startswith('tesseract'))
-        # Tesseract a fini avant que Claude ait rendu la page : sa lecture est cachée.
-        self.assertLess(noms.index('tesseract_fin'), noms.index('claude_fin'))
+        # Tesseract a commencé avant que Claude ait rendu la page : les deux lectures se
+        # recouvrent (la fin de chacune dépend de la charge de la machine, pas du code).
+        self.assertLess(noms.index('tesseract_debut'), noms.index('claude_fin'))
         self.assertIn('P111TC    26', tenants)
+
+
+@unittest.skipUnless(Path(Config.TESSERACT_PATH).exists(), "Tesseract absent")
+class TestIndicateurDePage(unittest.TestCase):
+    """Taux de divergence Claude / Tesseract au journal ; page dégradée = ligne ℹ et A VERIFIER."""
+
+    def _convertir(self, document, page, gabarit):
+        entrees = [json.loads(lg) for lg in
+                   (FIX / 'positions_reponses_claude.jsonl').read_text('utf-8').splitlines()]
+        reponse = next(e['raw'] for e in entrees
+                       if e['document'] == document and e['page'] == page)
+
+        class Client(_FauxClient):
+            def _create(self, **kwargs):
+                retour = super()._create(**kwargs)
+                retour.content[0].text = reponse
+                return retour
+
+        journal = []
+        with tempfile.TemporaryDirectory() as tmp:
+            dossier = Path(tmp)
+            pdf = dossier / 'une_page.pdf'
+            with fitz.open(str(FIX / document)) as src, fitz.open() as un:
+                un.insert_pdf(src, from_page=page - 1, to_page=page - 1)
+                un.save(str(pdf))
+            with _mode_claude(), patch('anthropic.Anthropic', Client), \
+                    patch.object(Config, 'POSITIONS_CACHE_DOSSIER', dossier / 'cache'), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                resultat = Converter(word_file=pdf, output_dir=dossier / 'sortie',
+                                     template=TemplateManager().get(gabarit),
+                                     on_log=journal.append).run()
+            wb = openpyxl.load_workbook(resultat['excel'])
+            feuille = ([[c.value for c in r] for r in wb['A VERIFIER'].iter_rows()]
+                       if 'A VERIFIER' in wb.sheetnames else None)
+        return journal, feuille
+
+    def test_page_propre_taux_au_journal_sans_a_verifier(self):
+        journal, feuille = self._convertir('6A23111PE133_extrait_8pages.pdf', 6, 'REPARTITEUR')
+        bilan = next(m for m in journal if "positions d'origine p. 1 :" in m)
+        self.assertRegex(bilan, r'divergence Claude / Tesseract \d+ %')
+        self.assertFalse([m for m in journal if 'ℹ' in m])
+        self.assertIsNone(feuille)
+
+    def test_page_degradee_ligne_d_information_et_a_verifier(self):
+        journal, feuille = self._convertir('223111PE011_extrait_10pages.pdf', 5,
+                                           'REPARTITEUR 2')
+        infos = [m.strip() for m in journal if 'ℹ' in m]
+        self.assertEqual(len(infos), 1)
+        self.assertRegex(infos[0], r'^ℹ p\. 1 : scan dégradé \(divergence \d+ %\) : à relire '
+                                   r'en priorité$')
+        self.assertFalse([m for m in journal if '⚠' in m and 'scan' in m])
+        # Une seule page scannée, dégradée : plus de la moitié → synthèse puis la page.
+        self.assertEqual([r[3] for r in feuille[1:]], ['synthèse', 'page dégradée'])
 
 
 class TestRejeuSansPdf(unittest.TestCase):

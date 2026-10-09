@@ -345,7 +345,10 @@ def grouper_lignes_mots(mots: List[Mot]) -> List[List[Mot]]:
 
 
 def _lignes_tesseract(lecture: LecturePage, bornes: List[float], pas: float, phase: float):
-    """Par ligne de la page : (mots coupés aux traits avec leur colonne, mots bruts)."""
+    """Par ligne de la page : (mots coupés aux traits, mots bruts).
+
+    Chaque mot : (texte, colonne de grille, colonne du tableau, confiance, y du centre).
+    """
     lignes = []
     for ligne in grouper_lignes_mots(lecture.mots):
         ligne = sorted(ligne, key=lambda m: m[0])
@@ -355,11 +358,40 @@ def _lignes_tesseract(lecture: LecturePage, bornes: List[float], pas: float, pha
             k = next((k for k in range(len(bornes) - 1) if bornes[k] <= m[0] < bornes[k + 1]),
                      None)
             if k is not None:
-                coupes.append((m[4], colonne_caractere(m[0], pas, phase), k))
-        bruts = [(m[4], colonne_caractere(m[0], pas, phase), 0) for m in dans_cadre]
+                coupes.append((m[4], colonne_caractere(m[0], pas, phase), k, m[5],
+                               (m[1] + m[3]) / 2))
+        bruts = [(m[4], colonne_caractere(m[0], pas, phase), 0, m[5], (m[1] + m[3]) / 2)
+                 for m in dans_cadre]
         if coupes:
             lignes.append((coupes, bruts))
     return lignes
+
+
+def lignes_page(lecture: LecturePage, colonnes: List[str]) -> Dict:
+    """Lignes Tesseract de la page dans la grille : lignes, traits (en caractères), pas, raison.
+
+    raison non vide = page non mesurable (aucun mot, colonnes du cadre non trouvées).
+    """
+    pas0 = pas_initial(lecture.mots)
+    bornes = (bornes_page(lecture.traits, lecture.mots, colonnes, lecture.taille[0])
+              if lecture.mots else None)
+    if pas0 is None or bornes is None:
+        return {'lignes': [], 'traits': [], 'pas': None,
+                'raison': ("aucun mot lu par Tesseract" if pas0 is None
+                           else "colonnes du cadre non trouvées")}
+    pas, phase = ajuster_grille([m[0] for m in lecture.mots], pas0)
+    return {'lignes': _lignes_tesseract(lecture, bornes, pas, phase),
+            'traits': [(b - phase) / pas for b in bornes], 'pas': pas, 'raison': None}
+
+
+def apparier_rangs(rows: List[Dict], lignes_t) -> Tuple[List[int], Dict[int, int]]:
+    """Lignes lues à placer (données, sections) et {indice de ligne lue: ligne Tesseract}."""
+    a_placer = [i for i, r in enumerate(rows) if r.get('type') in ('data', 'section')
+                and _mots_ligne(r)]
+    cles_c = [replier(''.join(_mots_ligne(rows[i]))) for i in a_placer]
+    cles_t = [replier(''.join(t[0] for t in coupes)) for coupes, _ in lignes_t]
+    paires = apparier_lignes(cles_c, cles_t)
+    return a_placer, {a_placer[rang]: li for rang, li in paires.items()}
 
 
 def _mots_ligne(row: Dict) -> List[str]:
@@ -378,30 +410,21 @@ def placer_page(rows: List[Dict], colonnes: List[str],
     bilan = {'exacts': 0, 'par_rang': 0, 'sans_jumeau': 0, 'deplaces': [],
              'lignes_sans_partenaire': 0, 'pas': None, 'raison': None}
     sortie = [dict(r) for r in rows]
-    pas0 = pas_initial(lecture.mots)
-    bornes = (bornes_page(lecture.traits, lecture.mots, colonnes, lecture.taille[0])
-              if lecture.mots else None)
-    if pas0 is None or bornes is None:
-        bilan['raison'] = ("aucun mot lu par Tesseract" if pas0 is None
-                           else "colonnes du cadre non trouvées")
+    page = lignes_page(lecture, colonnes)
+    if page['raison']:
+        bilan['raison'] = page['raison']
         return sortie, bilan
-    pas, phase = ajuster_grille([m[0] for m in lecture.mots], pas0)
-    bilan['pas'] = pas
-    lignes_t = _lignes_tesseract(lecture, bornes, pas, phase)
-    traits = [(b - phase) / pas for b in bornes]
-    a_placer = [i for i, r in enumerate(rows) if r.get('type') in ('data', 'section')
-                and _mots_ligne(r)]
-    cles_c = [replier(''.join(_mots_ligne(rows[i]))) for i in a_placer]
-    cles_t = [replier(''.join(t[0] for t in coupes)) for coupes, _ in lignes_t]
-    paires = apparier_lignes(cles_c, cles_t)
+    bilan['pas'] = page['pas']
+    lignes_t, traits = page['lignes'], page['traits']
+    a_placer, paires = apparier_rangs(rows, lignes_t)
     bilan['lignes_sans_partenaire'] = len(a_placer) - len(paires)
 
     n = len(colonnes)
     placees: Dict[int, object] = {}
-    for rang, i in enumerate(a_placer):
-        if rang not in paires:
+    for i in a_placer:
+        if i not in paires:
             continue
-        coupes, bruts = lignes_t[paires[rang]]
+        coupes, bruts = lignes_t[paires[i]]
         row = rows[i]
         if row.get('type') == 'section':
             placees[i] = _placer_section(row.get('text', ''), bruts)

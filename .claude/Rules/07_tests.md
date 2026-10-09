@@ -70,8 +70,10 @@ tests/
   test_mesurer_precision.py          → mesurer_precision.py (lecture xlsx/vérité/PDF, CSV, CLI), fichiers fabriqués
   test_positions_scan.py             → positions_scan.py sur lectures fabriquées : grille (pente, pas, phase, demi-pas), coupe aux traits (« 0815B/|RM »), jumeaux exacts / par rang / sans jumeau, déplacement (bord, débordement), sections ; rendu Excel (espaces, Courier New 11, False = avant)
   test_positions_scan_reel.py        → Réponses enregistrées (positions_reponses_claude.jsonl) + Tesseract local : PE011 p. 52 (0, 6, 16 ; restes nommés lignes 18 et 32), PE133 p. 15 (10 / 11), PE012 p. 39 (section 0, 4, 7, 13, 18), PE011 p. 1 sans déplacement, PE011 page 123 (cadre ouvert à droite)
+  test_controle_conservation.py      → controle_conservation.py : taux de divergence (lecture identique, mots lus autrement, O/0 compté), seuil PAGE_DEGRADEE, page sans cadre ; pages réelles PE011 p. 52 dégradée, PE133 p. 15 et PE012 p. 39 propres
+  test_a_verifier.py                 → Feuille A VERIFIER : colonnes, une ligne par page dégradée, synthèse + pages triées si majorité, pages vectorielles hors du compte, lien cliquable vers le bloc, pas de feuille sans entrée
   test_cache_lectures.py             → cache_lectures.py : empreinte du contenu, aller-retour, clé changée par DPI / psm, fichier illisible, nom court, purge par âge et par taille, dossier par défaut sous %LOCALAPPDATA%
-  test_positions_converter.py        → Converter : bilan au journal, positions dans l'Excel, lecture dans le cache de l'appli (rien dans la sortie), 2e conversion sans 2e OCR, Tesseract dans un fil à part pendant Claude ; rejeu sans PDF = une ligne au journal
+  test_positions_converter.py        → Converter : bilan au journal, positions dans l'Excel, lecture dans le cache de l'appli (rien dans la sortie), 2e conversion sans 2e OCR, Tesseract dans un fil à part pendant Claude, taux au journal, page dégradée = ligne ℹ + A VERIFIER ; rejeu sans PDF = une ligne au journal
   test_sections_claude.py            → Lignes « NOM DU CABLE : … » des pages lues par Claude : demandées par le prompt (SECTION:), lignes 'section' du format pivot à leur place, rejeu du journal, Excel livré comme la vérité de 223111PE012
   test_emplacement_pied.py           → Texte sans libellé à l'emplacement d'un champ (JARRETIERAGE à la place de BORNIER) : champ remplacé, pas d'alerte, texte gardé à sa place dans le pied livré de 6A23111PE133 ; BORNIER de 223111PE012 inchangé
   test_coquille_o.py                 → Décision B3 : coquille O/0 du numéro de borne (2e mot de TENANT, ABOUTISSANT, BORNE), 4 cellules de 6A23111PE133 p. 8, cas inchangés, cellule orange, alertes attendues
@@ -91,7 +93,7 @@ tests/
   test_claude_opus5.py               → claude_ocr sur Opus 5 / 5.5 : table de capacités, paramètres envoyés, refus avec catégorie, bloc de réflexion, effort refusé, images PNG ≤ 2576 px
 ```
 
-**1047 tests passent** (`pytest tests\`, relevé le 2026-10-05), aucun échec attendu, plus 1 test lent
+**1069 tests passent** (`pytest tests\`, relevé le 2026-10-05), aucun échec attendu, plus 1 test lent
 facultatif (`VERIF_TEST_LENT=1`, relecture du scan de 15 pages, ~30 s). Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.
 

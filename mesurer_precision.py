@@ -263,7 +263,12 @@ def lire_journal_conversion(chemin: Path) -> List[str]:
 
 
 def appliquer_attentes(rapport, attentes: dict, journal: List[str]) -> None:
-    """Alertes (attendues contre lignes ⚠ du journal) et contrôle INDICE dans le rapport."""
+    """Alertes (attendues contre lignes ⚠ du journal) et contrôle INDICE dans le rapport.
+
+    Les lignes ℹ (scan dégradé…) sont des informations de page : listées, jamais
+    comptées comme fausses alertes.
+    """
+    rapport.informations = [lg.split('ℹ', 1)[1].strip() for lg in journal if 'ℹ' in lg]
     if attentes.get('alertes') is not None:
         emises = [lg.split('⚠', 1)[1].strip() for lg in journal if '⚠' in lg]
         rapport.alertes_manquantes, rapport.fausses_alertes = comparer_alertes(

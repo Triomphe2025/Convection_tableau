@@ -131,6 +131,8 @@ class RapportMesure:
     fausses_alertes: Optional[List[str]] = None
     # Contrôle INDICE (« Verite_garde ») : None = non mesuré, sinon (conforme, détail).
     controle_indice: Optional[Tuple[bool, str]] = None
+    # Lignes ℹ du journal (scan dégradé…) : informations de page, jamais des alertes.
+    informations: List[str] = field(default_factory=list)
     nb_cellules_comparees: int = 0
     nb_cellules_identiques: int = 0
 
@@ -728,6 +730,10 @@ def formater_rapport(rapport: RapportMesure, max_ecarts: Optional[int] = None) -
         lignes.extend(f"    manquante : {a}" for a in rapport.alertes_manquantes)
         lignes.append(f"Fausses alertes       : {len(rapport.fausses_alertes)}")
         lignes.extend(f"    fausse : {a.strip()}" for a in rapport.fausses_alertes)
+    if rapport.informations:
+        lignes.append(f"Informations de page  : {len(rapport.informations)} (non comptées "
+                      f"comme alertes)")
+        lignes.extend(f"    {info}" for info in rapport.informations)
     if rapport.controle_indice is not None:
         conforme, detail = rapport.controle_indice
         lignes.append(f"Contrôle INDICE       : {'conforme' if conforme else 'NON CONFORME'} "

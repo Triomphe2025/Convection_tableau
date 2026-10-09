@@ -501,6 +501,7 @@ class Converter:
         import fitz
 
         from cache_lectures import empreinte_fichier
+        from controle_conservation import analyser_page
         from positions_scan import placer_page
         colonnes = list(self.template.columns)
         empreinte = empreinte_fichier(self.word_file)
@@ -514,8 +515,9 @@ class Converter:
                     continue
                 debut = time.monotonic()
                 try:
-                    rows, bilan = placer_page(resultat.get('rows', []), colonnes,
-                                              self._lecture_tesseract(doc, page, empreinte))
+                    lecture = self._lecture_tesseract(doc, page, empreinte)
+                    rows, bilan = placer_page(resultat.get('rows', []), colonnes, lecture)
+                    analyse = analyser_page(rows, colonnes, lecture)
                 except Exception as exc:
                     self._log(f"  ⚠ positions d'origine p. {page} non recalculées : {exc}")
                     continue
@@ -524,12 +526,22 @@ class Converter:
                               f"{bilan['raison']}")
                     continue
                 resultat['rows'] = rows
+                taux = ('non mesurable' if analyse['taux'] is None
+                        else f"{analyse['taux']:.0%}".replace('%', ' %'))
                 self._log(
                     f"  positions d'origine p. {page} : {bilan['exacts']} mot(s) au jumeau "
                     f"exact, {bilan['par_rang']} par rang, {bilan['sans_jumeau']} sans jumeau, "
                     f"{len(bilan['deplaces'])} déplacé(s), {bilan['lignes_sans_partenaire']} "
-                    f"ligne(s) non lue(s) par Tesseract ({time.monotonic() - debut:.1f} s)"
+                    f"ligne(s) non lue(s) par Tesseract, divergence Claude / Tesseract {taux} "
+                    f"({time.monotonic() - debut:.1f} s)"
                 )
+                if analyse['taux'] is not None:
+                    resultat['controle_page'] = {'taux': analyse['taux'],
+                                                 'degradee': analyse['degradee']}
+                if analyse['degradee']:
+                    # Information de page, pas une alerte de cellule (ℹ, pas ⚠).
+                    self._log(f"  ℹ p. {page} : scan dégradé (divergence {taux}) : "
+                              f"à relire en priorité")
                 for d in bilan['deplaces']:
                     self._log(f"    p. {page} ligne {d['ligne']} : « {d['mot']} » passé de "
                               f"{d['de']} à {d['vers']} (lu dans {d['vers']} sur le scan)")

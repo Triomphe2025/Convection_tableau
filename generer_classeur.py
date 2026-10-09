@@ -19,6 +19,7 @@ from openpyxl import Workbook
 from openpyxl.comments import Comment
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.hyperlink import Hyperlink
 from openpyxl.worksheet.page import PageMargins
 from openpyxl.worksheet.pagebreak import Break
 from openpyxl.worksheet.properties import PageSetupProperties
@@ -433,6 +434,78 @@ def appliquer_positions(valides: List[Dict]) -> List[Dict]:
     return resultats
 
 
+COLONNES_A_VERIFIER = ['Page', 'Ligne', 'Colonne', 'Type', 'Message', 'Lecture Tesseract',
+                       'Lien']
+FEUILLE_A_VERIFIER = 'A VERIFIER'
+
+
+def _pourcent(taux: float) -> str:
+    return f"{round(taux * 100)} %"
+
+
+def entrees_pages_degradees(valides: List[Dict]) -> List[Dict]:
+    """Lignes de A VERIFIER pour les scans dégradés (information de page).
+
+    Plus de la moitié des pages scannées dégradées : une synthèse, puis les pages triées
+    par taux décroissant (une ligne par page ne priorise plus rien) ; sinon une ligne
+    par page dégradée. cible = (indice de la page, ligne, colonne) ou None.
+    """
+    mesurees = [(i, r) for i, r in enumerate(valides) if r.get('controle_page')]
+    degradees = [(i, r) for i, r in mesurees if r['controle_page']['degradee']]
+    if not degradees:
+        return []
+    degradees.sort(key=lambda ir: -ir[1]['controle_page']['taux'])
+
+    def entree(i, r, type_, message):
+        return {'page': numero_page(r), 'ligne': None, 'colonne': None, 'type': type_,
+                'message': message, 'lecture': None, 'cible': (i, None, None)}
+
+    if len(degradees) * 2 <= len(mesurees):
+        return [entree(i, r, 'page dégradée', f"scan dégradé (divergence "
+                f"{_pourcent(r['controle_page']['taux'])}) : à relire en priorité")
+                for i, r in degradees]
+    taux = [r['controle_page']['taux'] for _, r in degradees]
+    synthese = {'page': None, 'ligne': None, 'colonne': None, 'type': 'synthèse',
+                'message': f"scan dégradé sur {len(degradees)} pages sur {len(mesurees)} "
+                           f"(taux de {round(min(taux) * 100)} à {_pourcent(max(taux))}) : "
+                           f"contrôle de conservation impossible",
+                'lecture': None, 'cible': None}
+    return [synthese] + [entree(i, r, 'page dégradée',
+                                f"divergence {_pourcent(r['controle_page']['taux'])}")
+                         for i, r in degradees]
+
+
+def ligne_excel(ligne_debut: int, resultat: Dict, rang: int) -> int:
+    """Ligne de la feuille où _fill_worksheet écrit la ligne lue `rang` du bloc."""
+    ligne = ligne_debut + 1
+    for row in (resultat.get('rows') or [])[:rang]:
+        ligne += row.get('count', 1) if row.get('type') == 'blank' else 1
+    return ligne
+
+
+def ecrire_a_verifier(wb, entrees: List[Dict], valides: List[Dict], debuts: List[int],
+                      feuille_tableaux: str) -> None:
+    """Feuille A VERIFIER : une ligne par entrée, lien cliquable vers la cellule ou le bloc."""
+    ws = wb.create_sheet(FEUILLE_A_VERIFIER, index=wb.sheetnames.index(feuille_tableaux) + 1)
+    ws.append(COLONNES_A_VERIFIER)
+    for cellule in ws[1]:
+        cellule.font = Font(bold=True)
+    for e in entrees:
+        ws.append([e['page'], e['ligne'], e['colonne'], e['type'], e['message'],
+                   e['lecture'], None])
+        if e['cible'] is None:
+            continue
+        i, rang, k = e['cible']
+        coord = (f"A{debuts[i]}" if rang is None
+                 else f"{get_column_letter(k + 1)}{ligne_excel(debuts[i], valides[i], rang)}")
+        lien = ws.cell(row=ws.max_row, column=len(COLONNES_A_VERIFIER), value=f"→ {coord}")
+        lien.hyperlink = Hyperlink(ref=lien.coordinate,
+                                   location=f"'{feuille_tableaux}'!{coord}")
+        lien.style = 'Hyperlink'
+    for lettre, largeur in zip('ABCDEFG', (8, 7, 14, 16, 70, 22, 10)):
+        ws.column_dimensions[lettre].width = largeur
+
+
 def police_donnees(ws, ligne_debut: int, resultat: Dict, n_colonnes: int) -> None:
     """Police à chasse fixe sur les cellules de données et de section du bloc."""
     ligne = ligne_debut + 1
@@ -629,8 +702,10 @@ def generer_excel(
     ws.print_options.verticalCentered = True
 
     current_row = 1
+    debuts_blocs: List[int] = []
 
     for i, result in enumerate(valides):
+        debuts_blocs.append(current_row)
         # Aucun nom de bornier ni P.E.T. de repli : un champ absent du pied
         # reste vide (alerte ci-dessus), jamais tiré du nom de fichier.
         next_row = extractor._fill_worksheet(
@@ -662,6 +737,9 @@ def generer_excel(
     if n_illisibles:
         log(f"  ⚠ {n_illisibles} cellule(s) avec « {Config.MARQUEUR_ILLISIBLE} » (caractère "
             f"illisible) colorée(s) dans l'Excel : à vérifier sur l'original.")
+    entrees = entrees_pages_degradees(valides)
+    if entrees:
+        ecrire_a_verifier(wb, entrees, valides, debuts_blocs, ws.title)
 
     # ── Feuille « tableaux word » (si des tableaux Word sont fournis) ──
     if word_results:

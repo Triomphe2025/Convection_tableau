@@ -1154,3 +1154,35 @@ dégradé (PE011), il noierait l'utilisateur : tout seuil qui ramène les fausse
 lisible (≥ 70) fait aussi perdre les vraies (OC→CC). Taux de divergence parmi les mots appariés :
 PE011 p. 52 28 %, p. 119 29 % ; PE133 2 à 6 % ; PE012 ≤ 2 % — une jauge de page pourrait
 séparer les deux cas (à décider, rien n'est branché).
+
+## Commit B1 — indicateur de page et feuille A VERIFIER (2026-10-09)
+
+`controle_conservation.analyser_page` (nouveau module pur) : taux de divergence = mots Claude
+appariés à un mot Tesseract de texte différent / mots appariés (même définition que la mesure
+B0 : alignement du commit A, texte brut). Page « scan dégradé » si taux > `PAGE_DEGRADEE`
+(0,10). `positions_scan` expose `lignes_page` et `apparier_rangs` (factorisation de
+`placer_page`, placement identique ; mots Tesseract avec confiance et y).
+
+Converter : le taux est ajouté à la ligne « positions d'origine p. N » ; page dégradée =
+« ℹ p. N : scan dégradé (divergence N %) : à relire en priorité » (information, pas ⚠).
+Excel : feuille « A VERIFIER » (Page, Ligne, Colonne, Type, Message, Lecture Tesseract, Lien),
+placée après « Borniers », lien cliquable vers le bloc de la page ; conçue pour que l'étape 9
+y ajoute ses alertes (cible = page, ligne, colonne). Plus de la moitié des scans dégradés :
+une synthèse « scan dégradé sur N pages sur M (taux de x à y %) : contrôle de conservation
+impossible » puis les pages par taux décroissant ; sinon une ligne par page dégradée.
+Pas de feuille sans entrée (instantané Excel inchangé). Banc : lignes ℹ listées
+(`RapportMesure.informations`), jamais comptées comme fausses alertes. Campagne : colonne
+`pages_degradees`.
+
+Rejeu sans API des 3 extraits :
+
+| Document | Pages scannées : taux | Classement |
+|---|---|---|
+| 223111PE011 | 1 : 50 %, 2 : 31 %, 3 : 19 %, 9 : 36 %, 52 : 29 %, 119 : 31 %, 122 : 33 %, 123 : 18 % | 8 dégradées sur 8 → synthèse + liste |
+| 6A23111PE133 | 6 : 6 %, 12 : 3 %, 15 : 5 % | propres, pas de feuille A VERIFIER |
+| 223111PE012 | 1 : 2 %, 8 : 2 %, 18 : 1 %, 39 : 1 % | propres, pas de feuille A VERIFIER |
+
+Pages vectorielles : non concernées (lues en grille, pas de lecture Tesseract). Banc : cellules,
+positions, alertes inchangées (PE011 : 0 manquante / 0 fausse, 8 informations listées).
+Test du fil Tesseract pendant Claude rendu indépendant de la charge de la machine (Tesseract
+commence avant la réponse de Claude ; exiger qu'il finisse avant échouait sous charge).

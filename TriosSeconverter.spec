@@ -48,6 +48,7 @@ a = Analysis(
         'relecture_scan',
         'positions_scan',
         'cache_lectures',
+        'controle_conservation',
     ],
     hookspath=[],
     hooksconfig={},
