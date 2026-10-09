@@ -351,7 +351,9 @@ class Config:
     # (COULEUR de 223111PE012 p. 1 est vide à juste titre).
     QUALITE_COLONNES_OBLIGATOIRES = {
         'REPARTITEUR': ('TENANT', 'JAR', 'ABOUTISSANT'),
-        'REPARTITEUR 2': ('FIL', 'TENANT', 'ABOUTISSANT'),
+        # TENANT et ABOUTISSANT vides sur des lignes « NON CABLEE » (vérité 223111PE011 :
+        # 158 et 162 remplis sur 166) : pas obligatoires.
+        'REPARTITEUR 2': ('FIL',),
         'Bornier standard': ('BORNE', 'SIGNAL'),
     }
     # Format des cellules, par modèle de sortie (espaces ramenés à un) ; colonne absente =
@@ -367,10 +369,21 @@ class Config:
             'ABOUTISSANT': r'[A-Z]{2} [A-Z0-9/\-]+ \d{2}( [A-Z0-9])?',
         },
         'Bornier standard': {
-            'BORNE': r'[A-Z]?\d{1,2}[A-Z]?',
+            # Lettre de tête A à Z sans O ni I (repérage des borniers) : « O1 », « I2 » sont
+            # très probablement 01 et 12.
+            'BORNE': r'[A-HJ-NP-Z]?\d{1,2}[A-Z]?',
             'JARRETIERES': r'\d{4,5}[A-Z]?( \d{4,5}[A-Z]?)*',
         },
     }
+    # Garde-fou pour un document jamais vu : plus de cette part des cellules non vides
+    # d'une colonne hors du motif (ou des pages avec une colonne obligatoire vide), c'est
+    # le motif qui ne convient pas : une seule ligne de synthèse, contrôle coupé.
+    QUALITE_GARDE_FOU = 0.20
+    # Confusions de lecture du lexique de référence : une substitution, jamais un chiffre
+    # contre un autre (« RA 17 » / « RA 11 » sont deux numéros voisins normaux).
+    QUALITE_CONFUSIONS_LEXIQUE = (('O', 'C'), ('O', '0'), ('O', 'D'), ('O', 'Q'), ('I', '1'),
+                                  ('I', 'L'), ('S', '5'), ('B', '8'), ('Z', '2'), ('G', '6'),
+                                  ('E', 'F'))
     # Fond d'une cellule signalée par le contrôle qualité (jaune pâle, distinct des autres).
     COULEUR_QUALITE = "FFF2CC"
 

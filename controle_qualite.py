@@ -45,14 +45,22 @@ def formes(texte) -> Set[str]:
     return sortie
 
 
-def variantes(texte: str) -> Iterable[str]:
+def variantes(texte: str, confusions=None) -> Iterable[str]:
     """Formes à une confusion de caractère près (une seule substitution)."""
+    for variante, _ in variantes_et_paires(texte, confusions):
+        yield variante
+
+
+def variantes_et_paires(texte: str, confusions=None):
+    """(forme, « A/B ») à une substitution près ; jamais un chiffre contre un chiffre."""
     for i, ch in enumerate(texte):
-        for a, b in Config.QUALITE_CONFUSIONS:
+        for a, b in (confusions or Config.QUALITE_CONFUSIONS):
+            if a.isdigit() and b.isdigit():
+                continue
             if ch == a:
-                yield texte[:i] + b + texte[i + 1:]
+                yield texte[:i] + b + texte[i + 1:], f"{a}/{b}"
             elif ch == b:
-                yield texte[:i] + a + texte[i + 1:]
+                yield texte[:i] + a + texte[i + 1:], f"{a}/{b}"
 
 
 def _cellules(pages: List[Dict]):
@@ -66,9 +74,9 @@ def _cellules(pages: List[Dict]):
                     yield p, r, k, valeur
 
 
-def _alerte(p, r, k, regle, message, proposition=None) -> Dict:
+def _alerte(p, r, k, regle, message, proposition=None, paire=None) -> Dict:
     return {'page': p, 'ligne': r, 'colonne': k, 'regle': regle, 'message': message,
-            'proposition': proposition}
+            'proposition': proposition, 'paire': paire}
 
 
 def regle_coherence(pages: List[Dict], lexique: Optional[Set[str]] = None) -> List[Dict]:
@@ -81,21 +89,23 @@ def regle_coherence(pages: List[Dict], lexique: Optional[Set[str]] = None) -> Li
             if forme in lexique:
                 continue
             majoritaires = sorted(
-                ((frequences[v], v) for v in set(variantes(forme))
+                ((frequences[v], v, paire) for v, paire in set(variantes_et_paires(forme))
                  if frequences[v] >= Config.QUALITE_MIN_MAJORITE
                  and frequences[v] >= Config.QUALITE_RATIO_MAJORITE * frequences[forme]),
                 reverse=True)
-            connues = sorted(v for v in set(variantes(forme)) if v in lexique)
+            connues = sorted((v, paire) for v, paire in set(variantes_et_paires(
+                forme, Config.QUALITE_CONFUSIONS_LEXIQUE)) if v in lexique)
             if majoritaires:
-                n, v = majoritaires[0]
+                n, v, paire = majoritaires[0]
                 alertes.append(_alerte(p, r, k, 'coherence',
                                        f"« {forme} » écrit « {v} » {n} fois dans le document",
-                                       v))
+                                       v, paire))
                 break
             if connues:
+                v, paire = connues[0]
                 alertes.append(_alerte(p, r, k, 'coherence',
                                        f"« {forme} » absent du lexique de référence, qui porte "
-                                       f"« {connues[0]} »", connues[0]))
+                                       f"« {v} »", v, paire))
                 break
     return alertes
 
@@ -120,7 +130,8 @@ def regle_dictionnaire(pages: List[Dict], dictionnaire) -> List[Dict]:
         entetes = page.get('headers') or []
         colonne = entetes[k] if k < len(entetes) else ''
         proposee, corrigee = dictionnaire.correct(colonne, valeur)
-        if corrigee and proposee != valeur:
+        # Un écart d'espaces seul n'est pas une proposition (cellules aux positions d'origine)
+        if corrigee and ' '.join(proposee.split()) != ' '.join(valeur.split()):
             alertes.append(_alerte(p, r, k, 'dictionnaire',
                                    f"« {valeur} » : le dictionnaire propose « {proposee} »",
                                    proposee))
@@ -145,33 +156,60 @@ def regle_continuite(pages: List[Dict], colonnes: Iterable[str], saut_max: int) 
             if nom.upper() not in entetes:
                 continue
             k = entetes.index(nom.upper())
-            precedent, suspect = None, None
+            # Une suite par code (« RM 11B, RM 12B » et « RA 17, RA 18 » sont deux suites
+            # entremêlées), remise à zéro à chaque ligne de section.
+            suites: Dict[str, list] = {}
 
             def dans_la_suite(avant, apres):
-                return (avant is not None and avant[0] == apres[0]
-                        and 0 <= apres[1] - avant[1] <= saut_max)
+                return avant is not None and 0 <= apres[1] - avant[1] <= saut_max
 
             for r, row in enumerate(page.get('rows') or []):
+                if row.get('type') == 'section':
+                    suites = {}
+                    continue
                 if row.get('type') != 'data' or k >= len(row.get('cells') or []):
                     continue
                 lu = _numero(row['cells'][k])
                 if lu is None:
                     continue
+                precedent, suspect = suites.get(lu[0], (None, None))
                 # Après une alerte, la suite reprend de la valeur signalée (vrai saut, déjà
                 # signalé une fois) ou de celle d'avant (valeur isolée) : pas de 2e alerte.
-                if (precedent is None or precedent[0] != lu[0] or dans_la_suite(precedent, lu)
-                        or dans_la_suite(suspect, lu)):
-                    precedent, suspect = lu, None
+                if precedent is None or dans_la_suite(precedent, lu) or dans_la_suite(suspect, lu):
+                    suites[lu[0]] = (lu, None)
                     continue
                 alertes.append(_alerte(p, r, k, 'continuite',
                                        f"suite des numéros : {precedent[1]} puis {lu[1]}"))
-                suspect = lu
+                suites[lu[0]] = (precedent, lu)
     return alertes
 
 
-def regle_colonne_vide(pages: List[Dict], obligatoires: Iterable[str]) -> List[Dict]:
-    """Colonne obligatoire du modèle entièrement vide sur une page qui a des lignes."""
-    alertes = []
+def _garde_fou(alertes_par_colonne: Dict[tuple, List[Dict]], totaux: Dict[tuple, int],
+               regle: str, message) -> List[Dict]:
+    """Colonne où plus de QUALITE_GARDE_FOU des cas sortent : une synthèse, contrôle coupé.
+
+    Sur un document jamais vu, c'est alors le motif (ou la liste des colonnes
+    obligatoires) qui ne convient pas, pas la lecture.
+    """
+    sortie = []
+    for (k, nom), alertes in sorted(alertes_par_colonne.items()):
+        if totaux.get((k, nom)) and len(alertes) / totaux[(k, nom)] > Config.QUALITE_GARDE_FOU:
+            sortie.append(_alerte(None, None, k, regle, message(nom)))
+        else:
+            sortie += alertes
+    return sortie
+
+
+def taux_colonnes_vides(pages: List[Dict], obligatoires: Iterable[str]) -> Dict[str, float]:
+    """Part des pages (qui ont des lignes) où chaque colonne obligatoire est vide."""
+    vides, pages_comptees = _colonnes_vides(pages, obligatoires)
+    return {nom: len(a) / pages_comptees[(k, nom)]
+            for (k, nom), a in vides.items() if pages_comptees.get((k, nom))}
+
+
+def _colonnes_vides(pages, obligatoires):
+    vides: Dict[tuple, List[Dict]] = {}
+    comptees: Dict[tuple, int] = {}
     for p, page in enumerate(pages):
         lignes = [row for row in page.get('rows') or [] if row.get('type') == 'data']
         entetes = [h.upper() for h in page.get('headers') or []]
@@ -181,24 +219,54 @@ def regle_colonne_vide(pages: List[Dict], obligatoires: Iterable[str]) -> List[D
             if nom.upper() not in entetes:
                 continue
             k = entetes.index(nom.upper())
+            cle = (k, nom)
+            comptees[cle] = comptees.get(cle, 0) + 1
+            vides.setdefault(cle, [])
             if not any((row['cells'][k] if k < len(row['cells']) else '').strip()
                        for row in lignes):
-                alertes.append(_alerte(p, None, k, 'colonne_vide',
-                                       f"colonne {nom} entièrement vide sur la page"))
-    return alertes
+                vides[cle].append(_alerte(p, None, k, 'colonne_vide',
+                                          f"colonne {nom} entièrement vide sur la page"))
+    return vides, comptees
+
+
+def regle_colonne_vide(pages: List[Dict], obligatoires: Iterable[str]) -> List[Dict]:
+    """Colonne obligatoire du modèle entièrement vide sur une page qui a des lignes."""
+    vides, comptees = _colonnes_vides(pages, obligatoires)
+    return _garde_fou(vides, comptees, 'colonne_vide',
+                      lambda nom: f"colonne {nom} vide sur trop de pages de ce document, "
+                                  f"contrôle coupé pour cette colonne")
+
+
+def _hors_format(pages, formats):
+    motifs = {c.upper(): re.compile(m) for c, m in formats.items()}
+    hors: Dict[tuple, List[Dict]] = {}
+    totaux: Dict[tuple, int] = {}
+    for p, r, k, valeur in _cellules(pages):
+        entetes = [h.upper() for h in pages[p].get('headers') or []]
+        nom = entetes[k] if k < len(entetes) else ''
+        motif = motifs.get(nom)
+        if not motif:
+            continue
+        totaux[(k, nom)] = totaux.get((k, nom), 0) + 1
+        hors.setdefault((k, nom), [])
+        if not motif.fullmatch(_norm(valeur)):
+            hors[(k, nom)].append(_alerte(p, r, k, 'format',
+                                          f"« {_norm(valeur)} » hors du format de {nom}"))
+    return hors, totaux
+
+
+def taux_hors_format(pages: List[Dict], formats: Dict[str, str]) -> Dict[str, float]:
+    """Part des cellules non vides de chaque colonne hors de son motif, dans le document."""
+    hors, totaux = _hors_format(pages, formats)
+    return {nom: len(a) / totaux[(k, nom)] for (k, nom), a in hors.items()}
 
 
 def regle_format(pages: List[Dict], formats: Dict[str, str]) -> List[Dict]:
     """Cellule hors du motif de sa colonne (espaces ramenés à un, cellule vide ignorée)."""
-    alertes = []
-    motifs = {c.upper(): re.compile(m) for c, m in formats.items()}
-    for p, r, k, valeur in _cellules(pages):
-        entetes = [h.upper() for h in pages[p].get('headers') or []]
-        motif = motifs.get(entetes[k]) if k < len(entetes) else None
-        if motif and not motif.fullmatch(_norm(valeur)):
-            alertes.append(_alerte(p, r, k, 'format',
-                                   f"« {_norm(valeur)} » hors du format de {entetes[k]}"))
-    return alertes
+    hors, totaux = _hors_format(pages, formats)
+    return _garde_fou(hors, totaux, 'format',
+                      lambda nom: f"format de la colonne {nom} non reconnu dans ce document, "
+                                  f"contrôle coupé pour cette colonne")
 
 
 def controler_document(pages: List[Dict], modele: str, lexique: Optional[Set[str]] = None,

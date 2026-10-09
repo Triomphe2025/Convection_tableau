@@ -156,6 +156,8 @@ le calibrage déjà fait sur `verificateur.py`.
 | `QUALITE_CONTINUITE` / `QUALITE_SAUT_MAX` | par modèle / `10` | Colonnes numérotées et saut maximal (à calibrer) |
 | `QUALITE_COLONNES_OBLIGATOIRES` | par modèle | Colonnes jamais entièrement vides |
 | `QUALITE_FORMATS` | par modèle | Motif des cellules par colonne (à valider) |
+| `QUALITE_GARDE_FOU` | `0.20` | Au-delà de cette part de cellules hors motif (ou de pages à colonne obligatoire vide) dans un document : une seule ligne de synthèse, contrôle coupé pour la colonne |
+| `QUALITE_CONFUSIONS_LEXIQUE` | O/C, O/0, O/D, O/Q, I/1, I/L, S/5, B/8, Z/2, G/6, E/F | « À une confusion près » du lexique : une substitution, jamais chiffre contre chiffre |
 | `COULEUR_QUALITE` | `FFF2CC` | Fond d'une cellule signalée par le contrôle qualité |
 
 ## Ajouter un nouveau paramètre

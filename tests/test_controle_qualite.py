@@ -105,6 +105,14 @@ class TestDictionnaire(unittest.TestCase):
             alertes = cq.regle_dictionnaire(self._pages(), _Dico())
         self.assertNotIn(2, [a['page'] for a in alertes])
 
+    def test_ecart_d_espaces_seul_pas_signale(self):
+        class Espaces:
+            def correct(self, colonne, valeur):
+                return ('4   BC', True)
+        pages = [_page(('4  BC', '', '', ''), methode='header')]
+        with patch.object(Config, 'QUALITE_DICTIONNAIRE_MODES', {'claude': False, 'ocr': True}):
+            self.assertEqual(cq.regle_dictionnaire(pages, Espaces()), [])
+
 
 class TestContinuite(unittest.TestCase):
 
@@ -133,7 +141,9 @@ class TestContinuite(unittest.TestCase):
 class TestColonneVide(unittest.TestCase):
 
     def test_colonne_obligatoire_vide_signalee(self):
-        pages = [_page(('PA 01', '', 'P310TS 10', 'X'), ('PA 02', '', 'P310TS 11', 'Y'))]
+        # 1 page sur 5 : sous le garde-fou (20 %), alerte de page.
+        pages = [_page(('PA 01', '', 'P310TS 10', 'X'), ('PA 02', '', 'P310TS 11', 'Y'))] + [
+            _page(('PA 01', '0281W', 'P310TS 10', 'X')) for _ in range(4)]
         alertes = cq.regle_colonne_vide(pages, ['JAR'])
         self.assertEqual([(a['page'], a['ligne'], a['colonne']) for a in alertes],
                          [(0, None, 1)])
@@ -149,8 +159,9 @@ class TestColonneVide(unittest.TestCase):
 class TestFormat(unittest.TestCase):
 
     def test_hors_motif_signale(self):
+        # 1 cellule hors motif sur 6 : sous le garde-fou (20 %), alerte de cellule.
         pages = [_page(('PA 01', '0281W', '', ''), ('PA 02', '028IW', '', ''),
-                       ('PA 03', '', '', ''))]
+                       ('PA 03', '', '', ''), *[('PA 04', '0282W', '', '')] * 4)]
         alertes = cq.regle_format(pages, {'JAR': r'\d{4}[A-Z]'})
         self.assertEqual(_cellules(alertes), [(0, 1, 1)])
 
@@ -177,3 +188,62 @@ class TestControlerDocument(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestAjustementsC0(unittest.TestCase):
+    """Ajustements validés avant la mesure C0."""
+
+    def test_borne_lettre_de_tete_sans_o_ni_i(self):
+        motif = Config.QUALITE_FORMATS['Bornier standard']['BORNE']
+        page = {'success': True, 'headers': ['BORNE', 'COULEUR', 'SIGNAL', 'JARRETIERES'],
+                'rows': [{'type': 'data', 'cells': [b, '', 'X', '']}
+                         for b in ('A1', 'P5', '01A', 'O1', 'I2', 'A1', 'B2', 'C3', 'D4', 'E5',
+                                   'F6', 'G7')]}
+        alertes = cq.regle_format([page], {'BORNE': motif})
+        self.assertEqual(sorted(a['ligne'] for a in alertes), [3, 4])
+
+    def test_garde_fou_format_une_synthese(self):
+        page = _page(*[('PA 01', 'X%d' % i, '', '') for i in range(4)],
+                     *[('PA 01', '0281W', '', '')] * 6)
+        alertes = cq.regle_format([page], {'JAR': r'\d{4}[A-Z]'})
+        self.assertEqual(len(alertes), 1)
+        self.assertEqual((alertes[0]['page'], alertes[0]['ligne']), (None, None))
+        self.assertIn('format de la colonne JAR non reconnu dans ce document',
+                      alertes[0]['message'])
+
+    def test_garde_fou_format_sous_le_seuil(self):
+        page = _page(('PA 01', 'X1', '', ''), *[('PA 01', '0281W', '', '')] * 9)
+        self.assertEqual(len(cq.regle_format([page], {'JAR': r'\d{4}[A-Z]'})), 1)
+
+    def test_garde_fou_colonne_vide(self):
+        pages = [_page(('PA 01', '', 'X', '')) for _ in range(3)] + [
+            _page(('PA 01', '0281W', 'X', '')) for _ in range(7)]
+        alertes = cq.regle_colonne_vide(pages, ['JAR'])
+        self.assertEqual(len(alertes), 1)
+        self.assertIsNone(alertes[0]['page'])
+        self.assertIn('colonne JAR', alertes[0]['message'])
+
+    def test_lexique_table_de_confusions_et_paire(self):
+        pages = [_page(('PA 01', '', 'Q4BVG 18', 'CC FS 14 50'))]
+        alertes = cq.regle_coherence(pages, lexique={'OC FS 14 50', 'Q48VG 18'})
+        self.assertEqual(sorted((a['colonne'], a['paire']) for a in alertes),
+                         [(2, 'B/8'), (3, 'O/C')])
+
+    def test_lexique_jamais_chiffre_contre_chiffre(self):
+        pages = [_page(('RA 17', '', '', ''), ('RA 11', '', '', ''))]
+        self.assertEqual(cq.regle_coherence(pages, lexique={'RA 17'}), [])
+
+    def test_lexique_sans_voisin_pas_d_alerte(self):
+        pages = [_page(('NOUVEL 01', '', '', ''))]
+        self.assertEqual(cq.regle_coherence(pages, lexique={'PA 01'}), [])
+
+    def test_continuite_une_suite_par_code(self):
+        pages = [_page(('RM 11B', '', 'RA 17', ''), ('RM 12B', '', 'RA 18', ''),
+                       ('RA 19', '', 'RM 13B', ''), ('RM 14B', '', 'RA 40', ''))]
+        alertes = cq.regle_continuite(pages, ['TENANT', 'ABOUTISSANT'], saut_max=2)
+        self.assertEqual(_cellules(alertes), [(0, 3, 2)])
+
+    def test_continuite_remise_a_zero_a_la_section(self):
+        page = _page(('PA 01', '', '', ''), ('PA 02', '', '', ''), ('PA 30', '', '', ''))
+        page['rows'].insert(2, {'type': 'section', 'text': 'NOM DU CABLE : X'})
+        self.assertEqual(cq.regle_continuite([page], ['TENANT'], saut_max=2), [])

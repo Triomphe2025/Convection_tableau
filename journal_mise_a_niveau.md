@@ -1283,3 +1283,25 @@ Constats préalables : dans l'extrait 223111PE011, les seuls « OC FS » sont le
 La correction silencieuse du dictionnaire n'existe que dans `_fill_worksheet`, appelé par
 `generer_classeur` (modes Tesseract, Docling, Word) : la retirer ne demandera pas de toucher
 `ocr_processor.py`.
+
+## Étape 9, ajustements validés et mesure C0 (2026-10-09)
+
+Ajustements : REPARTITEUR 2, seule FIL obligatoire (vérité : FIL 166/166, TENANT 158/166,
+ABOUTISSANT 162/166 — cases vides des lignes NON CABLEE p. 2, 3, 119) ; BORNE sans O ni I en
+lettre de tête ; garde-fou 20 % (format et colonne vide) ; lexique « à une confusion près »
+(table de 11 paires, jamais chiffre contre chiffre, pas de voisin = pas d'alerte) ; continuité
+par code, remise à zéro aux sections ; dictionnaire : un écart d'espaces seul n'est pas une
+proposition. Lexique : `references/excels_valides/` (PE013, PE021, PE022), hors de git.
+
+C0 (rejeu des réponses enregistrées, sans API ; 21 pages, 50 erreurs injectées, graine
+20261009), rapport complet dans `mesures/c0_rapport.md` :
+- cohérence + lexique : 2 vraies, 0 fausse (les 2 « CC FS 14 50 » de PE011) ; 14/50 injectées ;
+- format : 4 vraies, 0 fausse ; 18/50 ; taux hors motif le plus haut 1 % (PE133 TENANT) ;
+- colonne vide : 0 / 0 ;
+- dictionnaire : Claude 1 vraie, 95 fausses (4,52 / page) ; Tesseract 24 vraies, 74 fausses
+  (3,22 / page) ;
+- continuité : aucune vraie, 7,05 à 2,76 fausses / page des seuils 1 à 20 (suites descendantes
+  et numéros d'équipements différents sous un même code) ;
+- règles sous le critère, ensemble : 17/25 injectées vues sur pages vectorielles, 13/25 sur
+  pages scannées.
+Rien de branché : décision de l'utilisateur attendue.
