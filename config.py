@@ -318,6 +318,63 @@ class Config:
     COULEUR_CONSERVATION = "E4DFEC"
 
     # ========================================
+    # ✅ CONTRÔLE QUALITÉ (controle_qualite.py, étape 9)
+    # ========================================
+    # Le contrôle qualité ne modifie jamais une valeur : alerte dans A VERIFIER, cellule
+    # colorée, proposition en commentaire. Une règle n'est activée qu'après la mesure C0
+    # (au plus 1 fausse alerte par page en moyenne sur les 3 extraits).
+    QUALITE_REGLES = {'coherence': False, 'dictionnaire': False, 'continuite': False,
+                      'colonne_vide': False, 'format': False}
+    # Confusions de caractère de la règle de cohérence (une substitution à la fois).
+    QUALITE_CONFUSIONS = (('O', 'C'), ('O', '0'), ('I', '1'), ('S', '5'), ('B', '8'))
+    # Mots plus courts (« OC », « PH ») trop fréquents pour être comparés seuls ; la
+    # cellule entière l'est aussi (« CC FS 14 50 » contre « OC FS 14 50 »).
+    QUALITE_LONGUEUR_MIN = 4
+    # Forme majoritaire : au moins N occurrences et RATIO fois la forme suspecte.
+    QUALITE_MIN_MAJORITE = 2
+    QUALITE_RATIO_MAJORITE = 1.5
+    # Lexique de référence : Excel déjà corrigés par l'utilisateur (hors de git).
+    QUALITE_LEXIQUE_DOSSIER = Path(__file__).parent / 'references' / 'excels_valides'
+    QUALITE_LEXIQUE_FEUILLE = 'Listing'
+    # Dictionnaire en alerte, par mode ; jamais sur une page vectorielle (texte exact).
+    # 'claude' = moteurs vision (décidé par la mesure C0), 'ocr' = Tesseract, Docling, Word.
+    QUALITE_DICTIONNAIRE_MODES = {'claude': False, 'ocr': True}
+    # Continuité des numéros : colonnes par modèle de sortie et saut maximal (les originaux
+    # ont de vrais trous : 6A23111PE133 p. 6 0303W → 0308R, p. 12 0652B → 0662B).
+    QUALITE_CONTINUITE = {
+        'REPARTITEUR': ('TENANT', 'JAR', 'ABOUTISSANT'),
+        'REPARTITEUR 2': ('TENANT', 'ABOUTISSANT'),
+        'Bornier standard': ('BORNE', 'JARRETIERES'),
+    }
+    QUALITE_SAUT_MAX = 10
+    # Colonnes qui ne sont jamais entièrement vides sur une page, par modèle de sortie
+    # (COULEUR de 223111PE012 p. 1 est vide à juste titre).
+    QUALITE_COLONNES_OBLIGATOIRES = {
+        'REPARTITEUR': ('TENANT', 'JAR', 'ABOUTISSANT'),
+        'REPARTITEUR 2': ('FIL', 'TENANT', 'ABOUTISSANT'),
+        'Bornier standard': ('BORNE', 'SIGNAL'),
+    }
+    # Format des cellules, par modèle de sortie (espaces ramenés à un) ; colonne absente =
+    # texte libre (SIGNAL, FIL, COULEUR). Motifs tirés des vérités des 3 extraits.
+    QUALITE_FORMATS = {
+        'REPARTITEUR': {
+            'TENANT': r'[A-Z0-9/]+ \d{1,3}[A-Z]?',
+            'JAR': r'\d{4}[A-Z]|\d{5}',
+            'ABOUTISSANT': r'[A-Z0-9/]+ \d{1,3}[A-Z]?',
+        },
+        'REPARTITEUR 2': {
+            'TENANT': r'[A-Z]{2} [A-Z0-9/\-]+ \d{2}( [A-Z0-9])?',
+            'ABOUTISSANT': r'[A-Z]{2} [A-Z0-9/\-]+ \d{2}( [A-Z0-9])?',
+        },
+        'Bornier standard': {
+            'BORNE': r'[A-Z]?\d{1,2}[A-Z]?',
+            'JARRETIERES': r'\d{4,5}[A-Z]?( \d{4,5}[A-Z]?)*',
+        },
+    }
+    # Fond d'une cellule signalée par le contrôle qualité (jaune pâle, distinct des autres).
+    COULEUR_QUALITE = "FFF2CC"
+
+    # ========================================
     # 📏 MESURE DE PRÉCISION (outil de QA sur jeu de test connu)
     # ========================================
     # Compare une sortie .xlsx à une référence organisée à l'avance (PDF

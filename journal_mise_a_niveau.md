@@ -1265,3 +1265,21 @@ A VERIFIER, 0 alerte de conservation sur les réponses non modifiées, 0 déplac
   remesurer.
 
 Tag : etape-8-ok.
+
+## Étape 9, phase 1 — contrôle qualité écrit, non branché, non mesuré (2026-10-09)
+
+`controle_qualite.py` (module pur, format pivot, ne modifie jamais une valeur) : règles
+cohérence (document + lexique), dictionnaire (par mode, jamais sur une page vectorielle),
+continuité, colonne obligatoire vide, format par modèle ; toutes coupées
+(`QUALITE_REGLES`). `lexique_reference.py` : formes des feuilles « Listing » de
+`references/excels_valides/` (223111PE013, PE021, PE022 : 6 817 formes, dont « OC FS 14 50 »
+et « OC FS 14 50 + OCFSCS » de PE013), document mesuré exclu. `outils_reference/mesure_c0.py` :
+rejeu Claude + conversion Tesseract locale, chaque règle seule, vraies / fausses, 50 erreurs
+injectées, OC→CC — pas encore lancé : les motifs de format attendent la validation de
+l'utilisateur.
+
+Constats préalables : dans l'extrait 223111PE011, les seuls « OC FS » sont les 2 cellules lues
+« CC FS » par Claude — la cohérence du document seul ne peut pas les voir ; le lexique peut.
+La correction silencieuse du dictionnaire n'existe que dans `_fill_worksheet`, appelé par
+`generer_classeur` (modes Tesseract, Docling, Word) : la retirer ne demandera pas de toucher
+`ocr_processor.py`.

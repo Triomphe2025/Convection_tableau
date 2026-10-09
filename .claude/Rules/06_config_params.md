@@ -143,6 +143,21 @@ le calibrage déjà fait sur `verificateur.py`.
 | `CONSERVATION_CONFIANCE_MIN` | `60` | Confiance Tesseract minimale d'un mot (médiane pour une ligne) pour une alerte de conservation |
 | `COULEUR_CONSERVATION` | `E4DFEC` | Fond d'une cellule où un élément est peut-être omis |
 
+## Contrôle qualité (étape 9, section « CONTRÔLE QUALITÉ »)
+
+| Paramètre | Valeur défaut | Rôle |
+|-----------|--------------|------|
+| `QUALITE_REGLES` | toutes `False` | Interrupteur par règle ; activée seulement si la mesure C0 donne au plus 1 fausse alerte par page en moyenne |
+| `QUALITE_CONFUSIONS` | O/C, O/0, I/1, S/5, B/8 | Confusions de la règle de cohérence |
+| `QUALITE_LONGUEUR_MIN` | `4` | Mots et cellules plus courts non comparés |
+| `QUALITE_MIN_MAJORITE` / `QUALITE_RATIO_MAJORITE` | `2` / `1.5` | Forme majoritaire d'un document |
+| `QUALITE_LEXIQUE_DOSSIER` / `QUALITE_LEXIQUE_FEUILLE` | `references/excels_valides` / `Listing` | Excel déjà corrigés servant de lexique (jamais de remplacement) |
+| `QUALITE_DICTIONNAIRE_MODES` | `claude` False, `ocr` True | Dictionnaire en alerte par mode ; jamais sur une page vectorielle |
+| `QUALITE_CONTINUITE` / `QUALITE_SAUT_MAX` | par modèle / `10` | Colonnes numérotées et saut maximal (à calibrer) |
+| `QUALITE_COLONNES_OBLIGATOIRES` | par modèle | Colonnes jamais entièrement vides |
+| `QUALITE_FORMATS` | par modèle | Motif des cellules par colonne (à valider) |
+| `COULEUR_QUALITE` | `FFF2CC` | Fond d'une cellule signalée par le contrôle qualité |
+
 ## Ajouter un nouveau paramètre
 
 1. Ajouter dans `Config` (class dans config.py) avec valeur par défaut
