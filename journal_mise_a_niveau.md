@@ -1106,3 +1106,51 @@ Mesure (rejeu PE011, faux client à 4 s par page, Tesseract local, cache vide) :
 finit avant la réponse de Claude, et l'Excel est identique.
 Limite : les pages de garde scannées sont lues par Tesseract même si Claude les écarte ensuite
 (≈ 2 s chacune, dans le temps caché).
+
+## Étape 8 — mesure B0 : Tesseract seconde lecture et contrôle de conservation (2026-10-09)
+
+Outil `outils_reference/mesure_b0.py` (hors de l'appli, aucun appel API, aucun code de l'appli
+modifié) ; rapport complet : `mesures/b0_rapport.md`. 15 pages scannées de tableau (PE011 : 8,
+PE133 : 3, PE012 : 4), dernières réponses Claude enregistrées, lecture Tesseract du commit A,
+vérités validées, graine 20261009. Divergence = mot Claude apparié (alignement du commit A) à un
+mot Tesseract de texte différent ; vraie si le mot Claude est faux selon la vérité.
+
+Totaux, divergences brutes :
+
+| Seuil conf | Alertes/page moy (max) | Vraies / fausses | Ratées | Erreurs injectées vues | Mots retrouvés | Lignes retrouvées | Bruit conservation/page moy (max) |
+|---|---|---|---|---|---|---|---|
+| aucun | 31,7 (183) | 3 / 472 | 1 | 48/50 | 18/20 | 4/5 | 3,0 (17) |
+| 60 | 11,1 (55) | 2 / 164 | 2 | 42/50 | 16/20 | 4/5 | 1,4 (7) |
+| 70 | 7,0 (36) | 0 / 105 | 4 | 35/50 | 15/20 | 4/5 | 1,2 (6) |
+| 80 | 3,1 (15) | 0 / 47 | 4 | 33/50 | 13/20 | 4/5 | 1,1 (5) |
+| 90 | 1,0 (7) | 0 / 15 | 4 | 29/50 | 8/20 | 4/5 | 0,3 (2) |
+| 95 | 0,3 (2) | 0 / 5 | 4 | 12/50 | 6/20 | 3/5 | 0,0 (0) |
+
+Par document, à 80 : PE011 3,8 alertes/page (max 15), 30 fausses ; PE133 3,7 (7), 11 fausses ;
+PE012 1,5 (3), 6 fausses. Sans seuil : PE011 50,6/page (max 183 en p. 119), PE133 19,0,
+PE012 3,2. Variante sans les confusions O/0, I/1, l/1 : fausses alertes − 17 % sans seuil,
+mais les erreurs injectées O/0 et I/1 ne sont plus vues (35/50 sans seuil).
+
+Erreurs connues de Claude : OC→CC de PE011 p. 119 signalées 2/2 sans seuil et à 60 (conf
+Tesseract 64, 66 et 26), 0/2 dès 70. TRANS. de PE133 p. 15 : 0/1 à tout seuil — Tesseract lit
+lui aussi la tache comme un point.
+
+Glissements remis par le commit A : 9/10 (PE011 p. 1 : « QTEL2 » mal lu par Tesseract, seul
+« 12 » revient) ; déplacements à tort : 0 sur les réponses non modifiées, 0 sur la copie.
+
+Qualité de Tesseract seul (cellules identiques à la vérité) : PE133 et PE012 81 à 100 % par
+colonne, part des mots Claude alignés 89 à 100 %, autant de lignes Tesseract que de lignes
+Claude ; PE011 0 à 86 % (TENANT 0 à 12 % sur p. 52 et 119 : « Al04 », « FH », « TAl06 »),
+part alignée 74 à 96 %, lignes manquées (p. 1 : 3 pour 4 ; p. 2 et 3 : 5 pour 7 ; p. 52 : 58
+pour 60).
+
+Pourquoi des omissions ne sont pas retrouvées : sur les pages aux lignes presque identiques
+(p. 52 « PH A104 nn … »), une ligne retirée fait glisser l'appariement d'un cran ; erreurs
+injectées non vues : ligne non lue par Tesseract (p. 52 ligne 32) ou aucun mot Tesseract en face.
+
+Constat : sur les scans propres (PE133, PE012), Tesseract tient le rôle — ≈ 1 à 4 alertes par
+page à 80, 2/3 des erreurs injectées vues, bruit de conservation ≈ 1 mot par page. Sur un scan
+dégradé (PE011), il noierait l'utilisateur : tout seuil qui ramène les fausses alertes à un niveau
+lisible (≥ 70) fait aussi perdre les vraies (OC→CC). Taux de divergence parmi les mots appariés :
+PE011 p. 52 28 %, p. 119 29 % ; PE133 2 à 6 % ; PE012 ≤ 2 % — une jauge de page pourrait
+séparer les deux cas (à décider, rien n'est branché).
