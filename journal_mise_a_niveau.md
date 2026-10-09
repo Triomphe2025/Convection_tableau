@@ -1228,3 +1228,40 @@ de la mesure B0 (« 15B/M ») tient à deux lignes voisines sans clé exploitabl
 (« 17B/N » supprimé par la mesure, « 16BC » lu « 168 » par Tesseract) : entre deux ancres, des
 lignes qui ne diffèrent que par leur numéro restent indiscernables. Page dégradée : le contrôle
 de conservation y est de toute façon coupé.
+
+## Étape 8 — passage réel et clôture (2026-10-09)
+
+Passage réel sur les 3 extraits avec le code final (commit 1969535), Opus 5.5 effort medium,
+1 passage par extrait : PE011 passage 9, PE133 passage 2, PE012 passage 3. Identifiants de
+réponse tous neufs (8 + 4 + 5, aucun déjà vu dans un autre passage). Coût 0,335 + 0,214 +
+0,218 = 0,77 $.
+
+| | PE011 | PE133 | PE012 |
+|---|---|---|---|
+| Cellules fausses | 2 / 664 (OC→CC, p. 119, connu) | 1 / 892 (TRANS., p. 15, tache) | 0 / 949 |
+| Positions fausses | 4 (p. 52, lignes 18 et 32 non lues par Tesseract) | 0 | 0 |
+| Pieds faux, glissements, lignes manquantes | 0 | 0 | 0 |
+| Alertes manquantes / fausses | 0 / 0 | 0 / 0 | 0 / 0 |
+| Contrôle INDICE | (pas de garde) | conforme | conforme |
+| Lignes brutes au mauvais nombre de colonnes | 0 / 152 | 0 / 155 | 0 / 147 |
+| Pages sans positions | 0 | 0 | 0 |
+| Taux de divergence par page | 50, 31, 19, 36, 29, 31, 33, 18 % | 6, 3, 5 % | 2, 2, 1, 1 % |
+| Pages dégradées | 8 / 8 → synthèse dans A VERIFIER | 0 (pas de feuille) | 0 (pas de feuille) |
+| Alertes de conservation | — (contrôle impossible) | 0 | 0 |
+
+Conforme au rejeu sans API, chiffre pour chiffre (cellules, positions, taux, classement,
+A VERIFIER, 0 alerte de conservation sur les réponses non modifiées, 0 déplacement).
+
+Étape 8 terminée :
+- Positions d'origine des pages scannées (commit A, page 123, cache de l'appli, Tesseract
+  pendant Claude) : PE011 p. 52 120 → 4, PE133 p. 15 112 → 0, PE012 p. 39 1 → 0.
+- Indicateur de page (B1) : taux de divergence, « scan dégradé » au-delà de 10 %, feuille
+  A VERIFIER (conçue pour l'étape 9), synthèse quand la majorité des scans sont dégradés.
+- Contrôle de conservation (B2, B3) : pages propres, confiance ≥ 60, mots recollés sans
+  alerte, ancrage des lignes ; mesure : mots 11/11, lignes 4/4, glissements 7/7, 0 fausse
+  alerte.
+- Double lecture mot à mot : mesurée (B0), non activée — 0 vraie alerte dès le seuil 70, les
+  2 vraies noyées dans 132 fausses en dessous ; `outils_reference/mesure_b0.py` gardé pour la
+  remesurer.
+
+Tag : etape-8-ok.
