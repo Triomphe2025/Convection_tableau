@@ -1186,3 +1186,28 @@ Pages vectorielles : non concernées (lues en grille, pas de lecture Tesseract).
 positions, alertes inchangées (PE011 : 0 manquante / 0 fausse, 8 informations listées).
 Test du fil Tesseract pendant Claude rendu indépendant de la charge de la machine (Tesseract
 commence avant la réponse de Claude ; exiger qu'il finisse avant échouait sous charge).
+
+## Commit B2 — contrôle de conservation (2026-10-09)
+
+`controle_conservation.analyser_page` : sur une page propre (taux ≤ `PAGE_DEGRADEE`) et
+`CONTROLE_CONSERVATION`, un mot Tesseract de confiance ≥ `CONSERVATION_CONFIANCE_MIN` (60) sans
+mot Claude en face donne « élément peut-être omis » dans sa cellule ; une ligne Tesseract de la
+zone du tableau (entre la première et la dernière ligne appariée), sans ligne Claude et de
+confiance médiane ≥ 60, donne « ligne peut-être manquante entre « … » et « … » ». Un bloc
+Tesseract égal, recollé, au bloc Claude d'en face n'est pas une omission (« 1B » pour « 1 B » :
+les 5 fausses omissions de PE012 à 60 dans la mesure B0). Page dégradée : une seule ligne
+« … à relire en priorité ; contrôle de conservation impossible » (journal ℹ et A VERIFIER).
+
+Converter : alertes ⚠ au journal et dans `resultat['a_verifier']` (ligne, colonne, type,
+message, lecture) — clé que l'étape 9 réutilisera. Excel : lignes dans A VERIFIER après les
+pages, lien vers la cellule ; élément omis = cellule colorée (`COULEUR_CONSERVATION`) et
+commentée, valeur de Claude gardée ; ligne manquante = commentaire sur la 1re cellule de la ligne
+suivante, aucune ligne insérée.
+
+Mesure (rejeu sans API, `outils_reference/mesure_b0.py`, section « Commit B » : code livré, sur
+lignes placées comme dans le convertisseur) :
+- Pages propres (PE133 6, 12, 15 ; PE012 1, 8, 18, 39) : mots retrouvés **11/11**, lignes
+  **4/4**, glissements remis **7/7**, déplacements à tort **0** (origine et copie), fausses
+  alertes de conservation sur la copie : **0** (max 0 par page).
+- Réponses non modifiées : **0 alerte** sur les 15 pages scannées.
+- PE011 : 8 pages dégradées (18 à 50 %), contrôle de conservation impossible.

@@ -139,6 +139,9 @@ le calibrage déjà fait sur `verificateur.py`.
 | Paramètre | Valeur défaut | Rôle |
 |-----------|--------------|------|
 | `PAGE_DEGRADEE` | `0.10` | Taux de divergence Claude / Tesseract (mots appariés) au-delà duquel la page est un « scan dégradé » : ligne ℹ au journal, ligne dans A VERIFIER |
+| `CONTROLE_CONSERVATION` | `True` | Contrôle de conservation des pages propres (mots et lignes Tesseract sans lecture Claude en face) ; page dégradée = « contrôle impossible » |
+| `CONSERVATION_CONFIANCE_MIN` | `60` | Confiance Tesseract minimale d'un mot (médiane pour une ligne) pour une alerte de conservation |
+| `COULEUR_CONSERVATION` | `E4DFEC` | Fond d'une cellule où un élément est peut-être omis |
 
 ## Ajouter un nouveau paramètre
 

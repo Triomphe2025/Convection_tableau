@@ -120,3 +120,74 @@ class TestPagesReelles(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestConservation(unittest.TestCase):
+    """Page propre : mot Tesseract sans mot Claude en face, ligne Tesseract sans ligne Claude."""
+
+    def _page_avec(self, *mots_en_plus, lignes=4):
+        rows, lecture = _page(lignes)
+        lecture.mots += list(mots_en_plus)
+        return rows, lecture
+
+    def test_mot_omis_dans_la_cellule(self):
+        rows, lecture = _page(4)
+        rows[1]['cells'][1] = 'PH A104'                      # « 02 » omis par Claude
+        analyse = analyser_page(rows, COLONNES, lecture)
+        self.assertEqual([(o['ligne'], o['colonne'], o['lecture']) for o in analyse['omissions']],
+                         [(1, 1, '02')])
+        self.assertEqual(rows[1]['cells'][1], 'PH A104')    # la valeur de Claude est gardée
+
+    def test_confiance_sous_le_seuil_ignoree(self):
+        rows, lecture = _page(4)
+        rows[1]['cells'][1] = 'PH A104'
+        lecture.mots = [m if m[4] != '02' else m[:5] + (40,) for m in lecture.mots]
+        self.assertEqual(analyser_page(rows, COLONNES, lecture)['omissions'], [])
+
+    def test_mots_recolles_pas_une_omission(self):
+        # 223111PE012 : Claude « 1 B », Tesseract « 1B » ; rien ne manque.
+        rows, lecture = _page(3)
+        rows[1]['cells'][2] = 'S IG'
+        self.assertEqual(analyser_page(rows, COLONNES, lecture)['omissions'], [])
+
+    def test_ligne_manquante_entre_deux_lignes(self):
+        rows, lecture = _page(5)
+        del rows[2]                                          # ligne 3 absente de Claude
+        analyse = analyser_page(rows, COLONNES, lecture)
+        self.assertEqual([(m['avant'], m['apres']) for m in analyse['lignes_manquantes']],
+                         [(1, 2)])
+        self.assertIn('A3', analyse['lignes_manquantes'][0]['lecture'])
+
+    def test_ligne_peu_sure_ignoree(self):
+        rows, lecture = _page(5)
+        del rows[2]
+        lecture.mots = [m if m[1] != 300 else m[:5] + (30,) for m in lecture.mots]
+        self.assertEqual(analyser_page(rows, COLONNES, lecture)['lignes_manquantes'], [])
+
+    def test_page_degradee_controle_impossible(self):
+        rows, lecture = _page(4, differents=(1, 2, 3, 4))
+        rows[1]['cells'][1] = 'PH A104'
+        analyse = analyser_page(rows, COLONNES, lecture)
+        self.assertTrue(analyse['controle_impossible'])
+        self.assertEqual((analyse['omissions'], analyse['lignes_manquantes']), ([], []))
+
+    def test_controle_desactive(self):
+        rows, lecture = _page(4)
+        rows[1]['cells'][1] = 'PH A104'
+        with patch.object(Config, 'CONTROLE_CONSERVATION', False):
+            analyse = analyser_page(rows, COLONNES, lecture)
+        self.assertEqual((analyse['omissions'], analyse['lignes_manquantes']), ([], []))
+        self.assertFalse(analyse['controle_impossible'])
+
+
+@unittest.skipUnless(Path(Config.TESSERACT_PATH).exists(), "Tesseract absent")
+class TestConservationPagesReelles(TestPagesReelles):
+    """Réponses non modifiées des pages propres : aucune alerte de conservation."""
+
+    def test_pe133_p15_sans_alerte(self):
+        analyse = self._analyser('6A23111PE133_extrait_8pages.pdf', 6, 'REPARTITEUR')
+        self.assertEqual((analyse['omissions'], analyse['lignes_manquantes']), ([], []))
+
+    def test_pe012_p39_sans_alerte(self):
+        analyse = self._analyser('223111PE012_extrait_10pages.pdf', 8, 'Bornier standard')
+        self.assertEqual((analyse['omissions'], analyse['lignes_manquantes']), ([], []))

@@ -462,7 +462,9 @@ def entrees_pages_degradees(valides: List[Dict]) -> List[Dict]:
 
     if len(degradees) * 2 <= len(mesurees):
         return [entree(i, r, 'page dégradée', f"scan dégradé (divergence "
-                f"{_pourcent(r['controle_page']['taux'])}) : à relire en priorité")
+                f"{_pourcent(r['controle_page']['taux'])}) : à relire en priorité"
+                + (" ; contrôle de conservation impossible"
+                   if r['controle_page'].get('controle_impossible') else ""))
                 for i, r in degradees]
     taux = [r['controle_page']['taux'] for _, r in degradees]
     synthese = {'page': None, 'ligne': None, 'colonne': None, 'type': 'synthèse',
@@ -473,6 +475,43 @@ def entrees_pages_degradees(valides: List[Dict]) -> List[Dict]:
     return [synthese] + [entree(i, r, 'page dégradée',
                                 f"divergence {_pourcent(r['controle_page']['taux'])}")
                          for i, r in degradees]
+
+
+def entrees_cellules(valides: List[Dict]) -> List[Dict]:
+    """Lignes de A VERIFIER des alertes posées sur une cellule (resultat['a_verifier']).
+
+    Chaque alerte : {ligne (indice dans rows), colonne (indice), type, message, lecture} ;
+    le contrôle de conservation les produit, l'étape 9 y ajoutera les siennes.
+    """
+    entrees = []
+    for i, r in enumerate(valides):
+        entetes = r.get('headers') or []
+        for a in r.get('a_verifier') or []:
+            k = a['colonne']
+            entrees.append({'page': numero_page(r), 'ligne': a['ligne'] + 1,
+                            'colonne': entetes[k] if k < len(entetes) else None,
+                            'type': a['type'], 'message': a['message'],
+                            'lecture': a.get('lecture'), 'cible': (i, a['ligne'], k)})
+    return entrees
+
+
+def marquer_a_verifier(ws, ligne_debut: int, resultat: Dict, couleur: str) -> int:
+    """Cellules visées par resultat['a_verifier'] : commentées ; un élément peut-être omis
+    est aussi coloré. La valeur de la cellule n'est jamais changée."""
+    n = 0
+    for a in resultat.get('a_verifier') or []:
+        cellule = ws.cell(row=ligne_excel(ligne_debut, resultat, a['ligne']),
+                          column=a['colonne'] + 1)
+        if a['type'] == 'élément peut-être omis':
+            cellule.fill = PatternFill('solid', fgColor=couleur)
+            texte = a['message']
+        else:
+            texte = f"{a['message']} (avant cette ligne) ; Tesseract lit « {a.get('lecture')} »"
+        # Une cellule peut déjà porter un commentaire (coquille O/0, déduit) : on l'ajoute.
+        ancien = cellule.comment.text + '\n' if cellule.comment else ''
+        cellule.comment = Comment(ancien + texte, 'TriosSeconverter')
+        n += 1
+    return n
 
 
 def ligne_excel(ligne_debut: int, resultat: Dict, rang: int) -> int:
@@ -719,6 +758,7 @@ def generer_excel(
 
         marquer_deduits(ws, next_row, result.get('metadata', {}), Config.COULEUR_DEDUIT)
         marquer_corrections_o(ws, current_row, result, Config.COULEUR_CORRIGE)
+        marquer_a_verifier(ws, current_row, result, Config.COULEUR_CONSERVATION)
         if Config.POSITIONS_ORIGINALES:
             police_donnees(ws, current_row, result, len(extractor._tpl.columns))
 
@@ -737,7 +777,7 @@ def generer_excel(
     if n_illisibles:
         log(f"  ⚠ {n_illisibles} cellule(s) avec « {Config.MARQUEUR_ILLISIBLE} » (caractère "
             f"illisible) colorée(s) dans l'Excel : à vérifier sur l'original.")
-    entrees = entrees_pages_degradees(valides)
+    entrees = entrees_pages_degradees(valides) + entrees_cellules(valides)
     if entrees:
         ecrire_a_verifier(wb, entrees, valides, debuts_blocs, ws.title)
 

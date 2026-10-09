@@ -196,6 +196,8 @@ class TestIndicateurDePage(unittest.TestCase):
         bilan = next(m for m in journal if "positions d'origine p. 1 :" in m)
         self.assertRegex(bilan, r'divergence Claude / Tesseract \d+ %')
         self.assertFalse([m for m in journal if 'ℹ' in m])
+        # Page propre, réponse non modifiée : aucune alerte de conservation.
+        self.assertFalse([m for m in journal if 'peut-être' in m])
         self.assertIsNone(feuille)
 
     def test_page_degradee_ligne_d_information_et_a_verifier(self):
@@ -204,7 +206,7 @@ class TestIndicateurDePage(unittest.TestCase):
         infos = [m.strip() for m in journal if 'ℹ' in m]
         self.assertEqual(len(infos), 1)
         self.assertRegex(infos[0], r'^ℹ p\. 1 : scan dégradé \(divergence \d+ %\) : à relire '
-                                   r'en priorité$')
+                                   r'en priorité ; contrôle de conservation impossible$')
         self.assertFalse([m for m in journal if '⚠' in m and 'scan' in m])
         # Une seule page scannée, dégradée : plus de la moitié → synthèse puis la page.
         self.assertEqual([r[3] for r in feuille[1:]], ['synthèse', 'page dégradée'])

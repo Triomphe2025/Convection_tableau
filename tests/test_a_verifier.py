@@ -114,3 +114,52 @@ class TestFeuilleAVerifier(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestAlertesDeConservation(unittest.TestCase):
+    """Entrées « a_verifier » d'une page (contrôle de conservation, étape 9 ensuite)."""
+
+    def _pages(self):
+        page = _page('7', 0.02)
+        page['rows'].append({'type': 'data', 'cells': ['A2', 'PH A104', 'SIG', ''],
+                             'confidence': [100] * 4})
+        page['a_verifier'] = [
+            {'ligne': 1, 'colonne': 1, 'type': 'élément peut-être omis',
+             'message': 'élément peut-être omis : Tesseract lit « 02 » (confiance 91)',
+             'lecture': '02'},
+            {'ligne': 1, 'colonne': 0, 'type': 'ligne peut-être manquante',
+             'message': 'ligne peut-être manquante entre « A1 | PH A104 01 | SIG | » et '
+                        '« A2 | PH A104 | SIG | »', 'lecture': 'A15 PH A104 15'},
+        ]
+        return [_page('6', 0.29), page]
+
+    def test_lignes_apres_les_pages_avec_lien_vers_la_cellule(self):
+        _, (lignes, liens) = _feuille(self._pages())
+        self.assertEqual([r[3] for r in lignes[1:]], ['page dégradée', 'élément peut-être omis',
+                                                      'ligne peut-être manquante'])
+        self.assertEqual(lignes[2][:3], ['7', 2, 'TENANT'])
+        self.assertEqual(lignes[2][5], '02')
+        debut = 1 + Config.PAGE_SIZE
+        self.assertEqual(liens[2:], [f"'Borniers'!B{debut + 2}", f"'Borniers'!A{debut + 2}"])
+
+    def test_cellule_coloree_commentee_valeur_de_claude_gardee(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sortie = Path(tmp) / 's.xlsx'
+            with contextlib.redirect_stdout(io.StringIO()):
+                generer_excel(self._pages(), PdfTableExtractor(TPL), sortie,
+                              on_log=lambda m: None)
+            ws = openpyxl.load_workbook(sortie)['Borniers']
+            debut = 1 + Config.PAGE_SIZE
+            omise, suivante = ws[f'B{debut + 2}'], ws[f'A{debut + 2}']
+            self.assertEqual(' '.join(omise.value.split()), 'PH A104')
+            self.assertEqual(omise.fill.fgColor.rgb, '00' + Config.COULEUR_CONSERVATION)
+            self.assertIn('« 02 »', omise.comment.text)
+            self.assertIn('ligne peut-être manquante', suivante.comment.text)
+            self.assertEqual(suivante.value.strip(), 'A2')
+
+    def test_page_degradee_minoritaire_controle_impossible(self):
+        page = _page('52', 0.29)
+        page['controle_page']['controle_impossible'] = True
+        entrees = entrees_pages_degradees([page, _page('1', 0.02), _page('2', 0.03)])
+        self.assertEqual(entrees[0]['message'], 'scan dégradé (divergence 29 %) : à relire en '
+                                                'priorité ; contrôle de conservation impossible')

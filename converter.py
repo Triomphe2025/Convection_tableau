@@ -501,7 +501,7 @@ class Converter:
         import fitz
 
         from cache_lectures import empreinte_fichier
-        from controle_conservation import analyser_page
+        from controle_conservation import analyser_page, texte_ligne
         from positions_scan import placer_page
         colonnes = list(self.template.columns)
         empreinte = empreinte_fichier(self.word_file)
@@ -536,15 +536,43 @@ class Converter:
                     f"({time.monotonic() - debut:.1f} s)"
                 )
                 if analyse['taux'] is not None:
-                    resultat['controle_page'] = {'taux': analyse['taux'],
-                                                 'degradee': analyse['degradee']}
+                    resultat['controle_page'] = {
+                        'taux': analyse['taux'], 'degradee': analyse['degradee'],
+                        'controle_impossible': analyse['controle_impossible']}
                 if analyse['degradee']:
-                    # Information de page, pas une alerte de cellule (ℹ, pas ⚠).
+                    # Information de page, pas une alerte de cellule (ℹ, pas ⚠) ; une seule
+                    # ligne par page, contrôle de conservation compris.
+                    suite = (" ; contrôle de conservation impossible"
+                             if analyse['controle_impossible'] else "")
                     self._log(f"  ℹ p. {page} : scan dégradé (divergence {taux}) : "
-                              f"à relire en priorité")
+                              f"à relire en priorité{suite}")
+                self._alertes_conservation(page, resultat, colonnes, analyse, texte_ligne)
                 for d in bilan['deplaces']:
                     self._log(f"    p. {page} ligne {d['ligne']} : « {d['mot']} » passé de "
                               f"{d['de']} à {d['vers']} (lu dans {d['vers']} sur le scan)")
+
+    def _alertes_conservation(self, page: int, resultat: Dict, colonnes: List[str],
+                              analyse: Dict, texte_ligne) -> None:
+        """Alertes de conservation au journal (⚠) et dans resultat['a_verifier'] (Excel)."""
+        rows = resultat.get('rows', [])
+        entrees = resultat.setdefault('a_verifier', [])
+        for o in analyse['omissions']:
+            message = (f"élément peut-être omis : Tesseract lit « {o['lecture']} » "
+                       f"(confiance {o['confiance']}) ; la valeur lue par Claude est gardée")
+            self._log(f"  ⚠ p. {page} ligne {o['ligne'] + 1}, {colonnes[o['colonne']]} : "
+                      f"{message}")
+            entrees.append({'ligne': o['ligne'], 'colonne': o['colonne'],
+                            'type': 'élément peut-être omis', 'message': message,
+                            'lecture': o['lecture']})
+        for m in analyse['lignes_manquantes']:
+            message = (f"ligne peut-être manquante entre « {texte_ligne(rows, m['avant'])} » "
+                       f"et « {texte_ligne(rows, m['apres'])} »")
+            self._log(f"  ⚠ p. {page} : {message}, Tesseract lit « {m['lecture']} »")
+            # Aucune ligne n'est inventée : l'alerte est posée sur la ligne qui suit le trou.
+            suivante = m['apres'] if m['apres'] is not None else m['avant']
+            entrees.append({'ligne': suivante, 'colonne': 0,
+                            'type': 'ligne peut-être manquante', 'message': message,
+                            'lecture': m['lecture']})
 
     def _lecture_tesseract(self, doc, page: int, empreinte: str):
         """Lecture Tesseract de la page : en mémoire, sinon dans le cache de l'appli, sinon OCR."""

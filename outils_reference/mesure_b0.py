@@ -35,6 +35,7 @@ import fitz  # noqa: E402
 import openpyxl  # noqa: E402
 
 import cache_lectures  # noqa: E402
+import controle_conservation as cc  # noqa: E402
 import positions_scan as ps  # noqa: E402
 from claude_ocr import _parse_pipe_response  # noqa: E402
 from mesure_precision import _lignes_donnees, aligner_lignes, mesurer  # noqa: E402
@@ -378,7 +379,8 @@ def mesurer_b0():
         # Ligne de la copie amputée → rang dans la copie complète.
         al['paires_completes'] = {index[idx][r]: li for r, li in al['paires'].items()}
         places, bilan = ps.placer_page(amputees[idx], p['colonnes'], p['lecture'])
-        cons.append({'align': al, 'places': places, 'bilan': bilan})
+        cons.append({'align': al, 'places': places, 'bilan': bilan, 'rows': amputees[idx],
+                     'index': index[idx]})
     return pages, injectees, inj_div, cons, cons_rows, suppr_lignes, suppr_mots, deplacees
 
 
@@ -519,12 +521,75 @@ def rapport(resultats):
     return '\n'.join(lignes)
 
 
+def section_commit_b(resultats):
+    """Mesure du code livré (controle_conservation, comme le convertisseur : lignes placées)."""
+    pages, _, _, cons, cons_rows, suppr_lignes, suppr_mots, deplacees = resultats
+    lignes = ['', '## Commit B : code de l\'appli (controle_conservation sur lignes placées)', '',
+              '| Document | Page | Taux | Classement | Alertes sur réponses non modifiées |',
+              '|---|---|---|---|---|']
+    propres, explications = [], []
+    for idx, p in enumerate(pages):
+        placees, _ = ps.placer_page(p['rows'], p['colonnes'], p['lecture'])
+        a = cc.analyser_page(placees, p['colonnes'], p['lecture'])
+        p['analyse_b'] = a
+        alertes = ([f"omis {p['colonnes'][o['colonne']]} l.{o['ligne'] + 1} « {o['lecture']} »"
+                    for o in a['omissions']]
+                   + [f"ligne manquante « {m['lecture']} »" for m in a['lignes_manquantes']])
+        classement = ('dégradée, contrôle impossible' if a['degradee']
+                      else 'non mesurable' if a['taux'] is None else 'propre')
+        taux = '—' if a['taux'] is None else f"{round(a['taux'] * 100)} %"
+        lignes.append(f"| {p['doc']} | {p['imprime']} | {taux} | {classement} "
+                      f"| {len(alertes)} {alertes if alertes else ''} |")
+        if not a['degradee'] and a['taux'] is not None:
+            propres.append(idx)
+    mots = trouves = lignes_t = lignes_v = 0
+    fausses = []
+    for idx in propres:
+        p, c = pages[idx], cons[idx]
+        a = cc.analyser_page(c['places'], p['colonnes'], p['lecture'])
+        expliquees = set()
+        for pi, r, k, mot in suppr_mots:
+            if pi != idx:
+                continue
+            mots += 1
+            ra = c['index'].index(r)
+            vue = [n for n, o in enumerate(a['omissions']) if o['ligne'] == ra
+                   and o['colonne'] == k and any(ressemble(w, mot) for w in o['lecture'].split())]
+            trouves += bool(vue)
+            expliquees.update(('o', n) for n in vue)
+        for pi, r in suppr_lignes:
+            if pi != idx:
+                continue
+            lignes_t += 1
+            texte = ''.join(mots_rang(p['rows'][r]))
+            vue = [n for n, m in enumerate(a['lignes_manquantes'])
+                   if SequenceMatcher(None, ps.replier(''.join(m['lecture'].split())),
+                                      ps.replier(texte), autojunk=False).ratio() >= 0.5]
+            lignes_v += bool(vue)
+            expliquees.update(('l', n) for n in vue)
+        restes = ([o for n, o in enumerate(a['omissions']) if ('o', n) not in expliquees]
+                  + [m for n, m in enumerate(a['lignes_manquantes'])
+                     if ('l', n) not in expliquees])
+        fausses.append(len(restes))
+        explications += [f"- {p['doc']} p. {p['imprime']} : alerte non expliquée {x}"
+                         for x in restes]
+    remis, total, tort_o, tort_c = glissements(pages, cons, cons_rows, deplacees, propres,
+                                               suppr_lignes)
+    lignes += ['', f"Pages propres ({len(propres)}) : mots retrouvés {trouves}/{mots}, "
+                   f"lignes retrouvées {lignes_v}/{lignes_t}, glissements remis {remis}/{total}, "
+                   f"déplacements à tort {tort_o} (origine) / {tort_c} (copie), fausses alertes "
+                   f"de conservation sur la copie par page : max {max(fausses, default=0)}, "
+                   f"total {sum(fausses)}"] + explications
+    return lignes
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[1])
     parser.add_argument('--rapport', type=Path, default=None,
                         help='Fichier Markdown où écrire le rapport (sinon écran seul)')
     args = parser.parse_args(argv)
-    texte = rapport(mesurer_b0())
+    resultats = mesurer_b0()
+    texte = rapport(resultats) + '\n' + '\n'.join(section_commit_b(resultats))
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     print(texte)

@@ -306,6 +306,16 @@ class Config:
     # est un « scan dégradé » : Tesseract y lit trop mal pour contrôler la lecture (mesure
     # B0 : 18 à 50 % sur 223111PE011, 1 à 6 % sur 6A23111PE133 et 223111PE012).
     PAGE_DEGRADEE = 0.10
+    # Contrôle de conservation (pages non dégradées) : un mot Tesseract sans mot Claude en
+    # face (élément peut-être omis), une ligne Tesseract sans ligne Claude (ligne peut-être
+    # manquante). La cellule garde toujours la valeur de Claude.
+    CONTROLE_CONSERVATION = True
+    # Confiance Tesseract minimale d'un mot (médiane pour une ligne) : en dessous, une
+    # tache, un tampon ou un trait lu comme du texte ne donne pas d'alerte (mesure B0).
+    CONSERVATION_CONFIANCE_MIN = 60
+    # Fond d'une cellule où un élément est peut-être omis (lavande, distincte du bleu
+    # « déduit », de l'orange « corrigé » et du rouge « ?? »).
+    COULEUR_CONSERVATION = "E4DFEC"
 
     # ========================================
     # 📏 MESURE DE PRÉCISION (outil de QA sur jeu de test connu)
