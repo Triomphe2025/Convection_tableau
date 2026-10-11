@@ -46,6 +46,8 @@ def _converter(journal, dossier=None):
     conv = Converter(word_file=Path('x.pdf'), output_dir=Path(tempfile.gettempdir()),
                      template=TPL, on_log=journal.append)
     conv._lexique = set() if dossier is None else None
+    # La validation enrichit le dictionnaire réel (data_dictionary.json) : jamais en test.
+    conv._apprendre_corrections = lambda result: None
     return conv
 
 
