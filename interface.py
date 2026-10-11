@@ -4518,8 +4518,11 @@ class ValidationPageDialog(tk.Toplevel):
         attempt_txt = f"  —  Tentative {attempt}" if attempt > 1 else ""
         retry_err = self._result.get('_retry_error', '')
         hdr_fg = FG_ERR if retry_err else FG_TEXT
+        alertes = self._result.get('a_verifier') or []
         hdr_text = (
-            f"Validation page {page_done}/{page_total}"
+            f"Validation {page_done}/{page_total}"
+            f"  —  Page {meta.get('PAGE') or '—'}"
+            f"  —  {len(alertes)} alerte(s)"
             f"  —  Bornier : {bornier}"
             f"  —  {rows_count} lignes{attempt_txt}"
         )
@@ -4646,6 +4649,25 @@ class ValidationPageDialog(tk.Toplevel):
                 text=f"Fichier : {img_name}",
                 font=("Segoe UI", 8), fg=FG_MUTED, bg=BG_PANEL, anchor='w',
             ).pack(fill='x', padx=8, pady=(2, 6))
+
+        # Alertes des contrôles (pages à alertes présentées d'abord)
+        if alertes:
+            lf_alertes = tk.LabelFrame(
+                right, text=f"Alertes ({len(alertes)})",
+                font=FONT_BOLD, fg=FG_WARN, bg=BG_PANEL,
+                labelanchor='nw', bd=1, relief='groove',
+            )
+            lf_alertes.pack(fill='x', pady=(0, 8))
+            liste = scrolledtext.ScrolledText(
+                lf_alertes, font=("Segoe UI", 9), bg=BG_LOG, fg=FG_TEXT,
+                relief='flat', wrap='word', height=min(8, 2 * len(alertes)),
+                padx=6, pady=4,
+            )
+            liste.pack(fill='x', padx=8, pady=(4, 8))
+            for a in alertes:
+                ligne = '' if a.get('ligne') is None else f"ligne {a['ligne'] + 1} — "
+                liste.insert('end', f"• {ligne}{a.get('type', '')} : {a.get('message', '')}\n")
+            liste.configure(state='disabled')
 
         # Zone commentaire + statut
         lf_comment = tk.LabelFrame(

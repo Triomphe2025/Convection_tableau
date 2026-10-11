@@ -147,13 +147,13 @@ le calibrage déjà fait sur `verificateur.py`.
 
 | Paramètre | Valeur défaut | Rôle |
 |-----------|--------------|------|
-| `QUALITE_REGLES` | toutes `False` | Interrupteur par règle ; activée seulement si la mesure C0 donne au plus 1 fausse alerte par page en moyenne |
+| `QUALITE_REGLES` | `coherence`, `colonne_vide`, `format` : `True` ; `continuite`, `dictionnaire` : `False` | Interrupteur par règle, d'après la mesure C0 (au plus 1 fausse alerte par page) |
 | `QUALITE_CONFUSIONS` | O/C, O/0, I/1, S/5, B/8 | Confusions de la règle de cohérence |
 | `QUALITE_LONGUEUR_MIN` | `4` | Mots et cellules plus courts non comparés |
 | `QUALITE_MIN_MAJORITE` / `QUALITE_RATIO_MAJORITE` | `2` / `1.5` | Forme majoritaire d'un document |
 | `QUALITE_LEXIQUE_DOSSIER` / `QUALITE_LEXIQUE_FEUILLE` | `references/excels_valides` / `Listing` | Excel déjà corrigés servant de lexique (jamais de remplacement) |
-| `QUALITE_DICTIONNAIRE_MODES` | `claude` False, `ocr` True | Dictionnaire en alerte par mode ; jamais sur une page vectorielle |
-| `QUALITE_CONTINUITE` / `QUALITE_SAUT_MAX` | par modèle / `10` | Colonnes numérotées et saut maximal (à calibrer) |
+| `QUALITE_DICTIONNAIRE_MODES` | `claude` False, `ocr` False | Dictionnaire coupé dans tous les modes (C0 : 74 cellules justes abîmées en Tesseract) ; l'Excel ne le passe plus à `_fill_worksheet` |
+| `QUALITE_CONTINUITE` / `QUALITE_SAUT_MAX` | par modèle / `10` | Colonnes numérotées et saut maximal ; règle non branchée (C0 : 0 vraie alerte, suites non croissantes) |
 | `QUALITE_COLONNES_OBLIGATOIRES` | par modèle | Colonnes jamais entièrement vides |
 | `QUALITE_FORMATS` | par modèle | Motif des cellules par colonne (à valider) |
 | `QUALITE_GARDE_FOU` | `0.20` | Au-delà de cette part de cellules hors motif (ou de pages à colonne obligatoire vide) dans un document : une seule ligne de synthèse, contrôle coupé pour la colonne |

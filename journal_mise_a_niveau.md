@@ -1305,3 +1305,21 @@ C0 (rejeu des réponses enregistrées, sans API ; 21 pages, 50 erreurs injectée
 - règles sous le critère, ensemble : 17/25 injectées vues sur pages vectorielles, 13/25 sur
   pages scannées.
 Rien de branché : décision de l'utilisateur attendue.
+
+## Étape 9, contrôle qualité branché et rejeu C1 (2026-10-11)
+
+Branché : cohérence + lexique, colonne obligatoire vide, format, sur pages vectorielles et
+scannées. Continuité non branchée (code gardé, raison mesurée en commentaire). Dictionnaire
+coupé dans tous les modes ; `generer_classeur` ne le passe plus à `_fill_worksheet`.
+Une ligne par cellule dans A VERIFIER (raisons réunies, conservation comprise) ; une cellule
+corrigée par B3 garde son orange et sa ligne dit la correction. Lexique : chemin dans
+`QUALITE_LEXIQUE_DOSSIER` ; absent, vide ou illisible = cohérence seule, une ligne au
+journal. Validation interactive après lecture et contrôles du document : pages à alertes
+d'abord (triées par nombre), relecture puis nouveau contrôle.
+
+C1 (rejeu des 3 extraits sans API, `outils_reference/mesure_c1.py`, rapport
+`mesures/c1_rapport.md`) : 7 cellules encore fausses, 6 avec alerte (les 2 « CC FS » de
+PE011 p. 119 par la cohérence, les 4 O1A de PE133 p. 18 par le format), seule « TRANS. »
+de PE133 p. 15 sans alerte ; 0 fausse alerte sur 21 pages ; 33 erreurs injectées sur 50
+trouvées (colonne voisine 4/4, lignes fusionnées 4/4, ligne perdue 1/4 : seule PE133 p. 12,
+page propre, par la conservation). 1151 tests.

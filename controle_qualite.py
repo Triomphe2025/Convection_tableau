@@ -98,14 +98,14 @@ def regle_coherence(pages: List[Dict], lexique: Optional[Set[str]] = None) -> Li
             if majoritaires:
                 n, v, paire = majoritaires[0]
                 alertes.append(_alerte(p, r, k, 'coherence',
-                                       f"« {forme} » écrit « {v} » {n} fois dans le document",
-                                       v, paire))
+                                       f"lu « {forme} », peut-être « {v} » (écrit ainsi {n} "
+                                       f"fois dans le document)", v, paire))
                 break
             if connues:
                 v, paire = connues[0]
                 alertes.append(_alerte(p, r, k, 'coherence',
-                                       f"« {forme} » absent du lexique de référence, qui porte "
-                                       f"« {v} »", v, paire))
+                                       f"lu « {forme} », peut-être « {v} » (lexique de "
+                                       f"référence)", v, paire))
                 break
     return alertes
 
@@ -149,6 +149,9 @@ def _numero(valeur: str):
 
 def regle_continuite(pages: List[Dict], colonnes: Iterable[str], saut_max: int) -> List[Dict]:
     """Numéro qui descend ou saute de plus de saut_max dans la suite d'un même code."""
+    # Non branchée (mesure C0, 2026-10-09) : 0 vraie alerte sur les 3 extraits, 2,76 fausses
+    # par page au seuil le plus tolérant (20) ; les suites réelles ne sont pas croissantes
+    # (suites descendantes, jarretières non suivies, équipements différents sous un même code).
     alertes = []
     for p, page in enumerate(pages):
         entetes = [h.upper() for h in page.get('headers') or []]
@@ -267,6 +270,35 @@ def regle_format(pages: List[Dict], formats: Dict[str, str]) -> List[Dict]:
     return _garde_fou(hors, totaux, 'format',
                       lambda nom: f"format de la colonne {nom} non reconnu dans ce document, "
                                   f"contrôle coupé pour cette colonne")
+
+
+NOMS_REGLES = {'coherence': 'cohérence', 'dictionnaire': 'dictionnaire',
+               'continuite': 'continuité', 'colonne_vide': 'colonne vide', 'format': 'format'}
+
+
+def fusionner(alertes: List[Dict]) -> List[Dict]:
+    """Une alerte par cellule : les raisons de toutes les règles qui la visent, dans l'ordre.
+
+    Les alertes de page (ligne None) et les synthèses (page None) restent à part.
+    """
+    sortie: List[Dict] = []
+    par_cellule: Dict[tuple, Dict] = {}
+    for a in alertes:
+        if a['page'] is None or a['ligne'] is None:
+            sortie.append(dict(a, regles=[a['regle']]))
+            continue
+        cle = (a['page'], a['ligne'], a['colonne'])
+        if cle not in par_cellule:
+            par_cellule[cle] = dict(a, regles=[a['regle']])
+            sortie.append(par_cellule[cle])
+            continue
+        fusion = par_cellule[cle]
+        if a['regle'] not in fusion['regles']:
+            fusion['regles'].append(a['regle'])
+        if a['message'] not in fusion['message'].split(' ; '):
+            fusion['message'] += ' ; ' + a['message']
+        fusion['proposition'] = fusion['proposition'] or a.get('proposition')
+    return sortie
 
 
 def controler_document(pages: List[Dict], modele: str, lexique: Optional[Set[str]] = None,

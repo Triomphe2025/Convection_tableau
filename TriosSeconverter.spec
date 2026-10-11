@@ -49,6 +49,8 @@ a = Analysis(
         'positions_scan',
         'cache_lectures',
         'controle_conservation',
+        'controle_qualite',
+        'lexique_reference',
     ],
     hookspath=[],
     hooksconfig={},

@@ -323,8 +323,12 @@ class Config:
     # Le contrôle qualité ne modifie jamais une valeur : alerte dans A VERIFIER, cellule
     # colorée, proposition en commentaire. Une règle n'est activée qu'après la mesure C0
     # (au plus 1 fausse alerte par page en moyenne sur les 3 extraits).
-    QUALITE_REGLES = {'coherence': False, 'dictionnaire': False, 'continuite': False,
-                      'colonne_vide': False, 'format': False}
+    # Mesure C0 du 2026-10-09 (21 pages, rejeu) : cohérence + lexique, colonne vide et
+    # format à 0 fausse alerte. Continuité : 0 vraie alerte, 2,76 fausses par page au seuil
+    # 20 (suites non croissantes). Dictionnaire : 4,5 fausses par page en Claude, 3,2 en
+    # Tesseract (74 cellules justes qu'il aurait changées) — coupé dans tous les modes.
+    QUALITE_REGLES = {'coherence': True, 'dictionnaire': False, 'continuite': False,
+                      'colonne_vide': True, 'format': True}
     # Confusions de caractère de la règle de cohérence (une substitution à la fois).
     QUALITE_CONFUSIONS = (('O', 'C'), ('O', '0'), ('I', '1'), ('S', '5'), ('B', '8'))
     # Mots plus courts (« OC », « PH ») trop fréquents pour être comparés seuls ; la
@@ -338,7 +342,7 @@ class Config:
     QUALITE_LEXIQUE_FEUILLE = 'Listing'
     # Dictionnaire en alerte, par mode ; jamais sur une page vectorielle (texte exact).
     # 'claude' = moteurs vision (décidé par la mesure C0), 'ocr' = Tesseract, Docling, Word.
-    QUALITE_DICTIONNAIRE_MODES = {'claude': False, 'ocr': True}
+    QUALITE_DICTIONNAIRE_MODES = {'claude': False, 'ocr': False}
     # Continuité des numéros : colonnes par modèle de sortie et saut maximal (les originaux
     # ont de vrais trous : 6A23111PE133 p. 6 0303W → 0308R, p. 12 0652B → 0662B).
     QUALITE_CONTINUITE = {

@@ -27,7 +27,6 @@ from docx import Document
 
 from ocr_processor import BornierTableExtractor
 from config import Config
-from data_dictionary import get_dictionary
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -477,36 +476,86 @@ def entrees_pages_degradees(valides: List[Dict]) -> List[Dict]:
                          for i, r in degradees]
 
 
-def entrees_cellules(valides: List[Dict]) -> List[Dict]:
-    """Lignes de A VERIFIER des alertes posées sur une cellule (resultat['a_verifier']).
+LIGNE_MANQUANTE = 'ligne peut-être manquante'
+OMISSION = 'élément peut-être omis'
 
-    Chaque alerte : {ligne (indice dans rows), colonne (indice), type, message, lecture} ;
-    le contrôle de conservation les produit, l'étape 9 y ajoutera les siennes.
+
+def alertes_par_cellule(resultat: Dict) -> List[Dict]:
+    """Alertes de resultat['a_verifier'], une par cellule : toutes les raisons réunies.
+
+    Une ligne peut-être manquante vise le trou avant la ligne, pas la cellule : à part.
+    """
+    sortie: List[Dict] = []
+    par_cellule: Dict[tuple, Dict] = {}
+    for a in resultat.get('a_verifier') or []:
+        cle = (a['ligne'], a['colonne'])
+        if a['type'] == LIGNE_MANQUANTE or a['ligne'] is None or cle not in par_cellule:
+            fusion = dict(a, types=[a['type']])
+            sortie.append(fusion)
+            if a['type'] != LIGNE_MANQUANTE and a['ligne'] is not None:
+                par_cellule[cle] = fusion
+            continue
+        fusion = par_cellule[cle]
+        fusion['types'].append(a['type'])
+        fusion['type'] = ', '.join(fusion['types'])
+        fusion['message'] += ' ; ' + a['message']
+        fusion['lecture'] = fusion.get('lecture') or a.get('lecture')
+    rows = resultat.get('rows') or []
+    for (r, k), fusion in par_cellule.items():
+        origine = (rows[r].get('corrections_o') or {}).get(k) if r < len(rows) else None
+        if origine:
+            # Une seule ligne pour la cellule : l'alerte dit aussi la correction B3 faite.
+            fusion['message'] += (f" ; corrigé dans l'Excel (coquille O/0), l'original "
+                                  f"porte {origine}")
+            fusion['corrige'] = True
+    return sortie
+
+
+def entrees_cellules(valides: List[Dict]) -> List[Dict]:
+    """Lignes de A VERIFIER des alertes de cellule ou de page (resultat['a_verifier']).
+
+    Chaque alerte : {ligne (indice dans rows, None = la page), colonne (indice), type,
+    message, lecture} ; contrôle de conservation et contrôle qualité, une ligne par cellule.
     """
     entrees = []
     for i, r in enumerate(valides):
         entetes = r.get('headers') or []
-        for a in r.get('a_verifier') or []:
+        for a in alertes_par_cellule(r):
             k = a['colonne']
-            entrees.append({'page': numero_page(r), 'ligne': a['ligne'] + 1,
+            entrees.append({'page': numero_page(r),
+                            'ligne': None if a['ligne'] is None else a['ligne'] + 1,
                             'colonne': entetes[k] if k < len(entetes) else None,
                             'type': a['type'], 'message': a['message'],
                             'lecture': a.get('lecture'), 'cible': (i, a['ligne'], k)})
     return entrees
 
 
-def marquer_a_verifier(ws, ligne_debut: int, resultat: Dict, couleur: str) -> int:
-    """Cellules visées par resultat['a_verifier'] : commentées ; un élément peut-être omis
-    est aussi coloré. La valeur de la cellule n'est jamais changée."""
+def entrees_syntheses_qualite(resultats: List[Dict]) -> List[Dict]:
+    """Synthèses du contrôle qualité (colonne au format non reconnu, contrôle coupé)."""
+    return [{'page': None, 'ligne': None, 'colonne': None, 'type': s['type'],
+             'message': s['message'], 'lecture': None, 'cible': None}
+            for r in resultats for s in r.get('syntheses_qualite') or []]
+
+
+def marquer_a_verifier(ws, ligne_debut: int, resultat: Dict, couleur: str,
+                       couleur_qualite: Optional[str] = None) -> int:
+    """Cellules visées par resultat['a_verifier'] : commentées et colorées (élément
+    peut-être omis, contrôle qualité). La valeur de la cellule n'est jamais changée."""
     n = 0
-    for a in resultat.get('a_verifier') or []:
+    for a in alertes_par_cellule(resultat):
+        if a['ligne'] is None:
+            continue
         cellule = ws.cell(row=ligne_excel(ligne_debut, resultat, a['ligne']),
                           column=a['colonne'] + 1)
-        if a['type'] == 'élément peut-être omis':
-            cellule.fill = PatternFill('solid', fgColor=couleur)
-            texte = a['message']
-        else:
+        if a['type'] == LIGNE_MANQUANTE:
             texte = f"{a['message']} (avant cette ligne) ; Tesseract lit « {a.get('lecture')} »"
+        else:
+            # Une omission possible prime : sa couleur dit « regarder le scan » ; une cellule
+            # corrigée (coquille O/0) garde son orange.
+            fond = couleur if OMISSION in a['types'] else (couleur_qualite or couleur)
+            if not a.get('corrige'):
+                cellule.fill = PatternFill('solid', fgColor=fond)
+            texte = a['message']
         # Une cellule peut déjà porter un commentaire (coquille O/0, déduit) : on l'ajoute.
         ancien = cellule.comment.text + '\n' if cellule.comment else ''
         cellule.comment = Comment(ancien + texte, 'TriosSeconverter')
@@ -666,12 +715,12 @@ def generer_excel(
     Config.MIN_DATA_ROWS lignes, illisibles) sont écrites dans on_log
     (« page ignorée : <numéro> <raison> ») ; un tableau vide est conservé.
 
-    Le dictionnaire de données (data_dictionary.json) est chargé
-    automatiquement et utilisé pour corriger les valeurs OCR douteuses.
+    Aucune valeur lue n'est corrigée par le dictionnaire de données (mesure C0 : il
+    aurait changé 74 cellules justes en mode Tesseract) ; les alertes du contrôle qualité
+    (resultat['a_verifier']) vont dans la feuille A VERIFIER.
     """
     log = on_log or print
     page_size = Config.PAGE_SIZE
-    dictionary = get_dictionary()
 
     valides = []
     ignores = 0
@@ -751,14 +800,15 @@ def generer_excel(
             ws, result,
             start_row=current_row,
             page_size=page_size,
-            dictionary=dictionary,
+            dictionary=None,
             bornier_name=None,
             pet_name=None,
         )
 
         marquer_deduits(ws, next_row, result.get('metadata', {}), Config.COULEUR_DEDUIT)
         marquer_corrections_o(ws, current_row, result, Config.COULEUR_CORRIGE)
-        marquer_a_verifier(ws, current_row, result, Config.COULEUR_CONSERVATION)
+        marquer_a_verifier(ws, current_row, result, Config.COULEUR_CONSERVATION,
+                           Config.COULEUR_QUALITE)
         if Config.POSITIONS_ORIGINALES:
             police_donnees(ws, current_row, result, len(extractor._tpl.columns))
 
@@ -777,7 +827,8 @@ def generer_excel(
     if n_illisibles:
         log(f"  ⚠ {n_illisibles} cellule(s) avec « {Config.MARQUEUR_ILLISIBLE} » (caractère "
             f"illisible) colorée(s) dans l'Excel : à vérifier sur l'original.")
-    entrees = entrees_pages_degradees(valides) + entrees_cellules(valides)
+    entrees = (entrees_syntheses_qualite(results) + entrees_pages_degradees(valides)
+               + entrees_cellules(valides))
     if entrees:
         ecrire_a_verifier(wb, entrees, valides, debuts_blocs, ws.title)
 
@@ -808,7 +859,7 @@ def generer_excel(
                     ws2, result,
                     start_row=cur2,
                     page_size=page_size,
-                    dictionary=dictionary,
+                    dictionary=None,
                     bornier_name=None,
                     pet_name=None,
                 )

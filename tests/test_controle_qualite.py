@@ -247,3 +247,26 @@ class TestAjustementsC0(unittest.TestCase):
         page = _page(('PA 01', '', '', ''), ('PA 02', '', '', ''), ('PA 30', '', '', ''))
         page['rows'].insert(2, {'type': 'section', 'text': 'NOM DU CABLE : X'})
         self.assertEqual(cq.regle_continuite([page], ['TENANT'], saut_max=2), [])
+
+
+class TestFusionner(unittest.TestCase):
+
+    def test_une_alerte_par_cellule_toutes_les_raisons(self):
+        alertes = cq.fusionner([
+            cq._alerte(0, 1, 1, 'coherence', 'lu « X », peut-être « Y »', 'Y'),
+            cq._alerte(0, 1, 1, 'format', '« X » hors du format de TENANT'),
+            cq._alerte(0, 2, 1, 'format', '« Z » hors du format de TENANT')])
+        self.assertEqual([(a['ligne'], a['regles'], a['message'], a['proposition'])
+                          for a in alertes],
+                         [(1, ['coherence', 'format'],
+                           'lu « X », peut-être « Y » ; « X » hors du format de TENANT', 'Y'),
+                          (2, ['format'], '« Z » hors du format de TENANT', None)])
+
+    def test_alertes_de_page_et_syntheses_a_part(self):
+        alertes = cq.fusionner([cq._alerte(0, None, 0, 'colonne_vide', 'a'),
+                                cq._alerte(0, None, 0, 'colonne_vide', 'a'),
+                                cq._alerte(None, None, 1, 'format', 'b')])
+        self.assertEqual(len(alertes), 3)
+
+    def test_liste_vide(self):
+        self.assertEqual(cq.fusionner([]), [])

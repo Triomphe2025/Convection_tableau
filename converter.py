@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
 from recuperer_image import ImageExtractor, ImageStorage
-from generer_classeur import generer_excel
+from generer_classeur import generer_excel, numero_page
 from ocr_processor import BornierTableExtractor
 from config import Config
 from template import TableTemplate, DEFAULT_TEMPLATE
@@ -106,6 +106,11 @@ class Converter:
         # la double lecture et le contrôle de conservation sans 2e OCR.
         self._lectures_tesseract: Dict[int, object] = {}
         self._derniers_resultats: Optional[List[Dict]] = None  # lus par verifier_conversion
+        # Pages à présenter à la validation interactive, une fois le document entier lu et
+        # contrôlé : {'result', 'image' (fonction → chemin), 'relire' (image, feedback →
+        # résultat, ou None), 'moteur', 'page_pdf' (positions à recalculer, ou None)}.
+        self._a_valider: List[Dict] = []
+        self._lexique = None
 
     # ── Apprentissage depuis les résultats validés ─────────────────────
 
@@ -203,6 +208,7 @@ class Converter:
         """
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self._verifier_template_large()
+        self._a_valider = []
 
         source_ext = self.word_file.suffix.lower()
 
@@ -239,6 +245,9 @@ class Converter:
             )
         self._log(f"  → {ok} / {len(ocr_results)} tableaux extraits.")
         self._progress(0.65, f"Extraction terminée : {ok}/{len(ocr_results)} tableaux.")
+        if not self._est_annule():
+            self._controler_qualite(ocr_results)
+            self._valider_document(ocr_results)
 
         # ── Import tableaux Word structurés (optionnel) ───────────────
         # Les tableaux Word sont gardés SÉPARÉS des résultats OCR afin
@@ -457,11 +466,138 @@ class Converter:
             # Même ordre que _extraire_avec_progres : images triées par numéro de page.
             par_page.update(zip(pages_image, results_ocr))
             self._placer_positions_originales(pages_image, results_ocr, lectures)
+            page_de = {id(r): p for p, r in zip(pages_image, results_ocr)}
+            for a_valider in self._a_valider:
+                a_valider['page_pdf'] = page_de.get(id(a_valider['result']))
+
+        if self._on_validation is not None:
+            # Pages lues en couche texte : présentées aussi, sans relecture (texte exact).
+            self._a_valider += [{'result': r, 'image': lambda: '', 'relire': None,
+                                 'moteur': 'couche texte', 'page_pdf': None}
+                                for i, r in par_page.items()
+                                if i not in pages_image and r.get('success')]
 
         results = [par_page[i] for i in sorted(par_page)]
         # generer_excel a besoin d'un extracteur même si aucune page n'est
         # passée par l'OCR ; PdfTableExtractor délègue la mise en forme.
         return results, extractor or lecteur_grille
+
+    def _controler_qualite(self, resultats: List[Dict]) -> None:
+        """Contrôle qualité du document (étape 9) : alertes dans resultat['a_verifier'].
+
+        Relancé après chaque relecture d'une page : les alertes du contrôle précédent sont
+        retirées d'abord (les règles comparent les pages entre elles).
+        """
+        from controle_qualite import NOMS_REGLES, controler_document, fusionner
+        for r in resultats:
+            if r.get('a_verifier'):
+                r['a_verifier'] = [a for a in r['a_verifier'] if not a.get('qualite')]
+            r.pop('syntheses_qualite', None)
+        if not any(Config.QUALITE_REGLES.values()):
+            return
+        if self._lexique is None and Config.QUALITE_REGLES.get('coherence'):
+            self._lexique = self._charger_lexique()
+        alertes = fusionner(controler_document(resultats, self.template.name, self._lexique))
+        premiere = next((r for r in resultats if r.get('success')), None)
+        for a in alertes:
+            type_ = ', '.join(NOMS_REGLES.get(n, n) for n in a['regles'])
+            if a['page'] is None:
+                self._log(f"  ⚠ contrôle qualité : {a['message']}")
+                if premiere is not None:
+                    premiere.setdefault('syntheses_qualite', []).append(
+                        {'type': type_, 'message': a['message']})
+                continue
+            r = resultats[a['page']]
+            colonnes = r.get('headers') or []
+            nom = colonnes[a['colonne']] if a['colonne'] < len(colonnes) else ''
+            ou = '' if a['ligne'] is None else f" ligne {a['ligne'] + 1},"
+            self._log(f"  ⚠ p. {numero_page(r)}{ou} {nom} : {a['message']}")
+            r.setdefault('a_verifier', []).append({
+                'ligne': a['ligne'], 'colonne': a['colonne'], 'type': type_,
+                'message': a['message'], 'lecture': None, 'qualite': True,
+                'proposition': a.get('proposition')})
+
+    def _charger_lexique(self) -> set:
+        """Lexique de référence ; dossier absent, vide ou illisible : cohérence seule."""
+        from lexique_reference import charger_lexique
+        dossier = Path(Config.QUALITE_LEXIQUE_DOSSIER)
+        try:
+            lexique = charger_lexique(dossier, feuille=Config.QUALITE_LEXIQUE_FEUILLE)
+        except Exception as exc:
+            self._log(f"  ⚠ lexique de référence illisible ({dossier}) : {exc} ; contrôle "
+                      f"de cohérence sur le document seul")
+            return set()
+        if not lexique:
+            self._log(f"  lexique de référence absent ou vide ({dossier}) : contrôle de "
+                      f"cohérence sur le document seul")
+        return lexique
+
+    def _valider_document(self, resultats: List[Dict]) -> None:
+        """Validation interactive : pages à alertes d'abord (les plus nombreuses en tête),
+        puis les autres dans l'ordre du document ; relecture possible page par page."""
+        if self._on_validation is None or not self._a_valider:
+            return
+        ordre = {id(r): i for i, r in enumerate(resultats)}
+        a_valider = sorted(self._a_valider, key=lambda v: (
+            -len(v['result'].get('a_verifier') or []), ordre.get(id(v['result']), 0)))
+        total = len(a_valider)
+        avec = sum(1 for v in a_valider if v['result'].get('a_verifier'))
+        self._log(f"Validation : {total} page(s), dont {avec} avec alertes, présentées "
+                  f"d'abord.")
+        for rang, v in enumerate(a_valider, 1):
+            if self._est_annule():
+                break
+            self._progress(0.65 + 0.02 * rang / total, f"Validation {rang}/{total}…")
+            self._valider_page(rang, total, v, resultats)
+
+    def _valider_page(self, rang: int, total: int, v: Dict, resultats: List[Dict]) -> None:
+        """Boucle de validation d'une page : accepter, ou relire avec un commentaire."""
+        result = v['result']
+        image = v['image']() if v['relire'] is not None else ''
+        attempt = 1
+        while True:
+            result['_attempt'] = attempt
+            response = self._on_validation(rang, total, result, image)
+            if not (isinstance(response, tuple) and len(response) == 2
+                    and response[0] == 'retry' and image):
+                if response and not isinstance(response, tuple):
+                    result['user_comment'] = response
+                self._apprendre_corrections(result)
+                return
+            attempt += 1
+            self._log(f"  ↺ Tentative #{attempt} [{v['moteur']}] — feedback : "
+                      f"« {response[1][:60]} »")
+            new_r = v['relire'](image, response[1])
+            if not new_r.get('success'):
+                err = new_r.get('error', 'erreur inconnue')
+                self._log(f"    ✗ Re-tentative échouée : {err}")
+                result['_retry_error'] = err
+                continue
+            # Les alertes et positions de l'ancienne lecture ne valent plus pour la nouvelle.
+            for cle in ('a_verifier', 'controle_page', '_retry_error'):
+                result.pop(cle, None)
+            result.update(new_r)
+            if v['page_pdf'] is not None:
+                self._placer_positions_originales([v['page_pdf']], [result])
+            self._controler_qualite(resultats)
+
+    def _image_page_pdf(self, page: int, result: Dict) -> str:
+        """Image de la page pour la relecture : celle du moteur, sinon rendue depuis le PDF."""
+        chemin = result.get('image_path', '')
+        if chemin and Path(chemin).exists():
+            return chemin
+        try:
+            import fitz
+            with fitz.open(str(self.word_file)) as doc:
+                if not 0 < page <= len(doc):
+                    return ''
+                image = self.output_dir / f"_retry_page_{page}.png"
+                doc[page - 1].get_pixmap(matrix=fitz.Matrix(2, 2)).save(str(image))
+            self._log(f"  → Image PDF rendue pour retry : {image.name}")
+            return str(image)
+        except Exception as exc:
+            self._log(f"  ⚠ Rendu image PDF impossible : {exc}")
+            return ''
 
     def _lancer_lectures_tesseract(self, pages: List[int]):
         """Lectures Tesseract des pages dans un fil à part ; Future, ou None sans positions."""
@@ -657,61 +793,14 @@ class Converter:
             if done % 10 == 0 or not result.get('success'):
                 self._log(f"  Page {done}/{total} [{engine}] : {ok_flag}")
 
-            # Mode validation interactive — boucle de re-traitement
+            # Validation interactive : après lecture et contrôle du document entier.
             if self._on_validation is not None and result.get('success'):
-                image_path_str = result.get('image_path', '')
-
-                # Pour les pages PDF couche-texte, aucune image n'est sauvegardée.
-                # Si le chemin stocké n'existe pas, on rend la page depuis le PDF
-                # via PyMuPDF afin de pouvoir l'envoyer à Claude Vision.
-                if image_path_str and not Path(image_path_str).exists():
-                    image_path_str = ''
-                if not image_path_str:
-                    try:
-                        import fitz  # PyMuPDF — déjà requis dans requirements.txt
-                        doc = fitz.open(str(self.word_file))
-                        page_idx = done - 1
-                        if 0 <= page_idx < len(doc):
-                            pix = doc[page_idx].get_pixmap(matrix=fitz.Matrix(2, 2))
-                            tmp_img = self.output_dir / f"_retry_page_{done}.png"
-                            pix.save(str(tmp_img))
-                            image_path_str = str(tmp_img)
-                            self._log(
-                                f"  → Image PDF rendue pour retry : "
-                                f"{tmp_img.name}"
-                            )
-                        doc.close()
-                    except Exception as exc:
-                        self._log(f"  ⚠ Rendu image PDF impossible : {exc}")
-                attempt = 1
-                while True:
-                    result['_attempt'] = attempt
-                    response = self._on_validation(done, total, result, image_path_str)
-                    if (isinstance(response, tuple)
-                            and len(response) == 2
-                            and response[0] == 'retry'
-                            and image_path_str):
-                        feedback = response[1]
-                        attempt += 1
-                        self._log(
-                            f"  ↺ Tentative #{attempt} [{_retry_label}] "
-                            f"— feedback : « {feedback[:60]} »"
-                        )
-                        new_r = _retry_extractor.extract(
-                            Path(image_path_str), feedback=feedback)
-                        if new_r.get('success'):
-                            result.update(new_r)
-                            result.pop('_retry_error', None)
-                        else:
-                            err = new_r.get('error', 'erreur inconnue')
-                            self._log(f"    ✗ Re-tentative échouée : {err}")
-                            result['_retry_error'] = err
-                        continue
-                    else:
-                        if response and not isinstance(response, tuple):
-                            result['user_comment'] = response
-                        self._apprendre_corrections(result)
-                        break
+                self._a_valider.append({
+                    'result': result,
+                    'image': lambda page=done, r=result: self._image_page_pdf(page, r),
+                    'relire': lambda image, feedback: _retry_extractor.extract(
+                        Path(image), feedback=feedback),
+                    'moteur': _retry_label, 'page_pdf': None})
 
         results, extractor = pdf_ext.extract_all(
             self.word_file, on_page_done=_page_callback, cancel_check=self._est_annule
@@ -1011,50 +1100,16 @@ class Converter:
                     f"en entrée, {conso.get('output_tokens', 0)} en sortie"
                 )
 
-            # Mode validation interactive — boucle de re-traitement par feedback
+            # Validation interactive : après lecture et contrôle du document entier.
             if self._on_validation is not None and result.get('success'):
-                _eng_label = (
-                    'Claude Vision' if vision_extractor is not None
-                    else 'Tesseract'
-                )
-                attempt = 1
-                while True:
-                    result['_attempt'] = attempt
-                    response = self._on_validation(i + 1, total, result, str(img))
-                    if (isinstance(response, tuple)
-                            and len(response) == 2
-                            and response[0] == 'retry'):
-                        feedback = response[1]
-                        attempt += 1
-                        self._log(
-                            f"  ↺ Tentative #{attempt} [{_eng_label}] "
-                            f"— feedback : « {feedback[:60]} »"
-                        )
-                        self._progress(pct, f"Tentative #{attempt} [{_eng_label}]…")
-                        if vision_extractor is not None:
-                            new_r = vision_extractor.extract(img, feedback=feedback)
-                        else:
-                            new_r = extractor.extract(img, feedback=feedback)
-                        if new_r.get('success'):
-                            result = new_r
-                            result.pop('_retry_error', None)
-                            lbl = _METHOD_LABEL.get(
-                                result.get('detection_method', ''), '')
-                            self._log(f"    → {lbl}")
-                        else:
-                            err = new_r.get('error', 'erreur inconnue')
-                            self._log(f"    ✗ Re-tentative échouée : {err}")
-                            # Mémoriser l'erreur dans result pour l'afficher
-                            # dans le prochain dialog (l'utilisateur peut retenter)
-                            result['_retry_error'] = err
-                        # Dans tous les cas, reboucler pour présenter le résultat
-                        # courant à l'utilisateur (il peut retenter ou accepter)
-                        continue
-                    else:
-                        if response and not isinstance(response, tuple):
-                            result['user_comment'] = response
-                        self._apprendre_corrections(result)
-                        break
+                moteur = vision_extractor if vision_extractor is not None else extractor
+                self._a_valider.append({
+                    'result': result, 'image': lambda img=img: str(img),
+                    'relire': lambda image, feedback, m=moteur: m.extract(
+                        Path(image), feedback=feedback),
+                    'moteur': ('Claude Vision' if vision_extractor is not None
+                               else 'Tesseract'),
+                    'page_pdf': None})
 
             results.append(result)
 
