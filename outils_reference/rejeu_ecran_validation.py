@@ -4,7 +4,6 @@ réel sont rejouées (faux client), pour essayer l'écran de validation à la ma
 
 Outil d'essai hors de l'appli livrée. La relecture (« Relancer l'OCR ») n'a pas de réponse
 enregistrée : elle échoue proprement, ce qui permet aussi de voir ce cas à l'écran.
-Le dictionnaire (data_dictionary.json) n'est pas enrichi par les pages acceptées.
 
 Lancement :
     env\\Scripts\\python.exe outils_reference\\rejeu_ecran_validation.py [223111PE011]
@@ -55,11 +54,8 @@ def main(argv=None):
     Config.OCR_MODE = 'claude'
     Config.CLAUDE_API_KEY = 'rejeu-sans-api'
     Config.VALIDATION_INTERACTIVE = True
-    from converter import Converter
     from interface import TriosSeconverterApp
-    # Une page acceptée enrichit data_dictionary.json : un essai ne doit pas l'écrire.
-    with patch('anthropic.Anthropic', faux_client(journaux[-1])), \
-            patch.object(Converter, '_apprendre_corrections', lambda self, result: None):
+    with patch('anthropic.Anthropic', faux_client(journaux[-1])):
         TriosSeconverterApp().mainloop()
     return 0
 

@@ -124,27 +124,6 @@ class Converter:
         self._a_valider: List[Dict] = []
         self._lexique = None
 
-    # ── Apprentissage depuis les résultats validés ─────────────────────
-
-    def _apprendre_corrections(self, result: dict) -> None:
-        """Enrichit le dictionnaire OCR avec les valeurs validées par l'utilisateur."""
-        try:
-            from data_dictionary import get_dictionary
-            dico = get_dictionary()
-            headers = result.get('headers', [])
-            added = 0
-            for row in result.get('rows', []):
-                if row.get('type') != 'data':
-                    continue
-                for col_name, val in zip(headers, row.get('cells', [])):
-                    if dico.add_value(col_name, val):
-                        added += 1
-            if added > 0:
-                dico.save()
-                self._log(f"  ✓ Dictionnaire enrichi : {added} valeur(s) mémorisée(s).")
-        except Exception as e:
-            self._log(f"  ⚠ Apprentissage dictionnaire : {e}")
-
     # ── Helpers ───────────────────────────────────────────────────────
 
     def _log(self, msg: str) -> None:
@@ -575,7 +554,8 @@ class Converter:
                     and response[0] == 'retry' and image):
                 if response and not isinstance(response, tuple):
                     result['user_comment'] = response
-                self._apprendre_corrections(result)
+                # Rien n'est appris dans data_dictionary.json : il apprenait les valeurs lues,
+                # fausses comprises ; le fichier reste figé, dans l'état mesuré (lexique à part).
                 return
             attempt += 1
             self._log(f"  ↺ Tentative #{attempt} [{v['moteur']}] — feedback : "

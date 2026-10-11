@@ -39,8 +39,8 @@ EMPREINTE_AVANT_TESTS = empreinte_dictionnaires()
 def dictionnaire_temporaire(tmp_path_factory):
     """Les tests travaillent sur une copie du dictionnaire, jamais sur le vrai fichier.
 
-    Une validation enrichit le dictionnaire (Converter._apprendre_corrections) : sans cette
-    copie, une suite de tests écrivait ses valeurs fabriquées dans data_dictionary.json.
+    Une validation enrichissait le dictionnaire (supprimé depuis) : une suite de tests avait
+    écrit ses valeurs fabriquées dans data_dictionary.json ; plus aucun test ne le peut.
     """
     dossier = tmp_path_factory.mktemp('dictionnaire')
     copies = []

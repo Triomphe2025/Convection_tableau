@@ -339,3 +339,20 @@ class TestPagesDegradeesEnValidation(unittest.TestCase):
                             'moteur': 'Claude Vision', 'page_pdf': None} for r in pages]
         conv._valider_document(pages)
         self.assertEqual(vus, ['119', '1', '52', '122a'])
+
+
+class TestDictionnaireFige(unittest.TestCase):
+
+    def test_validation_n_ecrit_rien_dans_le_dictionnaire(self):
+        import data_dictionary
+        fichier = data_dictionary.get_dictionary().path
+        avant = fichier.read_bytes() if fichier.exists() else None
+        pages = [_page('1', [('1', 'VALEUR JAMAIS APPRISE', 'SIG', 'RA B1 17')])]
+        conv = _converter([])
+        conv._on_validation = lambda rang, total, r, image: 'commentaire'
+        conv._a_valider = [{'result': pages[0], 'image': lambda: '', 'relire': None,
+                            'moteur': 'Claude Vision', 'page_pdf': None}]
+        conv._valider_document(pages)
+        self.assertEqual(fichier.read_bytes() if fichier.exists() else None, avant)
+        self.assertFalse(hasattr(conv, '_apprendre_corrections'))
+        self.assertEqual(pages[0]['user_comment'], 'commentaire')

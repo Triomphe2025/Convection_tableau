@@ -1340,3 +1340,20 @@ page propre, par la conservation). 1151 tests.
   couverture (document mesuré exclu) PE011 30 %, PE133 14 %, PE012 88 %.
 - `outils_reference/rejeu_ecran_validation.py` : interface en mode Claude sur les réponses
   enregistrées, pour l'essai à la main (dictionnaire non enrichi).
+
+## Étape 9, mesure D0 : nombre de lignes visibles (2026-10-12)
+
+`compte_lignes.py` (non branché, `CONTROLE_LIGNES = False`) : scan redressé, zone entre le
+trait sous l'en-tête (pointillés compris) et le premier trait plein, traits retirés, pas et
+phase ajustés ensemble, case = ligne si son encre couvre au moins 2 caractères de large et un
+quart du pas de haut. Page vectorielle : couche texte (identique à l'image sur les 6 pages).
+
+D0 (`outils_reference/mesure_d0.py`, rapport `mesures/d0_rapport.md`, images annotées
+`mesures/d0_images/`) : 21 pages sur 21 comptées comme la vérité (pas 46,7 à 50,2 px), aucun
+comptage impossible, aucune fausse alerte ; ligne perdue injectée sur chaque page : 21/21 ;
+fusion de deux lignes sur chaque page : 21/21. Les 8 scans dégradés de PE011 comptés exacts.
+Réserve : réglages faits en regardant ces 21 pages (pointillés de 18 px, pas de 33 à 70 px,
+hauteur minimale) ; une vérification sur des pages jamais vues est à faire avant de brancher.
+
+Dictionnaire : `Converter._apprendre_corrections` supprimé, data_dictionary.json n'apprend
+plus rien à la validation (lecture seule, état mesuré).

@@ -398,6 +398,37 @@ class Config:
     COULEUR_ENTETE_FLOU = "FFA500"
 
     # ========================================
+    # 📏 NOMBRE DE LIGNES VISIBLES (compte_lignes.py, étape 9, mesure D0)
+    # ========================================
+    # Lignes de texte visibles dans la zone du tableau comparées aux lignes lues, sans lire
+    # les mots (seul filet contre une ligne perdue sur un scan dégradé). Non branché tant
+    # que la mesure D0 n'est pas validée.
+    CONTROLE_LIGNES = False
+    # Pas de ligne cherché entre ces bornes, en pixels d'une page rendue à 300 DPI : les
+    # listings mesurés sont à 6 lignes par pouce (46,7 à 50 px) ; plus large, la recherche
+    # prend la moitié ou le double du pas sur une page de quelques lignes.
+    LIGNES_PAS_MIN = 33
+    LIGNES_PAS_MAX = 70
+    # Une case de la grille est une ligne si son encre couvre au moins N caractères de large
+    # (une tache dans une case vide n'est pas une ligne).
+    LIGNES_LARGEUR_MIN_CARACTERES = 2
+    # Régularité minimale du profil d'encre (0 à 1) ; en dessous : comptage impossible.
+    LIGNES_REGULARITE_MIN = 0.25
+    # Traits du cadre : vertical sur au moins cette part de la hauteur de la page,
+    # horizontal sur au moins cette part de sa largeur.
+    LIGNES_PART_TRAIT_VERTICAL = 0.25
+    LIGNES_PART_TRAIT_HORIZONTAL = 0.5
+    # Blanc maximal (pixels à 300 DPI) entre deux tirets d'un trait en pointillés
+    # (6A23111PE133 : jusqu'à 18 px).
+    LIGNES_BLANC_POINTILLES = 24
+    # Redressement du scan : angle cherché à ± N degrés, par pas de N degrés.
+    LIGNES_INCLINAISON_MAX = 1.5
+    LIGNES_INCLINAISON_PAS = 0.05
+    # Hauteur d'encre minimale d'une ligne, en part du pas (un trait ou une tache plate
+    # n'est pas une ligne de texte).
+    LIGNES_HAUTEUR_MIN_PART = 0.25
+
+    # ========================================
     # 📏 MESURE DE PRÉCISION (outil de QA sur jeu de test connu)
     # ========================================
     # Compare une sortie .xlsx à une référence organisée à l'avance (PDF

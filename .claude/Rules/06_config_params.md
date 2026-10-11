@@ -161,6 +161,19 @@ le calibrage déjà fait sur `verificateur.py`.
 | `COULEUR_QUALITE` | `A9E2E8` | Fond (cyan clair) d'une cellule signalée par le contrôle qualité ; le jaune pâle FFF2CC se confondait avec la confiance basse |
 | `COULEUR_CONFIANCE_BASSE` / `COULEUR_ENTETE_FLOU` | `FFFF99` / `FFA500` | Couleurs posées par `ocr_processor` (valeurs écrites là-bas), reprises pour la feuille LEGENDE de l'Excel, créée dès qu'une couleur de la légende est présente |
 
+## Nombre de lignes visibles (étape 9, section « NOMBRE DE LIGNES VISIBLES »)
+
+| Paramètre | Valeur défaut | Rôle |
+|-----------|--------------|------|
+| `CONTROLE_LIGNES` | `False` | Contrôle non branché tant que la mesure D0 n'est pas validée |
+| `LIGNES_PAS_MIN` / `LIGNES_PAS_MAX` | `33` / `70` | Pas de ligne cherché (px d'une page rendue à 300 DPI ; listings mesurés : 46,7 à 50 px) |
+| `LIGNES_LARGEUR_MIN_CARACTERES` | `2` | Une case est une ligne si son encre couvre au moins 2 caractères de large |
+| `LIGNES_HAUTEUR_MIN_PART` | `0.25` | … et au moins un quart du pas de haut (trait, tache plate) |
+| `LIGNES_REGULARITE_MIN` | `0.25` | En dessous : comptage impossible |
+| `LIGNES_PART_TRAIT_VERTICAL` / `LIGNES_PART_TRAIT_HORIZONTAL` | `0.25` / `0.5` | Longueur minimale d'un trait du cadre (part de la page) |
+| `LIGNES_BLANC_POINTILLES` | `24` | Blanc maximal entre deux tirets d'un trait en pointillés (6A23111PE133 : 18 px) |
+| `LIGNES_INCLINAISON_MAX` / `LIGNES_INCLINAISON_PAS` | `1.5` / `0.05` | Redressement du scan (degrés) |
+
 ## Ajouter un nouveau paramètre
 
 1. Ajouter dans `Config` (class dans config.py) avec valeur par défaut
