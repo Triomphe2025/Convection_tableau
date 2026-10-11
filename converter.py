@@ -39,6 +39,18 @@ def _mode_ocr_tesseract():
         Config.OCR_MODE = ancien
 
 
+def nombre_alertes(result: Dict) -> int:
+    """Alertes d'une page pour l'ordre de validation : cellules, plus 1 si scan dégradé."""
+    return (len(result.get('a_verifier') or [])
+            + bool((result.get('controle_page') or {}).get('degradee')))
+
+
+def taux_divergence(result: Dict) -> float:
+    """Divergence Claude / Tesseract d'une page dégradée (0 sinon) : la plus forte d'abord."""
+    controle = result.get('controle_page') or {}
+    return (controle.get('taux') or 0.0) if controle.get('degradee') else 0.0
+
+
 class Converter:
     """
     Pipeline complet avec callbacks de progression.
@@ -539,9 +551,10 @@ class Converter:
             return
         ordre = {id(r): i for i, r in enumerate(resultats)}
         a_valider = sorted(self._a_valider, key=lambda v: (
-            -len(v['result'].get('a_verifier') or []), ordre.get(id(v['result']), 0)))
+            -nombre_alertes(v['result']), -taux_divergence(v['result']),
+            ordre.get(id(v['result']), 0)))
         total = len(a_valider)
-        avec = sum(1 for v in a_valider if v['result'].get('a_verifier'))
+        avec = sum(1 for v in a_valider if nombre_alertes(v['result']))
         self._log(f"Validation : {total} page(s), dont {avec} avec alertes, présentées "
                   f"d'abord.")
         for rang, v in enumerate(a_valider, 1):

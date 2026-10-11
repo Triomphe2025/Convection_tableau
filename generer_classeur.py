@@ -571,6 +571,47 @@ def ligne_excel(ligne_debut: int, resultat: Dict, rang: int) -> int:
     return ligne
 
 
+FEUILLE_LEGENDE = 'LEGENDE'
+
+
+def legende_couleurs() -> List[Tuple[str, str]]:
+    """(couleur, sens) de chaque fond posé dans la feuille des tableaux."""
+    return [
+        (Config.COULEUR_CONFIANCE_BASSE, "confiance OCR basse (< 60 %, Tesseract) : vérifier "
+                                         "la valeur sur l'original"),
+        (Config.COULEUR_ILLISIBLE, f"« {Config.MARQUEUR_ILLISIBLE} » : caractère illisible, "
+                                   f"à recopier depuis l'original"),
+        (Config.COULEUR_DEDUIT, "case de pied reprise des autres pages du document (déduite)"),
+        (Config.COULEUR_CORRIGE, "valeur corrigée par l'appli (coquille O/0) : l'original est "
+                                 "dans le commentaire"),
+        (Config.COULEUR_CONSERVATION, "élément peut-être omis (Tesseract lit un mot absent de "
+                                      "la cellule)"),
+        (Config.COULEUR_QUALITE, "contrôle qualité (cohérence, lexique, format, colonne vide) : "
+                                 "raison dans le commentaire et dans A VERIFIER"),
+        (Config.COULEUR_ENTETE_FLOU, "en-tête : tableau source très flou"),
+    ]
+
+
+def ecrire_legende(wb, ws) -> bool:
+    """Feuille LEGENDE si la feuille des tableaux porte au moins un fond de la légende."""
+    couleurs = {c.upper() for c, _ in legende_couleurs()}
+    presentes = {str(c.fill.fgColor.rgb)[-6:].upper() for ligne in ws.iter_rows()
+                 for c in ligne if c.fill.fill_type == 'solid'}
+    if not couleurs & presentes:
+        return False
+    feuille = wb.create_sheet(FEUILLE_LEGENDE)
+    feuille.append(['Couleur', 'Signification'])
+    for cellule in feuille[1]:
+        cellule.font = Font(bold=True)
+    for couleur, sens in legende_couleurs():
+        feuille.append(['', sens])
+        feuille.cell(row=feuille.max_row, column=1).fill = PatternFill('solid',
+                                                                      fgColor=couleur)
+    feuille.column_dimensions['A'].width = 10
+    feuille.column_dimensions['B'].width = 90
+    return True
+
+
 def ecrire_a_verifier(wb, entrees: List[Dict], valides: List[Dict], debuts: List[int],
                       feuille_tableaux: str) -> None:
     """Feuille A VERIFIER : une ligne par entrée, lien cliquable vers la cellule ou le bloc."""
@@ -831,6 +872,7 @@ def generer_excel(
                + entrees_cellules(valides))
     if entrees:
         ecrire_a_verifier(wb, entrees, valides, debuts_blocs, ws.title)
+    ecrire_legende(wb, ws)
 
     # ── Feuille « tableaux word » (si des tableaux Word sont fournis) ──
     if word_results:

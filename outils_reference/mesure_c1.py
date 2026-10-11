@@ -4,8 +4,10 @@ Mesure C1 (étape 9, contrôle qualité branché) : rejeu des 3 extraits par le 
 Outil de mesure hors de l'appli, aucun appel API : réponses Claude enregistrées rejouées
 (faux client de mesure_c0), contrôles tels que branchés (cohérence + lexique, colonne
 obligatoire vide, format ; conservation des pages propres), document mesuré exclu du lexique.
-Donne : les cellules encore fausses contre la vérité et l'alerte que porte chacune, les lignes
-de la vérité absentes de la lecture, les vraies alertes de format (cellule, lu, vérité), les
+Le bilan porte sur l'Excel livré : cellules après la correction B3 (coquille O/0).
+Donne : la couverture du lexique, les cellules encore fausses contre la vérité et l'alerte
+que porte chacune, les cellules corrigées par B3, les lignes de la vérité absentes de la
+lecture, les alertes de format (cellule, lu, valeur dans l'Excel, vérité), les
 50 erreurs injectées (graine de C0) trouvées ou non et par quelle règle, les fausses alertes
 par page.
 
@@ -27,7 +29,8 @@ import mesure_c0 as c0  # noqa: E402
 from config import Config  # noqa: E402
 from controle_conservation import analyser_page, texte_ligne  # noqa: E402
 from converter import Converter  # noqa: E402
-from generer_classeur import alertes_par_cellule  # noqa: E402
+import controle_qualite as cq  # noqa: E402
+from generer_classeur import alertes_par_cellule, corriger_coquilles_o  # noqa: E402
 from lexique_reference import charger_lexique  # noqa: E402
 from mesure_precision import _lignes_donnees, aligner_lignes  # noqa: E402
 from mesure_precision import apparier_pages_par_contenu  # noqa: E402
@@ -123,9 +126,22 @@ def mesurer_c1():
     docs, sortie = {}, ['# Mesure C1 — contrôle qualité branché (rejeu, sans API)', '']
     for nom, doc, stem, gabarit in c0.DOCUMENTS:
         verite, _ = lire_verite_excel(c0.FIX / f'{doc}_extrait_verite.xlsx')
-        pages, conv, lexique = convertir(doc, stem, gabarit)
-        docs[nom] = {'pages': pages, 'conv': conv, 'lexique': lexique,
-                     'cmp': comparer(pages, verite)}
+        pivot, conv, lexique = convertir(doc, stem, gabarit)
+        # Excel livré : la décision B3 corrige O1A en 01A (cellule orange), après les contrôles.
+        pages, _ = corriger_coquilles_o(pivot, Config.CORRECTION_O_COLONNES)
+        formes_verite = {f for p in verite for r in p['rows'] if r['type'] == 'data'
+                         for c in r['cells'] for f in cq.formes(c)}
+        docs[nom] = {'pages': pages, 'pivot': pivot, 'conv': conv, 'lexique': lexique,
+                     'cmp': comparer(pages, verite), 'doc': doc,
+                     'couverture': (len(formes_verite & lexique), len(formes_verite))}
+
+    sortie += ['## Lexique de référence', '', "Fichiers : " + ', '.join(
+        f.name for f in sorted(Config.QUALITE_LEXIQUE_DOSSIER.glob('*.xlsx'))) + '.', '']
+    for nom, d in docs.items():
+        a, b = d['couverture']
+        sortie.append(f"- {nom} (sans {d['doc']}) : {len(d['lexique'])} formes ; couverture de "
+                      f"la vérité {a}/{b} = {a / b:.0%}")
+    sortie.append('')
 
     sortie += ['## Cellules encore fausses et leur alerte', '']
     for nom, d in docs.items():
@@ -140,6 +156,15 @@ def mesurer_c1():
             sortie.append(f"| {numeros[p]} | {c0.sorte(page)} | {r + 1} | "
                           f"{page['headers'][k]} | {lu or '(vide)'} | {vrai or '(vide)'} | "
                           f"{', '.join(types) or '**aucune**'} |")
+        corrigees = [(p, r, k, o) for p, page in enumerate(d['pages'])
+                     for r, row in enumerate(page['rows'])
+                     for k, o in (row.get('corrections_o') or {}).items()]
+        for p, r, k, o in corrigees:
+            etat = 'fausse' if (p, r, k) in fausses else 'juste'
+            sortie.append(f"| {numeros[p]} | {c0.sorte(d['pages'][p])} | {r + 1} | "
+                          f"{d['pages'][p]['headers'][k]} | corrigée B3 (lu {o}) : "
+                          f"{_norm(d['pages'][p]['rows'][r]['cells'][k])}, orange | — | "
+                          f"{etat} dans l'Excel |")
         sortie += ['', f'Sans alerte : {sans} sur {len(fausses)}.', '']
         for p, textes in sorted(absentes.items()):
             for t in textes:
@@ -147,16 +172,18 @@ def mesurer_c1():
                               f"({c0.sorte(d['pages'][p])}) : {t}")
         sortie.append('')
 
-    sortie += ['## Vraies alertes de format', '', '| Document | Page | Ligne | Colonne | Lu '
-               '| Vérité |', '|' + '---|' * 6]
+    sortie += ['## Alertes de format', '', '| Document | Page | Ligne | Colonne | Lu (lecture) '
+               "| Dans l'Excel | Vérité |", '|' + '---|' * 7]
     for nom, d in docs.items():
-        fausses, _, _, numeros = d['cmp']
+        numeros = d['cmp'][3]
         for p, page in enumerate(d['pages']):
             for a in alertes_par_cellule(page):
-                if 'format' in a['type'] and (p, a['ligne'], a['colonne']) in fausses:
-                    lu, vrai = fausses[(p, a['ligne'], a['colonne'])]
+                if 'format' in a['type'] and a['ligne'] is not None:
+                    lu = _norm(d['pivot'][p]['rows'][a['ligne']]['cells'][a['colonne']])
+                    livre = _norm(page['rows'][a['ligne']]['cells'][a['colonne']])
+                    vrai = d['cmp'][0].get((p, a['ligne'], a['colonne']), (None, livre))[1]
                     sortie.append(f"| {nom} | {numeros[p]} | {a['ligne'] + 1} | "
-                                  f"{page['headers'][a['colonne']]} | {lu} | {vrai} |")
+                                  f"{page['headers'][a['colonne']]} | {lu} | {livre} | {vrai} |")
 
     sortie += ['', '## Fausses alertes par page (toutes règles branchées)', '',
                '| Document | Page | Sorte | Alertes | Fausses | Texte des fausses |',
@@ -167,7 +194,10 @@ def mesurer_c1():
         for p, page in enumerate(d['pages']):
             total_pages += 1
             alertes = alertes_par_cellule(page)
-            mauvaises = [a for a in alertes if not juste(a, p, fausses, absentes, pleines)]
+            # Alerte sur une cellule corrigée par B3 : elle explique une correction faite
+            # (la lecture était fausse), ni vraie ni fausse dans l'Excel livré.
+            mauvaises = [a for a in alertes if not juste(a, p, fausses, absentes, pleines)
+                         and not a.get('corrige')]
             total_fausses += len(mauvaises)
             textes = '<br>'.join(
                 f"ligne {'—' if a['ligne'] is None else a['ligne'] + 1}, "
@@ -181,7 +211,7 @@ def mesurer_c1():
     sortie += ['', f'Total : {total_fausses} fausse(s) alerte(s) sur {total_pages} pages, '
                f'{total_fausses / total_pages:.2f} par page.', '']
 
-    copies, cibles = c0.injecter({nom: d['pages'] for nom, d in docs.items()},
+    copies, cibles = c0.injecter({nom: d['pivot'] for nom, d in docs.items()},
                                  random.Random(c0.GRAINE))
     for nom, d in docs.items():
         recontroler(copies[nom], d['conv'], d['lexique'])
@@ -193,7 +223,7 @@ def mesurer_c1():
         page = copies[cible['doc']][cible['page']]
         par = raisons(cible, page)
         avant = [] if cible['type'] in ('ligne perdue', 'lignes fusionnées') else raisons(
-            cible, d['pages'][cible['page']])
+            cible, d['pivot'][cible['page']])
         trouve = bool(par) and not (avant and set(par) == set(avant))
         bilan[(cible['type'], cible['sorte'])]['n'] += 1
         bilan[(cible['type'], cible['sorte'])]['vues'] += trouve

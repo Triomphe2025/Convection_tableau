@@ -46,8 +46,6 @@ def _converter(journal, dossier=None):
     conv = Converter(word_file=Path('x.pdf'), output_dir=Path(tempfile.gettempdir()),
                      template=TPL, on_log=journal.append)
     conv._lexique = set() if dossier is None else None
-    # La validation enrichit le dictionnaire réel (data_dictionary.json) : jamais en test.
-    conv._apprendre_corrections = lambda result: None
     return conv
 
 
@@ -292,3 +290,52 @@ class TestValidationApresControles(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestLegende(unittest.TestCase):
+
+    def test_couleurs_toutes_differentes(self):
+        from generer_classeur import legende_couleurs
+        couleurs = [c.upper() for c, _ in legende_couleurs()]
+        self.assertEqual(len(couleurs), len(set(couleurs)))
+        self.assertNotEqual(Config.COULEUR_QUALITE.upper(), Config.COULEUR_CONFIANCE_BASSE)
+
+    def test_feuille_legende_avec_la_couleur_du_controle_qualite(self):
+        pages = _document()
+        _converter([])._controler_qualite(pages)
+        sortie = Path(tempfile.mkdtemp()) / 's.xlsx'
+        with contextlib.redirect_stdout(io.StringIO()):
+            generer_excel(pages, PdfTableExtractor(TPL), sortie, on_log=lambda m: None)
+        ws = openpyxl.load_workbook(sortie)['LEGENDE']
+        lignes = {str(r[0].fill.fgColor.rgb)[-6:]: r[1].value for r in ws.iter_rows(min_row=2)}
+        self.assertIn('contrôle qualité', lignes[Config.COULEUR_QUALITE])
+        self.assertIn('confiance OCR basse', lignes[Config.COULEUR_CONFIANCE_BASSE])
+
+    def test_pas_de_legende_sans_couleur(self):
+        sortie = Path(tempfile.mkdtemp()) / 's.xlsx'
+        with contextlib.redirect_stdout(io.StringIO()):
+            generer_excel([_page('1', [('1', 'PH A104 01', 'SIG', 'RA B1 17')])],
+                          PdfTableExtractor(TPL), sortie, on_log=lambda m: None)
+        self.assertNotIn('LEGENDE', openpyxl.load_workbook(sortie).sheetnames)
+
+
+class TestPagesDegradeesEnValidation(unittest.TestCase):
+
+    def test_page_degradee_comptee_puis_par_taux(self):
+        from converter import nombre_alertes, taux_divergence
+        vus = []
+        pages = [_page(str(n), [(str(n), 'PH A104 01', 'SIG', 'RA B1 17')])
+                 for n in ('1', '52', '119', '122a')]
+        pages[0]['controle_page'] = {'taux': 0.50, 'degradee': True}
+        pages[1]['controle_page'] = {'taux': 0.29, 'degradee': True}
+        pages[2]['controle_page'] = {'taux': 0.31, 'degradee': True}
+        pages[2]['a_verifier'] = [{'ligne': 0}, {'ligne': 0}]
+        self.assertEqual([nombre_alertes(p) for p in pages], [1, 1, 3, 0])
+        self.assertEqual(taux_divergence(pages[3]), 0.0)
+        conv = _converter([])
+        conv._on_validation = lambda rang, total, r, image: vus.append(
+            r['metadata']['PAGE']) or None
+        conv._a_valider = [{'result': r, 'image': lambda: '', 'relire': None,
+                            'moteur': 'Claude Vision', 'page_pdf': None} for r in pages]
+        conv._valider_document(pages)
+        self.assertEqual(vus, ['119', '1', '52', '122a'])

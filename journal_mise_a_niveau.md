@@ -1323,3 +1323,20 @@ PE011 p. 119 par la cohérence, les 4 O1A de PE133 p. 18 par le format), seule �
 de PE133 p. 15 sans alerte ; 0 fausse alerte sur 21 pages ; 33 erreurs injectées sur 50
 trouvées (colonne voisine 4/4, lignes fusionnées 4/4, ligne perdue 1/4 : seule PE133 p. 12,
 page propre, par la conservation). 1151 tests.
+
+## Étape 9, suite (2026-10-12)
+
+- Bilan C1 sur l'Excel livré (après B3) : les 4 cellules O1A/O1B de PE133 p. 18 sont
+  « 01A/01B » en orange dans l'Excel (vérifié dans le classeur) ; restent fausses : les 2
+  « CC FS » de PE011 p. 119 (alerte cohérence) et « TRANS. » de PE133 p. 15 (attendue).
+  Les 4 alertes de format de ces cellules expliquent la correction : ni vraies ni fausses.
+- Tests sur une copie temporaire du dictionnaire ; vrai fichier contrôlé en fin de suite.
+- Couleurs : FFF2CC trop proche du jaune « confiance basse » FFFF99 → cyan clair A9E2E8 ;
+  feuille LEGENDE dès qu'une couleur est posée (aucune légende n'existait).
+- Validation : un scan dégradé compte comme une alerte de page ; PE011 (8 scans dégradés sur
+  8) : p. 119 d'abord, puis les pages par divergence décroissante, p. 52 en 6e position.
+- Lexique : 6A23111PE133.xlsx et 223111PE012.xlsx corrigés ajoutés à
+  `references/excels_valides/` (hors de git). Rejeu : 0 fausse alerte, 33/50 injectées ;
+  couverture (document mesuré exclu) PE011 30 %, PE133 14 %, PE012 88 %.
+- `outils_reference/rejeu_ecran_validation.py` : interface en mode Claude sur les réponses
+  enregistrées, pour l'essai à la main (dictionnaire non enrichi).

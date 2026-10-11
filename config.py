@@ -388,8 +388,14 @@ class Config:
     QUALITE_CONFUSIONS_LEXIQUE = (('O', 'C'), ('O', '0'), ('O', 'D'), ('O', 'Q'), ('I', '1'),
                                   ('I', 'L'), ('S', '5'), ('B', '8'), ('Z', '2'), ('G', '6'),
                                   ('E', 'F'))
-    # Fond d'une cellule signalée par le contrôle qualité (jaune pâle, distinct des autres).
-    COULEUR_QUALITE = "FFF2CC"
+    # Fond d'une cellule signalée par le contrôle qualité : cyan clair. Le jaune pâle d'abord
+    # choisi (FFF2CC) se confondait avec le jaune « confiance OCR basse » (FFFF99).
+    COULEUR_QUALITE = "A9E2E8"
+    # Jaune « confiance OCR basse » posé par ocr_processor._fill_worksheet (valeur écrite
+    # dans ce fichier-là) : repris ici pour la légende de l'Excel.
+    COULEUR_CONFIANCE_BASSE = "FFFF99"
+    # En-tête orange : tableau source très flou (ocr_processor._fill_worksheet).
+    COULEUR_ENTETE_FLOU = "FFA500"
 
     # ========================================
     # 📏 MESURE DE PRÉCISION (outil de QA sur jeu de test connu)

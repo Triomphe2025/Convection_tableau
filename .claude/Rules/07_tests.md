@@ -74,6 +74,7 @@ tests/
   test_a_verifier.py                 → Feuille A VERIFIER : colonnes, une ligne par page dégradée, synthèse + pages triées si majorité, pages vectorielles hors du compte, lien cliquable vers le bloc, pas de feuille sans entrée ; alertes de cellule (lien vers la cellule, couleur, commentaire, valeur gardée), ligne manquante commentée sur la ligne suivante
   test_controle_qualite.py           → controle_qualite.py, une classe par règle : variantes, cohérence (majorité, mots de 4 caractères, lexique, jamais de modification), dictionnaire par mode (jamais sur une page vectorielle), continuité (saut, suffixe, vrai trou), colonne vide, format, règles actives seules
   test_qualite_branchee.py           → Contrôle qualité branché : règles actives après C0, alerte posée sur la cellule avec proposition (« lu …, peut-être … »), relance sans doublon, lexique absent ou illisible (une ligne au journal), continuité non branchée, synthèse du garde-fou ; une ligne par cellule (toutes les raisons), cellule corrigée B3 gardée orange ; Excel sans dictionnaire ; validation après les contrôles (pages à alertes d'abord, relecture puis nouveau contrôle, page en couche texte sans relecture)
+  test_dictionnaire_isole.py         → Les tests travaillent sur une copie temporaire du dictionnaire (tests/conftest.py, toute la session) ; le vrai data_dictionary.json est contrôlé identique avant et après la suite
   test_lexique_reference.py          → lexique_reference.py : formes, en-têtes et pieds écartés, document mesuré exclu, dossier absent
   test_cache_lectures.py             → cache_lectures.py : empreinte du contenu, aller-retour, clé changée par DPI / psm, fichier illisible, nom court, purge par âge et par taille, dossier par défaut sous %LOCALAPPDATA%
   test_positions_converter.py        → Converter : bilan au journal, positions dans l'Excel, lecture dans le cache de l'appli (rien dans la sortie), 2e conversion sans 2e OCR, Tesseract dans un fil à part pendant Claude, taux au journal, page dégradée = ligne ℹ + A VERIFIER ; rejeu sans PDF = une ligne au journal
@@ -96,7 +97,7 @@ tests/
   test_claude_opus5.py               → claude_ocr sur Opus 5 / 5.5 : table de capacités, paramètres envoyés, refus avec catégorie, bloc de réflexion, effort refusé, images PNG ≤ 2576 px
 ```
 
-**1151 tests passent** (`pytest tests\`, relevé le 2026-10-11), aucun échec attendu, plus 1 test lent
+**1159 tests passent** (`pytest tests\`, relevé le 2026-10-12), aucun échec attendu, plus 1 test lent
 facultatif (`VERIF_TEST_LENT=1`, relecture du scan de 15 pages, ~30 s). Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.
 

@@ -1674,7 +1674,7 @@ class TriosSeconverterApp(tk.Tk):
 
         tk.Radiobutton(
             lf_opt,
-            text="Manuelle page par page — vérification à chaque page PDF",
+            text="Manuelle — après la conversion, pages à alertes d'abord",
             variable=self._validation_interactive, value=True,
             font=FONT_MAIN, fg=FG_TEXT, bg=BG_PANEL,
             selectcolor=BG_LOG, activebackground=BG_PANEL,
@@ -3546,7 +3546,7 @@ class TriosSeconverterApp(tk.Tk):
 
         tk.Radiobutton(
             lf_valid,
-            text="Manuelle page par page — vérification à chaque page PDF",
+            text="Manuelle — après la conversion, pages à alertes d'abord",
             variable=self._validation_interactive, value=True,
             font=FONT_MAIN, fg=FG_TEXT, bg=BG_PANEL,
             selectcolor=BG_LOG, activebackground=BG_PANEL,
@@ -4518,7 +4518,12 @@ class ValidationPageDialog(tk.Toplevel):
         attempt_txt = f"  —  Tentative {attempt}" if attempt > 1 else ""
         retry_err = self._result.get('_retry_error', '')
         hdr_fg = FG_ERR if retry_err else FG_TEXT
-        alertes = self._result.get('a_verifier') or []
+        alertes = list(self._result.get('a_verifier') or [])
+        controle = self._result.get('controle_page') or {}
+        if controle.get('degradee'):
+            alertes.insert(0, {'ligne': None, 'type': 'scan dégradé', 'message': (
+                f"divergence Claude / Tesseract {round(controle.get('taux', 0) * 100)} % : "
+                f"relire la page entière sur l'original")})
         hdr_text = (
             f"Validation {page_done}/{page_total}"
             f"  —  Page {meta.get('PAGE') or '—'}"
