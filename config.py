@@ -401,9 +401,15 @@ class Config:
     # 📏 NOMBRE DE LIGNES VISIBLES (compte_lignes.py, étape 9, mesure D0)
     # ========================================
     # Lignes de texte visibles dans la zone du tableau comparées aux lignes lues, sans lire
-    # les mots (seul filet contre une ligne perdue sur un scan dégradé). Non branché tant
-    # que la mesure D0 n'est pas validée.
-    CONTROLE_LIGNES = False
+    # les mots (seul filet contre une ligne perdue sur un scan dégradé).
+    # False = coupé ; 'ombre' = le compteur tourne pendant la lecture et écrit au journal et
+    # dans un fichier de mesure, rien dans l'Excel ni dans l'écran de validation ; True =
+    # alertes de page (A VERIFIER, ordre de validation). Contre-épreuve D1 : 10,5 % de
+    # fausses alertes (bornes de la zone) → ombre en v1.8, jugé à l'étape 10.
+    CONTROLE_LIGNES = 'ombre'
+    # Fichiers de mesure du mode ombre (un par document), hors des dossiers de l'utilisateur.
+    LIGNES_OMBRE_DOSSIER = Path(os.environ.get('LOCALAPPDATA', Path.home())) / \
+        'TriosSeconverter' / 'ombre_lignes'
     # Pas de ligne cherché entre ces bornes, en pixels d'une page rendue à 300 DPI : les
     # listings mesurés sont à 6 lignes par pouce (46,7 à 50 px) ; plus large, la recherche
     # prend la moitié ou le double du pas sur une page de quelques lignes.
@@ -414,10 +420,23 @@ class Config:
     LIGNES_LARGEUR_MIN_CARACTERES = 2
     # Régularité minimale du profil d'encre (0 à 1) ; en dessous : comptage impossible.
     LIGNES_REGULARITE_MIN = 0.25
-    # Traits du cadre : vertical sur au moins cette part de la hauteur de la page,
-    # horizontal sur au moins cette part de sa largeur.
+    # Trait vertical du cadre : sur au moins cette part de la hauteur de la page ; un trait à
+    # moins de LIGNES_MARGE_BORD (part de la largeur) du bord de l'image est le bord du scan.
     LIGNES_PART_TRAIT_VERTICAL = 0.25
-    LIGNES_PART_TRAIT_HORIZONTAL = 0.5
+    LIGNES_MARGE_BORD = 0.015
+    # Trait horizontal : bande d'au plus N pixels (300 DPI) dont l'encre, blancs entre tirets
+    # comblés, couvre au moins cette part de la largeur du tableau ; plein si l'encre brute
+    # en couvre au moins LIGNES_COUVERTURE_PLEIN.
+    LIGNES_EPAISSEUR_TRAIT = 12
+    # Rangées réunies pour mesurer un trait scanné, qui ondule sur plusieurs rangées.
+    LIGNES_FENETRE_TRAIT = 6
+    LIGNES_COUVERTURE_TRAIT = 0.6
+    LIGNES_COUVERTURE_PLEIN = 0.85
+    # Le trait sous l'en-tête est dans cette part haute du cadre ; plus bas, c'est le pied.
+    LIGNES_PART_ENTETE_MAX = 0.25
+    # Écart au-delà duquel ce n'est plus une alerte mais « comptage incertain » (au-delà de
+    # 2 lignes, c'est presque toujours la zone qui est fausse, contre-épreuve D1).
+    LIGNES_ECART_ALERTE_MAX = 2
     # Blanc maximal (pixels à 300 DPI) entre deux tirets d'un trait en pointillés
     # (6A23111PE133 : jusqu'à 18 px).
     LIGNES_BLANC_POINTILLES = 24

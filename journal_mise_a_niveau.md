@@ -1378,3 +1378,37 @@ pdf 11, 30, 36, 59 (appariement douteux). Détail : `mesures/d1_classement.md`.
 Bouton « Enrichir dictionnaire » remplacé par « Ajouter au lexique » : copie de l'Excel corrigé
 dans QUALITE_LEXIQUE_DOSSIER après vérification de la feuille Listing, nombre de formes
 nouvelles affiché ; le dictionnaire reste figé.
+
+## Étape 9, compteur de lignes corrigé, mode ombre (2026-10-12)
+
+Décision de l'utilisateur : pas de compteur visible dans la v1.8 ; corrigé, puis jugé à
+l'étape 10 en mode ombre.
+
+Corrections des bornes : bords noirs du scan écartés ; traits horizontaux trouvés par
+couverture de la largeur (pointillés coupés par les traits verticaux, traits scannés ondulés) ;
+trait sous l'en-tête cherché dans le quart haut du cadre seulement (sinon comptage
+impossible) ; zone fermée au premier trait plein (haut du cadre du pied). Garde-fous : alerte
+pour 1 ou 2 lignes d'écart, « comptage incertain » au-delà (information), synthèse si plus de
+20 % des pages d'un document sont en écart.
+
+Rejeu (pages déjà vues, condition nécessaire et non preuve) : extraits 21/21 ; contre-épreuve
+305 pages jugées : 7 alertes, dont 5 « compteur faux » (1,6 %) — PE012 p. 2 à 5 (ligne
+d'en-tête comptée), p. 139 (ligne « 7 VE » écartée par la règle des 2 caractères) ; PE021
+p. 38 Excel faux ou douteux ; PE022 p. 14 vue par l'utilisateur. 16 comptages incertains, 3
+impossibles (PE021). Outil de mesure : appariement par numéro imprimé confirmé par le contenu
+(PE021 pdf 11, 30, 36, 59 étaient mal appariés par l'outil). Détail : `mesures/d1_classement.md`.
+
+Mode ombre (`CONTROLE_LIGNES = 'ombre'`, défaut v1.8) : le compteur tourne dans un fil à part
+pendant la lecture (verrou partagé avec Tesseract, une seule lecture par page) ; bilan au
+journal, une ligne par page en écart ; fichier de mesure `.jsonl` dans
+`%LOCALAPPDATA%\TriosSeconverter\ombre_lignes` ; rien dans l'Excel ni dans l'écran de
+validation. `True` : alerte de page dans A VERIFIER et l'ordre de validation (prêt, non actif).
+
+Fenêtre « Dictionnaire OCR » : boutons de validation de l'onglet « À valider » désactivés,
+bulle « Dictionnaire figé depuis la v1.8 : utilisez Ajouter au lexique ».
+
+### À faire à l'étape 10 : jugement du compteur de lignes en mode ombre
+Sur 223111PE011 complet et sur le document jamais vu : classer chaque écart du fichier de
+mesure sur son image annotée — compteur faux, ligne vraiment perdue par la lecture, ou
+douteux (pas besoin d'Excel corrigé). Si les fausses alertes restent sous 5 % des pages :
+`CONTROLE_LIGNES = True`.

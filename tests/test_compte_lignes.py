@@ -14,14 +14,27 @@ import compte_lignes as cl
 PAS = 48
 
 
-def _page(lignes=30, entete=True, tache=False, pointilles_apres=None, angle=0.0, cadre=True):
-    """Page A4 à 300 DPI : 255 = blanc, 0 = encre."""
+def _page(lignes=30, entete=True, tache=False, pointilles_apres=None, angle=0.0, cadre=True,
+          bords_noirs=False, pied_dans_le_cadre=False):
+    """Page A4 à 300 DPI : 255 = blanc, 0 = encre.
+
+    pied_dans_le_cadre : traits verticaux prolongés jusqu'au bas du pied, sans trait de bas
+    de tableau ; le pied (3 lignes) n'est séparé que par le trait plein de son cadre.
+    """
     image = np.full((3508, 2480), 255, np.uint8)
     if cadre:
+        bas = 3300 if pied_dans_le_cadre else 3000
         for x in (100, 700, 1400, 2380):
-            image[100:3000, x:x + 3] = 0
+            image[100:bas, x:x + 3] = 0
         image[100:103, 100:2383] = 0
         image[3000:3003, 100:2383] = 0
+        if pied_dans_le_cadre:
+            for y in (3040, 3100, 3160):
+                for x in range(150, 900, 22):
+                    image[y:y + 25, x:x + 16] = 0
+    if bords_noirs:
+        image[:, 0:12] = 0
+        image[:, 2468:] = 0
     image[130:160, 150:300] = 0
     if entete:
         for x in range(100, 2380, 27):
@@ -113,7 +126,8 @@ class TestTraitsEtZone:
 
     def test_zone_sous_les_pointilles_jusqu_au_trait_plein(self):
         noir = 255 - _page(30)
-        zone = cl.zone_tableau(*cl.traits(noir))
+        vertical = cl.traits_verticaux(noir)
+        zone = cl.zone_tableau(vertical, cl.regles(noir, 103, 2380))
         assert zone['raison'] is None
         x0, x1, y0, y1 = zone['zone']
         assert 200 < y0 < 230 and 2980 < y1 < 3000
@@ -134,3 +148,77 @@ class TestCoucheTexte:
 
     def test_zone_vide(self):
         assert cl.lignes_couche_texte([], (0, 200, 90, 250)) == 0
+
+
+class TestBornesDeLaZone:
+
+    def test_bords_noirs_du_scan_ignores(self):
+        assert cl.compter_lignes(_page(30, bords_noirs=True), 22.0)['lignes'] == 30
+
+    def test_pied_dans_le_cadre_non_compte(self):
+        resultat = cl.compter_lignes(_page(20, pied_dans_le_cadre=True), 22.0)
+        assert resultat['lignes'] == 20
+        assert resultat['zone'][3] < 3000
+
+    def test_trait_trouve_seulement_dans_le_pied_comptage_impossible(self):
+        resultat = cl.compter_lignes(_page(30, entete=False), 22.0)
+        assert resultat['lignes'] is None
+        assert "haut du cadre" in resultat['raison']
+
+    def test_regles_pointilles_et_plein(self):
+        noir = 255 - _page(30)
+        trouves = cl.regles(noir, 103, 2380)
+        # Position à la fenêtre de mesure près (quelques pixels).
+        assert [plein for _, _, plein in trouves] == [True, False, True]
+        for (a, b, _), attendu in zip(trouves, (101, 201, 3001)):
+            assert abs((a + b) / 2 - attendu) <= 5
+
+    def test_regles_ligne_de_texte_pas_un_trait(self):
+        noir = np.zeros((400, 1000), np.uint8)
+        noir[100:125, 0:1000:2] = 255          # texte dense : trop haut pour un trait
+        assert cl.regles(noir, 0, 1000) == []
+
+    def test_traits_verticaux_bord_ecarte(self):
+        noir = 255 - _page(5, bords_noirs=True)
+        colonnes = np.where(cl.traits_verticaux(noir).sum(axis=0) > 0)[0]
+        assert colonnes.min() >= 100 and colonnes.max() <= 2383
+
+
+class TestDecisions:
+
+    def test_alerte_pour_un_ou_deux_ecarts(self):
+        d = cl.decisions([{'visibles': 47, 'lues': 46}, {'visibles': 30, 'lues': 30},
+                          {'visibles': 10, 'lues': 12}] + [{'visibles': 5, 'lues': 5}] * 7)
+        assert d['synthese'] is None
+        assert [p['type'] for p in d['pages'][:3]] == ['alerte', None, 'alerte']
+        assert d['pages'][0]['message'] == '47 lignes visibles, 46 lues'
+
+    def test_au_dela_comptage_incertain(self):
+        d = cl.decisions([{'visibles': 59, 'lues': 56}] + [{'visibles': 5, 'lues': 5}] * 9)
+        assert d['pages'][0] == {'type': 'incertain', 'message': (
+            'comptage incertain (écart de 3 lignes : 59 visibles, 56 lues)')}
+
+    def test_plus_de_20_pour_cent_une_synthese(self):
+        d = cl.decisions([{'visibles': 33, 'lues': 32}] * 3 + [{'visibles': 5, 'lues': 5}] * 7)
+        assert 'écart sur 3 pages sur 10' in d['synthese']
+        assert all(p['type'] is None for p in d['pages'])
+
+    def test_comptage_impossible_hors_du_compte(self):
+        d = cl.decisions([{'visibles': None, 'lues': 4}, {'visibles': 4, 'lues': 4}])
+        assert d['synthese'] is None
+        assert d['pages'][0]['type'] is None
+
+    def test_document_vide(self):
+        assert cl.decisions([]) == {'synthese': None, 'pages': []}
+
+
+class TestDecisionPage:
+
+    def test_egal_ou_non_compte(self):
+        assert cl.decision_page(30, 30) == {'type': None, 'message': None}
+        assert cl.decision_page(None, 30) == {'type': None, 'message': None}
+
+    def test_deux_lignes_alerte_trois_incertain(self):
+        assert cl.decision_page(32, 30)['type'] == 'alerte'
+        assert cl.decision_page(33, 30)['type'] == 'incertain'
+        assert cl.decision_page(27, 30)['type'] == 'incertain'

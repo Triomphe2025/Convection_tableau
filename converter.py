@@ -123,6 +123,11 @@ class Converter:
         # résultat, ou None), 'moteur', 'page_pdf' (positions à recalculer, ou None)}.
         self._a_valider: List[Dict] = []
         self._lexique = None
+        # Le fil du compteur de lignes et celui de Tesseract (positions) peuvent demander la
+        # même page : une seule lecture Tesseract par page, l'autre fil la reprend en mémoire.
+        self._verrou_tesseract = threading.Lock()
+        self._compte_lignes = None   # Future : {page du PDF: compte}, ou None
+        self._comptes_lignes: Dict[int, Dict] = {}
 
     # ── Helpers ───────────────────────────────────────────────────────
 
@@ -202,6 +207,8 @@ class Converter:
         self._a_valider = []
 
         source_ext = self.word_file.suffix.lower()
+        self._compte_lignes = (self._lancer_compte_lignes()
+                               if source_ext == '.pdf' and Config.CONTROLE_LIGNES else None)
 
         if source_ext == '.pdf':
             _ocr_mode = getattr(Config, 'OCR_MODE', 'tesseract').lower()
@@ -237,6 +244,8 @@ class Converter:
         self._log(f"  → {ok} / {len(ocr_results)} tableaux extraits.")
         self._progress(0.65, f"Extraction terminée : {ok}/{len(ocr_results)} tableaux.")
         if not self._est_annule():
+            if self._compte_lignes is not None:
+                self._controle_lignes(ocr_results)
             self._controler_qualite(ocr_results)
             self._valider_document(ocr_results)
 
@@ -468,10 +477,143 @@ class Converter:
                                 for i, r in par_page.items()
                                 if i not in pages_image and r.get('success')]
 
+        for i, r in par_page.items():
+            r['_page_pdf'] = i
         results = [par_page[i] for i in sorted(par_page)]
         # generer_excel a besoin d'un extracteur même si aucune page n'est
         # passée par l'OCR ; PdfTableExtractor délègue la mise en forme.
         return results, extractor or lecteur_grille
+
+    # ── Nombre de lignes visibles (compte_lignes.py) ──────────────────
+
+    def _lancer_compte_lignes(self):
+        """Compteur de lignes de toutes les pages du PDF dans un fil à part (comme Tesseract)."""
+        from concurrent.futures import ThreadPoolExecutor
+        executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='lignes')
+        future = executor.submit(self._compter_lignes_pdf)
+        executor.shutdown(wait=False)
+        return future
+
+    def _compter_lignes_pdf(self) -> Dict[int, Dict]:
+        """{page du PDF: visibles, raison, pas, durée} ; une erreur de page n'arrête rien.
+
+        Fil secondaire : rien au journal ici, le bilan est écrit par _controle_lignes.
+        """
+        import time
+        from statistics import median
+
+        import fitz
+        import numpy as np
+        from PIL import Image
+
+        from cache_lectures import empreinte_fichier
+        from compte_lignes import compter_lignes, lignes_couche_texte
+        from pdf_extractor import VECTORIEL, VIDE, diagnostiquer_page
+        from positions_scan import dpi_de_rendu, pas_initial
+        comptes: Dict[int, Dict] = {}
+        empreinte = empreinte_fichier(self.word_file)
+        with fitz.open(str(self.word_file)) as doc:
+            for numero, page in enumerate(doc, 1):
+                if self._est_annule():
+                    break
+                debut = time.monotonic()
+                try:
+                    nature = diagnostiquer_page(page)['nature']
+                    if nature == VIDE:
+                        continue
+                    dpi = dpi_de_rendu(page.rect.width, page.rect.height)
+                    pix = page.get_pixmap(dpi=dpi)
+                    gris = np.array(Image.frombytes('RGB', (pix.width, pix.height),
+                                                    pix.samples).convert('L'))
+                    mots = page.get_text('words')
+                    if nature == VECTORIEL:
+                        largeurs = [(m[2] - m[0]) / len(m[4]) for m in mots
+                                    if len(m[4]) >= 3 and m[4].isalnum()]
+                        pas_car = median(largeurs) * dpi / 72 if largeurs else None
+                    else:
+                        pas_car = pas_initial(self._lecture_tesseract(doc, numero,
+                                                                      empreinte).mots)
+                    resultat = compter_lignes(gris, pas_car or 0.6 * 50 * max(gris.shape) / 3508)
+                    visibles = resultat['lignes']
+                    # Page vectorielle : la couche texte donne le compte exact de la zone.
+                    if nature == VECTORIEL and resultat['zone']:
+                        x0, x1, y0, y1 = (v * 72 / dpi for v in resultat['zone'])
+                        visibles = lignes_couche_texte(mots, (x0, x1, y0, y1))
+                    comptes[numero] = {'visibles': visibles, 'raison': resultat['raison'],
+                                       'pas': resultat['pas'], 'nature': nature,
+                                       'duree': time.monotonic() - debut}
+                except Exception as exc:
+                    comptes[numero] = {'visibles': None, 'raison': f"erreur : {exc}",
+                                       'pas': None, 'nature': None,
+                                       'duree': time.monotonic() - debut}
+        return comptes
+
+    @staticmethod
+    def _lignes_lues(result: Dict) -> int:
+        return sum(1 for r in result.get('rows') or [] if r.get('type') == 'section'
+                   or (r.get('type') == 'data' and any((c or '').strip()
+                                                       for c in r.get('cells') or [])))
+
+    def _controle_lignes(self, resultats: List[Dict]) -> None:
+        """Lignes visibles contre lignes lues : journal et fichier de mesure ; en mode True,
+        alertes de page dans A VERIFIER (ordre de validation), jamais en mode 'ombre'."""
+        import datetime
+        import json
+
+        from compte_lignes import decisions
+        try:
+            comptes = self._compte_lignes.result()
+        except Exception as exc:
+            self._log(f"  ⚠ nombre de lignes : compteur en échec ({exc})")
+            return
+        self._comptes_lignes = comptes
+        pages = [r for r in resultats if r.get('success') and r.get('_page_pdf') in comptes]
+        verdict = decisions([{'visibles': comptes[r['_page_pdf']]['visibles'],
+                              'lues': self._lignes_lues(r)} for r in pages])
+        ombre = Config.CONTROLE_LIGNES == 'ombre'
+        prefixe = "nombre de lignes (mode ombre)" if ombre else "nombre de lignes"
+        impossibles = [r for r in pages if comptes[r['_page_pdf']]['visibles'] is None]
+        self._log(f"  {prefixe} : {len(pages) - len(impossibles)} page(s) comptée(s), "
+                  f"{sum(1 for d in verdict['pages'] if d['type'] == 'alerte')} écart(s) de 1 "
+                  f"ou 2 lignes, {sum(1 for d in verdict['pages'] if d['type'] == 'incertain')} "
+                  f"comptage(s) incertain(s), {len(impossibles)} impossible(s)")
+        if verdict['synthese']:
+            self._log(f"  ℹ {prefixe} : {verdict['synthese']}")
+        mesures = []
+        for r, d in zip(pages, verdict['pages']):
+            c = comptes[r['_page_pdf']]
+            numero = numero_page(r)
+            if c['visibles'] is None:
+                self._log(f"  ℹ {prefixe} p. {numero} : comptage impossible ({c['raison']})")
+            elif d['type'] == 'alerte' and not ombre:
+                self._log(f"  ⚠ p. {numero} : {d['message']}")
+                r.setdefault('a_verifier', []).append({
+                    'ligne': None, 'colonne': None, 'type': 'nombre de lignes',
+                    'message': d['message'], 'lecture': None, 'lignes': True})
+            elif d['type']:
+                self._log(f"  ℹ {prefixe} p. {numero} : {d['message']}")
+            mesures.append({'page_pdf': r['_page_pdf'], 'page': numero,
+                            'methode': r.get('detection_method'), 'nature': c['nature'],
+                            'visibles': c['visibles'], 'lues': self._lignes_lues(r),
+                            'decision': d['type'], 'message': d['message'],
+                            'raison': c['raison'], 'pas': c['pas'],
+                            'duree_s': round(c['duree'], 2)})
+        if verdict['synthese'] and not ombre and pages:
+            pages[0].setdefault('syntheses_lignes', []).append(
+                {'type': 'nombre de lignes', 'message': verdict['synthese']})
+        try:
+            dossier = Path(Config.LIGNES_OMBRE_DOSSIER)
+            dossier.mkdir(parents=True, exist_ok=True)
+            horodatage = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
+            fichier = dossier / f"{self.word_file.stem}_{horodatage}.jsonl"
+            with open(fichier, 'w', encoding='utf-8') as f:
+                for m in mesures:
+                    f.write(json.dumps(dict(m, document=self.word_file.name,
+                                            synthese=verdict['synthese']),
+                                       ensure_ascii=False) + '\n')
+            self._log(f"  mesures du nombre de lignes : {fichier}")
+        except OSError as exc:
+            self._log(f"  ⚠ mesures du nombre de lignes non écrites : {exc}")
 
     def _controler_qualite(self, resultats: List[Dict]) -> None:
         """Contrôle qualité du document (étape 9) : alertes dans resultat['a_verifier'].
@@ -572,7 +714,21 @@ class Converter:
             result.update(new_r)
             if v['page_pdf'] is not None:
                 self._placer_positions_originales([v['page_pdf']], [result])
+            self._alerte_lignes_relue(result)
             self._controler_qualite(resultats)
+
+    def _alerte_lignes_relue(self, result: Dict) -> None:
+        """Page relue : son alerte de nombre de lignes refaite avec la nouvelle lecture."""
+        from compte_lignes import decision_page
+        compte = self._comptes_lignes.get(result.get('_page_pdf'))
+        if compte is None or Config.CONTROLE_LIGNES is not True:
+            return
+        # Décision de la page seule : le garde-fou des 20 % porte sur le document entier.
+        d = decision_page(compte['visibles'], self._lignes_lues(result))
+        if d['type'] == 'alerte':
+            result.setdefault('a_verifier', []).append({
+                'ligne': None, 'colonne': None, 'type': 'nombre de lignes',
+                'message': d['message'], 'lecture': None, 'lignes': True})
 
     def _image_page_pdf(self, page: int, result: Dict) -> str:
         """Image de la page pour la relecture : celle du moteur, sinon rendue depuis le PDF."""
@@ -705,6 +861,10 @@ class Converter:
 
     def _lecture_tesseract(self, doc, page: int, empreinte: str):
         """Lecture Tesseract de la page : en mémoire, sinon dans le cache de l'appli, sinon OCR."""
+        with self._verrou_tesseract:
+            return self._lecture_tesseract_seule(doc, page, empreinte)
+
+    def _lecture_tesseract_seule(self, doc, page: int, empreinte: str):
         import cache_lectures
         from positions_scan import LecturePage, lire_page
         if page in self._lectures_tesseract:
@@ -774,6 +934,7 @@ class Converter:
         }.get(_ocr_mode_pdf, 'Tesseract')
 
         def _page_callback(done: int, total: int, result: dict) -> None:
+            result['_page_pdf'] = done
             if 'routage' in result:
                 self._journaliser_routage(done, total, result['routage'])
             pct = 0.05 + (done / total) * 0.55   # 5 % → 60 %

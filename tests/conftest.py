@@ -15,6 +15,8 @@ from config import Config  # noqa: E402
 # (%LOCALAPPDATA%\TriosSeconverter\cache) : dossier temporaire propre à la session de tests.
 _CACHE_TESTS = tempfile.TemporaryDirectory(prefix='triosseconverter_cache_tests_')
 Config.POSITIONS_CACHE_DOSSIER = Path(_CACHE_TESTS.name)
+# Mesures du compteur de lignes (mode ombre) : jamais dans le dossier de l'appli de la machine.
+Config.LIGNES_OMBRE_DOSSIER = Path(_CACHE_TESTS.name) / 'ombre_lignes'
 
 import hashlib  # noqa: E402
 import shutil  # noqa: E402

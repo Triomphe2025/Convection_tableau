@@ -524,17 +524,19 @@ def entrees_cellules(valides: List[Dict]) -> List[Dict]:
             k = a['colonne']
             entrees.append({'page': numero_page(r),
                             'ligne': None if a['ligne'] is None else a['ligne'] + 1,
-                            'colonne': entetes[k] if k < len(entetes) else None,
+                            'colonne': entetes[k] if k is not None and k < len(entetes)
+                            else None,
                             'type': a['type'], 'message': a['message'],
                             'lecture': a.get('lecture'), 'cible': (i, a['ligne'], k)})
     return entrees
 
 
 def entrees_syntheses_qualite(resultats: List[Dict]) -> List[Dict]:
-    """Synthèses du contrôle qualité (colonne au format non reconnu, contrôle coupé)."""
+    """Synthèses du contrôle qualité et du nombre de lignes (contrôle coupé pour le document)."""
     return [{'page': None, 'ligne': None, 'colonne': None, 'type': s['type'],
              'message': s['message'], 'lecture': None, 'cible': None}
-            for r in resultats for s in r.get('syntheses_qualite') or []]
+            for r in resultats for cle in ('syntheses_qualite', 'syntheses_lignes')
+            for s in r.get(cle) or []]
 
 
 def marquer_a_verifier(ws, ligne_debut: int, resultat: Dict, couleur: str,

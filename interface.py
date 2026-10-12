@@ -4458,6 +4458,34 @@ class TriosSeconverterApp(tk.Tk):
         threading.Thread(target=_worker, daemon=True).start()
 
 
+# ── Bulle d'aide ──────────────────────────────────────────────────────
+
+DICTIONNAIRE_FIGE = "Dictionnaire figé depuis la v1.8 : utilisez Ajouter au lexique"
+
+
+def bulle(widget, texte: str) -> None:
+    """Bulle d'aide affichée au survol du widget (même désactivé)."""
+    fenetre = {}
+
+    def montrer(_evt=None):
+        if fenetre:
+            return
+        tip = tk.Toplevel(widget)
+        tip.wm_overrideredirect(True)
+        tip.wm_geometry(f"+{widget.winfo_rootx() + 10}+{widget.winfo_rooty() + 28}")
+        tk.Label(tip, text=texte, font=("Segoe UI", 9), fg=FG_TEXT, bg=BG_CARD,
+                 padx=8, pady=4, relief='solid', bd=1).pack()
+        fenetre['tip'] = tip
+
+    def cacher(_evt=None):
+        tip = fenetre.pop('tip', None)
+        if tip is not None:
+            tip.destroy()
+
+    widget.bind('<Enter>', montrer, add='+')
+    widget.bind('<Leave>', cacher, add='+')
+
+
 # ── Fenêtre de validation page par page ──────────────────────────────
 
 class ValidationPageDialog(tk.Toplevel):
@@ -5460,17 +5488,20 @@ class DictionnaireDialog(tk.Toplevel):
 
         action_bar = tk.Frame(parent, bg=BG_PANEL)
         action_bar.pack(fill='x', padx=8, pady=(0, 4))
-        tk.Button(
+        # Dictionnaire figé (v1.8) : plus rien ne passe dans data_dictionary.json.
+        btn_tout = tk.Button(
             action_bar,
             text="OK Valider tout le dictionnaire",
             font=FONT_MAIN, bg='#1E8449', fg='white',
             activebackground='#145A32', activeforeground='white',
-            relief='flat', padx=12, pady=4, cursor='hand2',
-            command=self._valider_tout,
-        ).pack(side='left')
+            relief='flat', padx=12, pady=4,
+            command=self._valider_tout, state='disabled',
+        )
+        btn_tout.pack(side='left')
+        bulle(btn_tout, DICTIONNAIRE_FIGE)
         tk.Label(
             action_bar,
-            text="   Deplace toutes les valeurs en attente vers le dictionnaire valide.",
+            text=f"   {DICTIONNAIRE_FIGE}.",
             font=("Segoe UI", 8), fg=FG_MUTED, bg=BG_PANEL,
         ).pack(side='left')
 
@@ -5536,14 +5567,20 @@ class DictionnaireDialog(tk.Toplevel):
                       relief='flat', padx=10, pady=4, cursor='hand2',
                       command=cmd).pack(side='left', padx=(0, 4))
         tk.Frame(btns, bg=BG_CARD, width=2).pack(side='left', fill='y', padx=6)
-        for label, cmd, bg_col in [
-            ("OK Valider sel.", lambda c=col_name: self._valider_selection(c), '#1E8449'),
-            ("OK Valider colonne", lambda c=col_name: self._valider_colonne(c), '#1A5276'),
-            ("X  Rejeter sel.", lambda c=col_name: self._rejeter_selection(c), '#784212'),
+        for label, cmd, bg_col, fige in [
+            ("OK Valider sel.", lambda c=col_name: self._valider_selection(c), '#1E8449', True),
+            ("OK Valider colonne", lambda c=col_name: self._valider_colonne(c), '#1A5276',
+             True),
+            ("X  Rejeter sel.", lambda c=col_name: self._rejeter_selection(c), '#784212',
+             False),
         ]:
-            tk.Button(btns, text=label, font=FONT_MAIN, bg=bg_col, fg='white',
-                      relief='flat', padx=10, pady=4, cursor='hand2',
-                      command=cmd).pack(side='left', padx=(0, 4))
+            bouton = tk.Button(btns, text=label, font=FONT_MAIN, bg=bg_col, fg='white',
+                               relief='flat', padx=10, pady=4,
+                               cursor='arrow' if fige else 'hand2', command=cmd,
+                               state='disabled' if fige else 'normal')
+            bouton.pack(side='left', padx=(0, 4))
+            if fige:
+                bulle(bouton, DICTIONNAIRE_FIGE)
 
     def _fill_tree_pending(self, col_name: str, filtre: str = ''):
         tree = self._trees_pending.get(col_name)

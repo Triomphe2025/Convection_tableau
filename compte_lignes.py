@@ -2,8 +2,9 @@
 Nombre de lignes de texte visibles dans la zone du tableau d'une page, sans lire les mots.
 
 Les listings sont imprimés à pas de ligne fixe : même sur un scan sale, chaque ligne laisse
-une bande d'encre. Zone du tableau = entre le trait sous l'en-tête et le bas des traits
-verticaux du cadre, entre les traits extrêmes ; les traits du cadre sont retirés ; le pas
+une bande d'encre. Zone du tableau = entre le trait sous l'en-tête (dans le haut du cadre) et
+le premier trait plein en dessous, entre les traits verticaux extrêmes (bords du scan
+écartés) ; les traits du cadre sont retirés ; le pas
 et la phase de la grille des lignes sont ajustés ensemble sur le profil d'encre ; une case
 de la grille compte comme ligne si son encre s'étend sur au moins LIGNES_LARGEUR_MIN_CARACTERES
 caractères (une tache dans une case vide n'est pas une ligne).
@@ -32,35 +33,64 @@ def _groupes(indices, ecart: int = 3) -> List[Tuple[int, int]]:
     return groupes
 
 
-def traits(noir):
-    """Traits longs : verticaux, horizontaux (pointillés compris), horizontaux pleins."""
+def traits_verticaux(noir):
+    """Traits verticaux longs du cadre ; ceux collés au bord de l'image sont écartés (bords
+    noirs d'un scan, 223111PE012 p. 4 et 5 : pris pour le cadre, la page entière était comptée)."""
     import cv2
     hauteur, largeur = noir.shape
     vertical = cv2.morphologyEx(noir, cv2.MORPH_OPEN, cv2.getStructuringElement(
         cv2.MORPH_RECT, (1, max(20, int(hauteur * Config.LIGNES_PART_TRAIT_VERTICAL)))))
-    long = cv2.getStructuringElement(
-        cv2.MORPH_RECT, (max(20, int(largeur * Config.LIGNES_PART_TRAIT_HORIZONTAL)), 1))
-    pleins = cv2.morphologyEx(noir, cv2.MORPH_OPEN, long)
-    # Trait sous l'en-tête en pointillés (223111PE011, 6A23111PE133) : les blancs entre tirets
-    # sont comblés avant de chercher les traits longs ; ceux entre deux mots, plus larges, non.
-    combles = cv2.morphologyEx(noir, cv2.MORPH_CLOSE, cv2.getStructuringElement(
-        cv2.MORPH_RECT, (max(3, round(Config.LIGNES_BLANC_POINTILLES * _echelle(noir))), 1)))
-    horizontal = cv2.morphologyEx(combles, cv2.MORPH_OPEN, long)
-    return vertical, horizontal, pleins
+    bord = int(Config.LIGNES_MARGE_BORD * largeur)
+    vertical[:, :bord] = 0
+    vertical[:, largeur - bord:] = 0
+    return vertical
 
 
-def _traits_horizontaux(masque, x0: int, x1: int) -> List[float]:
+def regles(noir, x0: int, x1: int) -> List[Tuple[int, int, bool]]:
+    """Traits horizontaux entre x0 et x1 : (début, fin, plein), par couverture de la largeur.
+
+    Un trait est une bande mince dont l'encre, blancs entre tirets comblés et réunie sur
+    LIGNES_FENETRE_TRAIT rangées (un trait scanné ondule sur 8 à 10 rangées, aucune ne le
+    contient en entier), couvre au moins LIGNES_COUVERTURE_TRAIT de la largeur, avec du blanc
+    d'un côté au moins ; une ligne de texte est trop haute pour passer. Mesurer la couverture
+    et non un segment continu : les pointillés d'en-tête de 6A23111PE133 sont coupés par les
+    traits verticaux (plus long segment 890 px sur 2 267). Plein = l'encre brute couvre au
+    moins LIGNES_COUVERTURE_PLEIN de la largeur.
+    """
+    import cv2
     import numpy as np
-    return [(a + b) / 2 for a, b in _groupes(np.where(masque[:, x0:x1].sum(axis=1) > 0)[0])]
+    ech = _echelle(noir)
+    bande = noir[:, x0:x1]
+    fenetre = cv2.getStructuringElement(
+        cv2.MORPH_RECT, (1, max(1, round(Config.LIGNES_FENETRE_TRAIT * ech))))
+    combles = cv2.morphologyEx(bande, cv2.MORPH_CLOSE, cv2.getStructuringElement(
+        cv2.MORPH_RECT, (max(3, round(Config.LIGNES_BLANC_POINTILLES * ech)), 1)))
+    couverture = (cv2.dilate(combles, fenetre) > 0).mean(axis=1)
+    brute = (cv2.dilate(bande, fenetre) > 0).mean(axis=1)
+    epaisseur = max(2, round((Config.LIGNES_EPAISSEUR_TRAIT + Config.LIGNES_FENETRE_TRAIT)
+                             * ech))
+    autour = epaisseur + max(2, round(4 * ech))
+    sortie = []
+    for a, b in _groupes(np.where(couverture >= Config.LIGNES_COUVERTURE_TRAIT)[0], 1):
+        if b - a + 1 > epaisseur:
+            continue
+        voisins = [couverture[y] for y in (a - autour, b + autour) if 0 <= y < len(couverture)]
+        # Blanc d'un côté au moins : le trait sous l'en-tête touche presque le texte au-dessus.
+        if voisins and min(voisins) >= Config.LIGNES_COUVERTURE_TRAIT / 2:
+            continue
+        plein = bool(brute[a:b + 1].max() >= Config.LIGNES_COUVERTURE_PLEIN)
+        sortie.append((int(a), int(b), plein))
+    return sortie
 
 
-def zone_tableau(vertical, horizontal, pleins) -> Dict:
+def zone_tableau(vertical, liste_regles: List[Tuple[int, int, bool]]) -> Dict:
     """Zone des lignes de données : (x0, x1, y0, y1) en pixels, ou raison si introuvable.
 
-    Haut = premier trait horizontal (plein ou pointillé) sous le haut des traits verticaux :
-    celui qui ferme l'en-tête. Bas = premier trait plein en dessous (bas du tableau ou haut
-    du pied), sinon bas des traits verticaux ; les pointillés entre deux câbles (223111PE012)
-    ne ferment pas la zone. En-tête et pied sont hors de la zone.
+    Haut = premier trait sous le haut du cadre, et seulement dans le haut du cadre
+    (LIGNES_PART_ENTETE_MAX) : un trait trouvé plus bas est celui du pied (6A23111PE133 p. 2,
+    223111PE021 p. 2 : la zone tombait dans le pied) → comptage impossible, pas d'alerte.
+    Bas = premier trait plein en dessous (bas du tableau, haut du cadre du pied), sinon bas
+    des traits verticaux ; les pointillés entre deux câbles ne ferment pas la zone.
     """
     import numpy as np
     colonnes = _groupes(np.where(vertical.sum(axis=0) > 0)[0])
@@ -70,15 +100,16 @@ def zone_tableau(vertical, horizontal, pleins) -> Dict:
     lignes_v = np.where(vertical[:, colonnes[0][0]:colonnes[-1][1] + 1].sum(axis=1) > 0)[0]
     haut, bas = int(lignes_v.min()), int(lignes_v.max())
     marge = 10 * _echelle(vertical)
-    regles = _traits_horizontaux(horizontal, x0, x1)
+    centres = [((a + b) / 2, plein) for a, b, plein in liste_regles]
     # Haut du cadre : trait du haut s'il est au-dessus des traits verticaux (6A23111PE133
     # p. 15 : les séparateurs ne commencent que sous les pointillés de l'en-tête).
-    haut = min([haut] + [y for y in regles if y < haut])
-    sous_entete = [y for y in regles if haut + marge < y < bas - marge]
-    if not sous_entete:
-        return {'zone': None, 'raison': "trait sous l'en-tête non trouvé"}
+    haut = min([haut] + [y for y, _ in centres if y < haut])
+    limite = haut + Config.LIGNES_PART_ENTETE_MAX * (bas - haut)
+    sous_entete = [y for y, _ in centres if haut + marge < y < bas - marge]
+    if not sous_entete or sous_entete[0] > limite:
+        return {'zone': None, 'raison': "trait sous l'en-tête non trouvé dans le haut du cadre"}
     y0 = sous_entete[0]
-    suivants = [y for y in _traits_horizontaux(pleins, x0, x1) if y > y0 + marge]
+    suivants = [y for y, plein in centres if plein and y > y0 + marge]
     fin = min(bas, suivants[0]) if suivants else bas
     return {'zone': (x0, x1, int(y0 + marge / 2), int(fin - marge / 2)), 'raison': None}
 
@@ -178,13 +209,18 @@ def compter_lignes(gris, pas_caractere: float) -> Dict:
         noir = cv2.warpAffine(noir, cv2.getRotationMatrix2D(centre, angle, 1.0),
                               (noir.shape[1], noir.shape[0]))
     sortie['angle'] = angle
-    vertical, horizontal, pleins = traits(noir)
-    zone = zone_tableau(vertical, horizontal, pleins)
+    vertical = traits_verticaux(noir)
+    colonnes = _groupes(np.where(vertical.sum(axis=0) > 0)[0])
+    liste = regles(noir, colonnes[0][1] + 1, colonnes[-1][0] - 1) if len(colonnes) >= 2 else []
+    zone = zone_tableau(vertical, liste)
     if zone['raison']:
         return dict(sortie, raison=zone['raison'])
     x0, x1, y0, y1 = zone['zone']
     sortie['zone'] = zone['zone']
-    traces = cv2.dilate(vertical | horizontal | pleins, np.ones((7, 7), np.uint8))
+    traces = vertical.copy()
+    for a, b, _ in liste:
+        traces[a:b + 1, x0:x1] = 255
+    traces = cv2.dilate(traces, np.ones((7, 7), np.uint8))
     encre = (noir & ~traces)[y0:y1, x0:x1] > 0
     echelle = _echelle(gris)
     pas, phase, regularite = ajuster_pas(encre.sum(axis=1), Config.LIGNES_PAS_MIN * echelle,
@@ -198,6 +234,40 @@ def compter_lignes(gris, pas_caractere: float) -> Dict:
              if case_est_ligne(encre[a:b], largeur_min, pas_caractere, hauteur_min)]
     sortie['cases'] = [(a + y0, b + y0) for a, b in cases]
     sortie['lignes'] = len(cases)
+    return sortie
+
+
+def decision_page(visibles: Optional[int], lues: int) -> Dict:
+    """Décision pour une page seule : alerte (1 à LIGNES_ECART_ALERTE_MAX lignes d'écart),
+    comptage incertain au-delà, rien si égal ou non compté."""
+    if visibles is None or visibles == lues:
+        return {'type': None, 'message': None}
+    ecart = abs(visibles - lues)
+    if ecart <= Config.LIGNES_ECART_ALERTE_MAX:
+        return {'type': 'alerte', 'message': f"{visibles} lignes visibles, {lues} lues"}
+    return {'type': 'incertain', 'message': (
+        f"comptage incertain (écart de {ecart} lignes : {visibles} visibles, {lues} lues)")}
+
+
+def decisions(pages: List[Dict]) -> Dict:
+    """Alertes de page du contrôle du nombre de lignes, avec deux garde-fous.
+
+    pages : [{'visibles': int ou None, 'lues': int}] d'un même document. Écart de 1 à
+    LIGNES_ECART_ALERTE_MAX lignes : alerte ; au-delà, c'est presque toujours la zone qui est
+    fausse : information « comptage incertain ». Plus de QUALITE_GARDE_FOU des pages comptées
+    en écart : la mise en page trompe le compteur, une seule ligne de synthèse.
+    Rend {'synthese': texte ou None, 'pages': [{'type': 'alerte'|'incertain'|None, 'message'}]}.
+    """
+    comptees = [p for p in pages if p.get('visibles') is not None]
+    en_ecart = [p for p in comptees if p['visibles'] != p['lues']]
+    sortie: Dict = {'synthese': None, 'pages': []}
+    if comptees and len(en_ecart) / len(comptees) > Config.QUALITE_GARDE_FOU:
+        sortie['synthese'] = (f"nombre de lignes : écart sur {len(en_ecart)} pages sur "
+                              f"{len(comptees)}, mise en page non reconnue par le compteur, "
+                              f"contrôle coupé pour ce document")
+    for p in pages:
+        sortie['pages'].append({'type': None, 'message': None} if sortie['synthese']
+                               else decision_page(p.get('visibles'), p['lues']))
     return sortie
 
 

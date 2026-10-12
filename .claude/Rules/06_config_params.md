@@ -165,12 +165,18 @@ le calibrage déjà fait sur `verificateur.py`.
 
 | Paramètre | Valeur défaut | Rôle |
 |-----------|--------------|------|
-| `CONTROLE_LIGNES` | `False` | Contrôle non branché tant que la mesure D0 n'est pas validée |
+| `CONTROLE_LIGNES` | `'ombre'` | `False` coupé ; `'ombre'` : compteur en parallèle de la lecture, journal + fichier de mesure, rien dans l'Excel ni l'écran de validation ; `True` : alerte de page dans A VERIFIER et l'ordre de validation (décidé à l'étape 10) |
+| `LIGNES_OMBRE_DOSSIER` | `%LOCALAPPDATA%\TriosSeconverter\ombre_lignes` | Fichiers de mesure du mode ombre (un `.jsonl` par conversion) ; les tests le redirigent |
+| `LIGNES_MARGE_BORD` | `0.015` | Trait vertical à moins de cette part de la largeur du bord = bord noir du scan, écarté |
+| `LIGNES_EPAISSEUR_TRAIT` / `LIGNES_FENETRE_TRAIT` | `12` / `6` | Trait horizontal : bande mince, mesurée sur une fenêtre de rangées (trait scanné ondulé) |
+| `LIGNES_COUVERTURE_TRAIT` / `LIGNES_COUVERTURE_PLEIN` | `0.6` / `0.85` | Part de la largeur couverte : trait (tirets comblés) / trait plein (encre brute) |
+| `LIGNES_PART_ENTETE_MAX` | `0.25` | Le trait sous l'en-tête est dans ce quart haut du cadre ; plus bas c'est le pied → comptage impossible |
+| `LIGNES_ECART_ALERTE_MAX` | `2` | Alerte pour 1 ou 2 lignes d'écart ; au-delà « comptage incertain » (information) ; plus de `QUALITE_GARDE_FOU` des pages en écart = synthèse |
 | `LIGNES_PAS_MIN` / `LIGNES_PAS_MAX` | `33` / `70` | Pas de ligne cherché (px d'une page rendue à 300 DPI ; listings mesurés : 46,7 à 50 px) |
 | `LIGNES_LARGEUR_MIN_CARACTERES` | `2` | Une case est une ligne si son encre couvre au moins 2 caractères de large |
 | `LIGNES_HAUTEUR_MIN_PART` | `0.25` | … et au moins un quart du pas de haut (trait, tache plate) |
 | `LIGNES_REGULARITE_MIN` | `0.25` | En dessous : comptage impossible |
-| `LIGNES_PART_TRAIT_VERTICAL` / `LIGNES_PART_TRAIT_HORIZONTAL` | `0.25` / `0.5` | Longueur minimale d'un trait du cadre (part de la page) |
+| `LIGNES_PART_TRAIT_VERTICAL` | `0.25` | Longueur minimale d'un trait vertical du cadre (part de la hauteur de la page) |
 | `LIGNES_BLANC_POINTILLES` | `24` | Blanc maximal entre deux tirets d'un trait en pointillés (6A23111PE133 : 18 px) |
 | `LIGNES_INCLINAISON_MAX` / `LIGNES_INCLINAISON_PAS` | `1.5` / `0.05` | Redressement du scan (degrés) |
 
