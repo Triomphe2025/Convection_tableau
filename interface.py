@@ -1067,8 +1067,8 @@ class TriosSeconverterApp(tk.Tk):
         right.pack(side='right', fill='y')
 
         self._btn_dico = RoundedButton(
-            right, text="  Enrichir le dico  ",
-            command=self._enrich_dictionary,
+            right, text="  Ajouter au lexique  ",
+            command=self._ajouter_au_lexique,
             bg=BG_CARD, hover_bg=COL_ACC2,
             width=155, height=36, font=FONT_BOLD,
         )
@@ -1284,7 +1284,7 @@ class TriosSeconverterApp(tk.Tk):
         self._ctx_btn_format = self._ctx_btn(
             inner, "📐 Reformater", self._ctx_reformater)
         self._ctx_btn_dico = self._ctx_btn(
-            inner, "📚 Enrichir dictionnaire", self._enrich_dictionary)
+            inner, "📚 Ajouter au lexique", self._ajouter_au_lexique)
         self._ctx_btn_log = self._ctx_btn(
             inner, "📋 Ouvrir log", self._ouvrir_observateur)
         self._ctx_btn_folder = self._ctx_btn(
@@ -3588,11 +3588,11 @@ class TriosSeconverterApp(tk.Tk):
         btns_dico.pack(anchor='w', padx=12, pady=(0, 12))
 
         tk.Button(
-            btns_dico, text="Enrichir depuis Excel", font=FONT_BOLD,
+            btns_dico, text="Ajouter au lexique", font=FONT_BOLD,
             bg=COL_ACC2, fg=FG_TEXT,
             activebackground=COL_ACC, activeforeground="white",
             relief='flat', padx=14, pady=6, cursor='hand2',
-            command=self._enrich_dictionary,
+            command=self._ajouter_au_lexique,
         ).pack(side='left', padx=(0, 8))
 
         tk.Button(
@@ -4248,37 +4248,39 @@ class TriosSeconverterApp(tk.Tk):
             return
         AuditDialog(self, result)
 
-    def _enrich_dictionary(self):
-        """
-        Importe un classeur Excel vers le dictionnaire EN ATTENTE.
-        Les valeurs ne sont actives qu'après validation dans 'Dictionnaire OCR'.
-        """
+    def _ajouter_au_lexique(self):
+        """Copie un Excel corrigé (feuille Listing) dans le lexique de référence."""
+        from lexique_reference import ajouter_au_lexique
         path = filedialog.askopenfilename(
-            title="Sélectionner le classeur Excel à importer",
-            filetypes=[("Classeur Excel", "*.xlsx *.xls"), ("Tous les fichiers", "*.*")],
+            title="Excel corrigé à ajouter au lexique de référence",
+            filetypes=[("Classeur Excel", "*.xlsx"), ("Tous les fichiers", "*.*")],
         )
         if not path:
             return
         try:
-            from data_dictionary import get_pending_dictionary
-            pending = get_pending_dictionary()
-            counts = pending.update_from_excel(Path(path))
-            nouveaux = sum(counts.values())
-            if nouveaux > 0:
-                messagebox.showinfo(
-                    "Import réussi",
-                    f"✓ {nouveaux} valeur(s) ajoutée(s) au dictionnaire EN ATTENTE.\n\n"
-                    f"Ouvrez 'Dictionnaire OCR' → onglet 'À valider'\n"
-                    f"pour reviewer et valider vers le dictionnaire final.",
-                )
-            else:
-                messagebox.showinfo(
-                    "Aucune nouveauté",
-                    "Aucune nouvelle valeur trouvée dans ce fichier\n"
-                    "(déjà présentes ou invalides).",
-                )
-        except Exception as exc:
-            messagebox.showerror("Erreur d'import", f"Impossible de lire le fichier :\n{exc}")
+            try:
+                bilan = ajouter_au_lexique(Path(path))
+            except FileExistsError as exc:
+                if not messagebox.askyesno(
+                        "Déjà dans le lexique",
+                        f"Un classeur du même nom est déjà dans le lexique :\n{exc}\n\n"
+                        f"Le remplacer par celui-ci ?", parent=self):
+                    return
+                bilan = ajouter_au_lexique(Path(path), remplacer=True)
+        except ValueError as exc:
+            messagebox.showerror("Classeur refusé", str(exc), parent=self)
+            return
+        except OSError as exc:
+            messagebox.showerror("Copie impossible", str(exc), parent=self)
+            return
+        messagebox.showinfo(
+            "Lexique de référence",
+            f"✓ {bilan['chemin'].name} {'remplacé' if bilan['remplace'] else 'ajouté'} "
+            f"dans le lexique.\n\n{bilan['ajoutees']} forme(s) nouvelle(s) sur "
+            f"{bilan['formes']} lue(s).\n\nLe contrôle de cohérence s'en sert dès la "
+            f"prochaine conversion ; le dictionnaire OCR n'est pas modifié.",
+            parent=self,
+        )
 
     def _ouvrir_dictionnaire(self):
         """Ouvre le visionneur / éditeur du dictionnaire OCR."""

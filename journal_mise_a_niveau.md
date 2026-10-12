@@ -1357,3 +1357,24 @@ hauteur minimale) ; une vérification sur des pages jamais vues est à faire ava
 
 Dictionnaire : `Converter._apprendre_corrections` supprimé, data_dictionary.json n'apprend
 plus rien à la validation (lecture seule, état mesuré).
+
+## Étape 9, contre-épreuve D1 du compteur de lignes (2026-10-12)
+
+Réglages figés au commit 4770c8a. PDF sources complets de 6A23111PE133, 223111PE012,
+223111PE013, 223111PE021, 223111PE022 (tous présents) ; vérité = lignes de chaque page de la
+feuille Listing des Excel corrigés ; pages des extraits à part (toutes justes) ; pages sans
+bloc dans l'Excel (garde, sommaire, modifications) hors du critère.
+Outil (`outils_reference/contre_epreuve_d1.py`) corrigé en cours de route, compteur intact :
+pied de l'Excel reconnu à ses libellés suivis de « : » (« CABLE : » de PE021 ; « TS PET PORTE
+FERMEE PH » est une donnée), appariement par numéro imprimé puis contenu.
+
+Résultat : 295 pages jugées, 31 « compteur faux » (10,5 %) → critère (5 %) non tenu, rien de
+branché. Causes : trait sous l'en-tête manqué, zone dans le pied (8) ; bas du tableau manqué,
+pied compté en plus (19) ; bords noirs du scan pris pour le cadre (2) ; une ligne manquée (1).
+Comptage impossible : 3 pages (toutes 223111PE021). Temps : médiane 0,78 s par page, max 2,07 s.
+Excel faux ou douteux à vérifier : PE022 p. 14 (papier 33, Excel 32), p. 35, p. 36 ; PE021
+pdf 11, 30, 36, 59 (appariement douteux). Détail : `mesures/d1_classement.md`.
+
+Bouton « Enrichir dictionnaire » remplacé par « Ajouter au lexique » : copie de l'Excel corrigé
+dans QUALITE_LEXIQUE_DOSSIER après vérification de la feuille Listing, nombre de formes
+nouvelles affiché ; le dictionnaire reste figé.

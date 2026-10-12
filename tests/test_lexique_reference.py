@@ -66,3 +66,60 @@ class TestChargerLexique(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestAjouterAuLexique(unittest.TestCase):
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        racine = Path(self._tmp.name)
+        self.lexique, self.depot = racine / 'lexique', racine / 'depot'
+        self.lexique.mkdir()
+        self.depot.mkdir()
+        _classeur(self.lexique, 'PE013.xlsx', [('PH A104 01', '0815B', 'PH TA106 01', 'SIG')])
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_copie_et_formes_ajoutees(self):
+        from lexique_reference import ajouter_au_lexique
+        _classeur(self.depot, 'PE133.xlsx', [('PH A104 01', '0815B', 'D3T 01A', 'SIG')])
+        bilan = ajouter_au_lexique(self.depot / 'PE133.xlsx', self.lexique)
+        self.assertTrue((self.lexique / 'PE133.xlsx').exists())
+        self.assertEqual(bilan['ajoutees'], 1)          # « D3T 01A » seul est nouveau
+        self.assertIn('D3T 01A', charger_lexique(self.lexique))
+
+    def test_sans_feuille_listing_refuse_rien_copie(self):
+        from lexique_reference import ajouter_au_lexique
+        wb = openpyxl.Workbook()
+        wb.active.title = 'Borniers'
+        wb.save(self.depot / 'brut.xlsx')
+        with self.assertRaises(ValueError) as erreur:
+            ajouter_au_lexique(self.depot / 'brut.xlsx', self.lexique)
+        self.assertIn('Listing', str(erreur.exception))
+        self.assertFalse((self.lexique / 'brut.xlsx').exists())
+
+    def test_pas_un_xlsx(self):
+        from lexique_reference import ajouter_au_lexique
+        (self.depot / 'note.txt').write_text('x', encoding='utf-8')
+        with self.assertRaises(ValueError):
+            ajouter_au_lexique(self.depot / 'note.txt', self.lexique)
+
+    def test_meme_nom_demande_confirmation_puis_remplace(self):
+        from lexique_reference import ajouter_au_lexique
+        _classeur(self.depot, 'PE013.xlsx', [('PH A105 02', '0816B', 'PH TA106 02', 'SIG')])
+        with self.assertRaises(FileExistsError):
+            ajouter_au_lexique(self.depot / 'PE013.xlsx', self.lexique)
+        bilan = ajouter_au_lexique(self.depot / 'PE013.xlsx', self.lexique, remplacer=True)
+        self.assertTrue(bilan['remplace'])
+        self.assertIn('PH A105 02', charger_lexique(self.lexique))
+        self.assertNotIn('PH A104 01', charger_lexique(self.lexique))
+
+    def test_dictionnaire_jamais_touche(self):
+        import data_dictionary
+        from lexique_reference import ajouter_au_lexique
+        fichier = data_dictionary.get_dictionary().path
+        avant = fichier.read_bytes() if fichier.exists() else None
+        _classeur(self.depot, 'PE133.xlsx', [('D3T 01A', '0815B', 'D3T 02A', 'SIG')])
+        ajouter_au_lexique(self.depot / 'PE133.xlsx', self.lexique)
+        self.assertEqual(fichier.read_bytes() if fichier.exists() else None, avant)
