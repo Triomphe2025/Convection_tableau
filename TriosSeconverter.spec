@@ -51,6 +51,7 @@ a = Analysis(
         'controle_conservation',
         'controle_qualite',
         'lexique_reference',
+        'compte_lignes',
     ],
     hookspath=[],
     hooksconfig={},
