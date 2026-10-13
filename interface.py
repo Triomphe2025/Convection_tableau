@@ -7151,5 +7151,9 @@ class _SimpleInput(tk.Toplevel):
 # ── Point d'entrée ────────────────────────────────────────────────────
 
 if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        # Exe lancé avec des arguments : ligne de commande, sans fenêtre (essais, lots).
+        from ligne_de_commande import main as ligne_de_commande
+        raise SystemExit(ligne_de_commande(sys.argv[1:]))
     app = TriosSeconverterApp()
     app.mainloop()

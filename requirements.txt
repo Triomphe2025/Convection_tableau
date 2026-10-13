@@ -24,7 +24,8 @@ pandas>=2.0.0
 fpdf2>=2.7.0
 
 # Packaging en executable autonome (optionnel)
-pyinstaller>=6.0.0
+pyinstaller==6.22.3      # version exacte : build reproductible (étape 10)
+pyinstaller-hooks-contrib==2026.8
 
 # IA de détection de structure de tableau (optionnel — USE_TATR=True dans config.py)
 # Installation : pip install transformers torch torchvision timm

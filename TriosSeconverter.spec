@@ -4,8 +4,8 @@ Fichier de specification PyInstaller pour TriosSeconverter (v1.8).
 Genere un dossier autonome dans dist/TriosSeconverter/.
 
 Le lexique compile (lexique_compile.json) est produit par build_exe.bat avant ce build.
-Exclus : Docling (torch, transformers : plusieurs Go ; message clair si ce mode est choisi),
-scipy (cad/curve_fitter a une solution de repli), outils de developpement.
+Exclus : Docling (torch, transformers : plusieurs Go ; message clair si ce mode est choisi)
+et les outils de developpement. scipy est embarque : skimage (DXF raster) en depend.
 """
 from PyInstaller.utils.hooks import collect_submodules
 
@@ -15,6 +15,7 @@ block_cipher = None
 # (liste calculee en suivant les imports depuis interface.py).
 MODULES_PROJET = [
     'agent_ocr', 'audit_claude', 'cache_lectures', 'claude_ocr', 'compte_lignes', 'config',
+    'ligne_de_commande',
     'controle_conservation', 'controle_qualite', 'converter', 'data_dictionary',
     'docling_ocr', 'generer_classeur', 'hybrid_ocr', 'lexique_reference', 'ocr_processor',
     'ollama_ocr', 'pdf_extractor', 'pied_page', 'positions_scan', 'recuperer_image',
@@ -68,7 +69,6 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[
         'matplotlib',
-        'scipy',
         'IPython',
         'jupyter',
         'notebook',

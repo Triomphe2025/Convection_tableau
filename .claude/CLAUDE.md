@@ -177,7 +177,8 @@ Fichier Word source (.docx) — images de borniers scannés
 | Fichier | Usage |
 |---------|-------|
 | `install.bat` | Crée `env\`, installe les dépendances, raccourci bureau |
-| `build_exe.bat` + `TriosSeconverter.spec` | Compilation PyInstaller → `dist\TriosSeconverter.exe` |
+| `build_exe.bat` + `TriosSeconverter.spec` | Compilation PyInstaller → `dist\TriosSeconverter\TriosSeconverter.exe` (dossier onedir) |
+| `ligne_de_commande.py` | Exe lancé avec des arguments (`infos`, `convertir`, `formater`, `dxf`, journal dans `--journal`) : essais de l'exe sans clic, traitements par lots — répartition seule, appelée par `interface.py` |
 | `requirements.txt` | Dépendances Python du projet |
 | `templates.json` | Modèles de tableau sauvegardés (ne pas supprimer) |
 | `generer_rapport_evolution.py` | Génère un rapport PDF d'évolution |
@@ -334,7 +335,8 @@ numpy>=1.24.0            # calculs OCR
 Pillow>=11.0.0           # manipulation images
 pandas>=2.0.0            # données tabulaires
 fpdf2>=2.7.0             # génération PDF
-pyinstaller>=6.0.0       # compilation exe
+pyinstaller==6.22.3      # compilation exe (version exacte : build reproductible)
+pyinstaller-hooks-contrib==2026.8
 pytest>=9.0              # tests
 pymupdf>=1.24.0          # extraction PDF couche texte (mode PDF sans Tesseract)
 ```
