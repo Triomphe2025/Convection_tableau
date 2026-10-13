@@ -166,9 +166,13 @@ def apparier(pages_mots, blocs, numeros=None):
         if b['page']:
             par_numero.setdefault(b['page'].upper(), j)
     for i, (m, lus) in enumerate(zip(pages_mots, numeros)):
+        # Le bloc du numéro doit aussi être parmi les meilleurs par le contenu : l'Excel de
+        # 223111PE021 numérote certaines pages d'un cran plus loin que le papier (p. 38).
+        meilleur = max((_dice(b['mots'], m) for b in blocs), default=0.0)
         for n in lus:
             j = par_numero.get(n)
-            if j is not None and j not in pris and _dice(blocs[j]['mots'], m) >= 0.05:
+            if j is not None and j not in pris and _dice(blocs[j]['mots'], m) >= max(
+                    0.05, 0.8 * meilleur):
                 page_bloc[i] = j
                 pris.add(j)
                 break
@@ -199,7 +203,7 @@ def mesurer_d1():
     import fitz
     import numpy as np
     from PIL import Image
-    from pdf_extractor import VECTORIEL, diagnostiquer_page
+    from pdf_extractor import VECTORIEL, diagnostiquer_page, mots_visibles
     IMAGES.mkdir(parents=True, exist_ok=True)
     sortie = ['# Contre-épreuve D1 — compteur de lignes sur des pages jamais vues', '',
               'Réglages figés au commit 4770c8a (aucun ajustement pendant la mesure).', '']
@@ -235,7 +239,7 @@ def mesurer_d1():
                 pix = page.get_pixmap(dpi=dpi)
                 gris = np.array(Image.frombytes('RGB', (pix.width, pix.height),
                                                 pix.samples).convert('L'))
-                mots_pdf = page.get_text('words')
+                mots_pdf = mots_visibles(page) if natures[i] == VECTORIEL else []
                 if natures[i] == VECTORIEL:
                     largeurs = [(m[2] - m[0]) / len(m[4]) for m in mots_pdf
                                 if len(m[4]) >= 3 and m[4].isalnum()]

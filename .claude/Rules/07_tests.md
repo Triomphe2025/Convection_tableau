@@ -76,6 +76,7 @@ tests/
   test_qualite_branchee.py           → Contrôle qualité branché : règles actives après C0, alerte posée sur la cellule avec proposition (« lu …, peut-être … »), relance sans doublon, lexique absent ou illisible (une ligne au journal), continuité non branchée, synthèse du garde-fou ; une ligne par cellule (toutes les raisons), cellule corrigée B3 gardée orange ; Excel sans dictionnaire ; validation après les contrôles (pages à alertes d'abord, relecture puis nouveau contrôle, page en couche texte sans relecture)
   test_dictionnaire_isole.py         → Les tests travaillent sur une copie temporaire du dictionnaire (tests/conftest.py, toute la session) ; le vrai data_dictionary.json est contrôlé identique avant et après la suite
   test_compte_lignes.py              → compte_lignes.py sur pages fabriquées : compte, tache dans une case vide, pointillés entre deux câbles, scan penché, cadre ou trait d'en-tête absents, bords noirs du scan, pied dans le cadre, trait trouvé seulement dans le pied ; traits par couverture ; pas et phase, cases, largeur et hauteur minimales, couche texte ; décisions (alerte, incertain, synthèse 20 %, page seule)
+  test_texte_imprime.py              → Lecture vectorielle telle qu'imprimée : 223111PE022 p. 14 (31 lignes, lignes surimprimées lues une fois avec leur borne, jarretières entières, texte caché non lu), p. 9 (« NOM DE CABLE », page lue) ; surimpression, masque blanc, point seul gardé (pages fabriquées)
   test_lignes_converter.py           → Compteur dans le convertisseur : fil à part sur un PDF vectoriel fabriqué, mode ombre (journal, fichier de mesure, rien dans les résultats), mode True (alerte de page dans A VERIFIER, synthèse, page relue), défaut 'ombre'
   test_lexique_reference.py          → lexique_reference.py : formes, en-têtes et pieds écartés, document mesuré exclu, dossier absent ; ajout au lexique (copie, formes ajoutées, sans feuille Listing refusé, même nom = confirmation, dictionnaire intact)
   test_cache_lectures.py             → cache_lectures.py : empreinte du contenu, aller-retour, clé changée par DPI / psm, fichier illisible, nom court, purge par âge et par taille, dossier par défaut sous %LOCALAPPDATA%
@@ -99,7 +100,7 @@ tests/
   test_claude_opus5.py               → claude_ocr sur Opus 5 / 5.5 : table de capacités, paramètres envoyés, refus avec catégorie, bloc de réflexion, effort refusé, images PNG ≤ 2576 px
 ```
 
-**1203 tests passent** (`pytest tests\`, relevé le 2026-10-12), aucun échec attendu, plus 1 test lent
+**1218 tests passent** (`pytest tests\`, relevé le 2026-10-13), aucun échec attendu, plus 1 test lent
 facultatif (`VERIF_TEST_LENT=1`, relecture du scan de 15 pages, ~30 s). Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.
 

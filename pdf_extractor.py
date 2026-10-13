@@ -131,6 +131,96 @@ def _sens_de_lecture(span: Dict, matrice) -> Tuple[Dict, List[Dict]]:
     return dict(span, origin=tuple(fitz.Point(span['origin']) * matrice)), caracteres
 
 
+def _rendu_gris(page):
+    """Page rendue en niveaux de gris (PDF_VISIBILITE_DPI) et échelle pixels par point."""
+    import numpy as np
+    from config import Config
+    pix = page.get_pixmap(dpi=Config.PDF_VISIBILITE_DPI)
+    image = np.frombuffer(pix.samples, np.uint8).reshape(pix.height, pix.width, pix.n)
+    return image[:, :, :3].mean(axis=2), Config.PDF_VISIBILITE_DPI / 72
+
+
+def _a_lettre(texte: str) -> bool:
+    """Un signe de ponctuation seul (« . » posé sur la ligne de base, sous la bande mesurée)
+    n'est pas jugé caché : seuls les mots à lettre ou chiffre passent le test."""
+    return any(c.isalnum() for c in texte)
+
+
+def mot_visible(gris, echelle: float, bbox) -> bool:
+    """Le mot laisse de l'encre là où ses lettres doivent être, sur la page rendue.
+
+    Bande mesurée au cœur des lettres (45 à 75 % de la hauteur de la boîte), où un texte
+    caché par le découpage du PDF n'apparaît pas : 223111PE022 p. 14, un « RESERVE NON
+    CABLEE » dont seul le haut des lettres dépasse sous la ligne 16.
+    """
+    from config import Config
+    x0, y0, x1, y1 = (v * echelle for v in bbox)
+    h, marge = y1 - y0, Config.PDF_VISIBILITE_MARGE * (x1 - x0)
+    # Un peu d'encre suffit : un « | » ou un « + » seul n'en laisse que sur une colonne ;
+    # un mot caché n'en laisse aucune. Bords écartés : l'encre d'une lettre voisine.
+    bande = gris[max(0, int(y0 + 0.45 * h)):max(0, int(y0 + 0.75 * h)) + 1,
+                 max(0, int(x0 + marge)):max(0, int(x1 - marge)) + 1]
+    if bande.size == 0:
+        return True
+    return bool((bande < Config.PDF_VISIBILITE_GRIS).any())
+
+
+def surimprime(a, b, pas: float) -> bool:
+    """Deux mots identiques posés presque au même endroit (texte imprimé deux fois).
+
+    a, b : (x0, y0, x1, y1, texte). 223111PE022 p. 14 : chaque « RESERVE NON CABLEE » des
+    lignes 13 à 16 est écrit deux fois à 1,7 pt d'écart ; lu deux fois, il donnait
+    « RESERVERESERVE NONNON CABLEECABLE » et une ligne de plus par ligne.
+    """
+    from config import Config
+    hauteur = max(a[3] - a[1], b[3] - b[1], 1e-6)
+    return (a[4] == b[4] and abs(a[0] - b[0]) <= Config.PDF_SURIMPRESSION_DX_PAS * pas
+            and abs(a[1] - b[1]) <= Config.PDF_SURIMPRESSION_DY_PART * hauteur)
+
+
+def _sans_surimpression(mots, pas: float, cle=lambda m: m):
+    """Mots sans leurs doubles surimprimés.
+
+    Des copies, on garde celle qui est alignée avec le plus de mots des autres colonnes :
+    sur 223111PE022 p. 14 la première copie est 3,4 pt au-dessus du numéro de borne, qui
+    se retrouvait seul sur une ligne.
+    """
+    from config import Config
+    boites = [cle(m) for m in mots]
+
+    def alignes(b):
+        return sum(1 for o in boites if o[4] != b[4]
+                   and abs(o[1] - b[1]) <= Config.PDF_GRILLE_TOLERANCE_Y)
+
+    gardes: List = []
+    for m, b in zip(mots, boites):
+        double = next((i for i in range(max(0, len(gardes) - 60), len(gardes))
+                       if surimprime(cle(gardes[i]), b, pas)), None)
+        if double is None:
+            gardes.append(m)
+        elif alignes(b) > alignes(cle(gardes[double])):
+            gardes[double] = m
+    return gardes
+
+
+def mots_visibles(page) -> List[Tuple[float, float, float, float, str]]:
+    """Mots de la couche texte tels qu'imprimés : sens de lecture, sans doubles surimprimés
+    ni texte caché. (x0, y0, x1, y1, texte), en points de la page affichée."""
+    import fitz
+    from collections import Counter
+    mots = []
+    for m in page.get_text('words'):
+        rect = fitz.Rect(m[:4]) * page.rotation_matrix if page.rotation else fitz.Rect(m[:4])
+        mots.append((rect.x0, rect.y0, rect.x1, rect.y1, m[4]))
+    if not mots:
+        return []
+    largeurs = Counter(round((m[2] - m[0]) / len(m[4]), 1) for m in mots if len(m[4]) >= 3)
+    pas = largeurs.most_common(1)[0][0] if largeurs else 6.0
+    gris, echelle = _rendu_gris(page)
+    mots = _sans_surimpression(sorted(mots, key=lambda m: (round(m[1]), m[0])), pas)
+    return [m for m in mots if not _a_lettre(m[4]) or mot_visible(gris, echelle, m[:4])]
+
+
 def grille_page(page) -> List[str]:
     """Reconstruit une page de texte vectoriel en lignes à positions exactes.
 
@@ -157,8 +247,8 @@ def grille_page(page) -> List[str]:
     from config import Config
 
     # Un mot : (y du span, x du 1er caractère, x du dernier, texte, n° de span,
-    # x de début du span).
-    mots: List[Tuple[float, float, float, str, int, float]] = []
+    # x de début du span, boîte du mot).
+    mots: List[Tuple] = []
     ecarts: Counter = Counter()
     largeurs: Counter = Counter()
     num_span = 0
@@ -175,29 +265,40 @@ def grille_page(page) -> List[str]:
                 ecarts.update(round(b - a, 2) for a, b in zip(xs, xs[1:]))
                 largeurs.update(round(c['bbox'][2] - c['bbox'][0], 2) for c in caracteres)
                 y = span['origin'][1]
-                courant, x_mot, x_dernier = '', None, None
+                courant, x_mot, x_dernier, boites = '', None, None, []
                 for c in caracteres + [{'c': ' ', 'origin': (0, 0)}]:
                     if c['c'].isspace():
                         # Un mot fait uniquement de « _ » est un trait de cadre.
                         if courant and courant.strip('_'):
-                            mots.append((y, x_mot, x_dernier, courant, num_span, xs[0]))
-                        courant, x_mot = '', None
+                            boite = (boites[0][0], min(b[1] for b in boites), boites[-1][2],
+                                     max(b[3] for b in boites))
+                            mots.append((y, x_mot, x_dernier, courant, num_span, xs[0], boite))
+                        courant, x_mot, boites = '', None, []
                     else:
                         if not courant:
                             x_mot = c['origin'][0]
                         courant += c['c']
                         x_dernier = c['origin'][0]
+                        boites.append(c['bbox'])
     if not mots:
         return []
 
     positifs = [(pas, n) for pas, n in ecarts.most_common() if pas > 0]
     # Repli si la page n'a que des mots d'un caractère : largeur d'un caractère.
     pas_page = positifs[0][0] if positifs else largeurs.most_common(1)[0][0]
+    # Texte tel qu'imprimé : un mot écrit deux fois au même endroit n'est lu qu'une fois,
+    # un mot caché par le découpage du PDF n'est pas lu.
+    mots = _sans_surimpression(sorted(mots, key=lambda m: (round(m[0]), m[1])), pas_page,
+                               cle=lambda m: (m[6][0], m[6][1], m[6][2], m[6][3], m[3]))
+    gris, echelle = _rendu_gris(page)
+    mots = [m for m in mots if not _a_lettre(m[3]) or mot_visible(gris, echelle, m[6])]
+    if not mots:
+        return []
     x0 = min(m[1] for m in mots)
 
     groupes: List[List[Tuple[float, float, str, int, float]]] = []
     y_groupe = None
-    for y, x, x_der, texte, span, x_span in sorted(mots, key=lambda m: (m[0], m[1])):
+    for y, x, x_der, texte, span, x_span, _ in sorted(mots, key=lambda m: (m[0], m[1])):
         if y_groupe is None or y - y_groupe > Config.PDF_GRILLE_TOLERANCE_Y:
             groupes.append([])
             y_groupe = y
@@ -1081,7 +1182,12 @@ class PdfTableExtractor:
         return False
 
     def _is_section(self, text: str) -> bool:
-        return self._tpl.section_keyword.upper() in text
+        # Orthographes équivalentes du mot-clé (« NOM DE CABLE » sur 223111PE012 p. 99, 101,
+        # 143 et 223111PE022 p. 12) : sinon la ligne, qui contient « CABLE : », ouvrait le pied
+        # et toute la page était perdue.
+        from config import Config
+        cle = self._tpl.section_keyword.upper()
+        return any(m in text for m in (cle,) + tuple(Config.SECTION_EQUIVALENTS.get(cle, ())))
 
     # -- Extraction des metadonnees --------------------------------------
 

@@ -15,7 +15,7 @@ PAS = 48
 
 
 def _page(lignes=30, entete=True, tache=False, pointilles_apres=None, angle=0.0, cadre=True,
-          bords_noirs=False, pied_dans_le_cadre=False):
+          bords_noirs=False, pied_dans_le_cadre=False, ligne_courte=False, bord_haut=False):
     """Page A4 à 300 DPI : 255 = blanc, 0 = encre.
 
     pied_dans_le_cadre : traits verticaux prolongés jusqu'au bas du pied, sans trait de bas
@@ -35,6 +35,13 @@ def _page(lignes=30, entete=True, tache=False, pointilles_apres=None, angle=0.0,
     if bords_noirs:
         image[:, 0:12] = 0
         image[:, 2468:] = 0
+    if bord_haut:
+        image[0:6, :] = 0
+    if ligne_courte:
+        # Ligne de la seule colonne COULEUR : « 7 VE », trois caractères séparés par un blanc.
+        y = 230 + lignes * PAS
+        for x in (750, 810, 832):
+            image[y:y + 25, x:x + 16] = 0
     image[130:160, 150:300] = 0
     if entete:
         for x in range(100, 2380, 27):
@@ -106,20 +113,20 @@ class TestGrille:
         assert len(cases) == 10
         assert cases[0] == (0, 48)
 
-    def test_case_est_ligne_largeur_minimale(self):
-        case = np.zeros((48, 600), bool)
-        case[10:35, 100:115] = True
-        assert not cl.case_est_ligne(case, 44.0, 22.0, 12.0)
-        case[10:35, 100:200] = True
-        assert cl.case_est_ligne(case, 44.0, 22.0, 12.0)
+    def test_hauteur_caractere_mesuree_sur_la_page(self):
+        taches = [(0, 30, 20)] * 40 + [(0, 3, 3)] * 10 + [(0, 6, 40)] * 5
+        assert cl.hauteur_caractere(taches, 48.0) == 30
 
-    def test_case_est_ligne_trait_plat(self):
-        case = np.zeros((48, 600), bool)
-        case[20:23, 0:600] = True
-        assert not cl.case_est_ligne(case, 44.0, 22.0, 12.0)
+    def test_hauteur_caractere_sans_lettre(self):
+        assert cl.hauteur_caractere([(0, 3, 3)], 48.0) is None
 
-    def test_case_vide(self):
-        assert not cl.case_est_ligne(np.zeros((48, 600), bool), 44.0, 22.0, 12.0)
+    def test_tache_de_caractere(self):
+        assert cl.tache_de_caractere(30, 18, 30.0, 48.0)          # lettre
+        assert cl.tache_de_caractere(22, 18, 30.0, 48.0)          # « 7 » seul (≥ 70 %)
+        assert not cl.tache_de_caractere(8, 8, 30.0, 48.0)        # poussière
+        assert not cl.tache_de_caractere(4, 300, 30.0, 48.0)      # reste de trait, plat
+        assert not cl.tache_de_caractere(30, 2, 30.0, 48.0)       # rayure, trop fine
+        assert not cl.tache_de_caractere(1373, 8, 30.0, 48.0)     # reste de trait vertical
 
 
 class TestTraitsEtZone:
@@ -222,3 +229,18 @@ class TestDecisionPage:
         assert cl.decision_page(32, 30)['type'] == 'alerte'
         assert cl.decision_page(33, 30)['type'] == 'incertain'
         assert cl.decision_page(27, 30)['type'] == 'incertain'
+
+
+class TestCorrectionsEtape9:
+
+    def test_ligne_courte_comptee(self):
+        assert cl.compter_lignes(_page(20, ligne_courte=True))['lignes'] == 21
+
+    def test_bord_haut_du_scan_pas_le_haut_du_cadre(self):
+        resultat = cl.compter_lignes(_page(20, bord_haut=True))
+        assert resultat['lignes'] == 20
+        assert resultat['zone'][2] > 200          # sous l'en-tête, pas sous le bord
+
+    def test_pas_caractere_facultatif(self):
+        assert cl.compter_lignes(_page(10))['lignes'] == cl.compter_lignes(_page(10), 22.0)[
+            'lignes']

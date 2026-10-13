@@ -6,8 +6,8 @@ une bande d'encre. Zone du tableau = entre le trait sous l'en-tête (dans le hau
 le premier trait plein en dessous, entre les traits verticaux extrêmes (bords du scan
 écartés) ; les traits du cadre sont retirés ; le pas
 et la phase de la grille des lignes sont ajustés ensemble sur le profil d'encre ; une case
-de la grille compte comme ligne si son encre s'étend sur au moins LIGNES_LARGEUR_MIN_CARACTERES
-caractères (une tache dans une case vide n'est pas une ligne).
+de la grille compte comme ligne si elle contient une tache qui a la hauteur d'un caractère,
+mesurée sur la page (une poussière ou un reste de trait n'est pas une ligne).
 
 Module pur (numpy, OpenCV, config) : image en niveaux de gris en entrée, aucun OCR.
 """
@@ -77,6 +77,11 @@ def regles(noir, x0: int, x1: int) -> List[Tuple[int, int, bool]]:
         voisins = [couverture[y] for y in (a - autour, b + autour) if 0 <= y < len(couverture)]
         # Blanc d'un côté au moins : le trait sous l'en-tête touche presque le texte au-dessus.
         if voisins and min(voisins) >= Config.LIGNES_COUVERTURE_TRAIT / 2:
+            continue
+        # Bord haut ou bas de la feuille scannée (223111PE012 p. 2 à 5, trait à y = 2) : il
+        # passait pour le haut du cadre et l'en-tête entrait dans la zone.
+        bord = Config.LIGNES_MARGE_BORD * len(couverture)
+        if b < bord or a > len(couverture) - bord:
             continue
         plein = bool(brute[a:b + 1].max() >= Config.LIGNES_COUVERTURE_PLEIN)
         sortie.append((int(a), int(b), plein))
@@ -175,33 +180,50 @@ def inclinaison(noir) -> float:
     return meilleur[1]
 
 
-def case_est_ligne(encre_case, largeur_min: float, pas_caractere: float,
-                   hauteur_min: float = 0.0) -> bool:
-    """Encre de la case étalée sur au moins largeur_min pixels (lettres d'un mot réunies) et
-    haute d'au moins hauteur_min (un trait ou un reste de trait n'est pas une ligne)."""
+def taches(encre) -> List[Tuple[float, int, int]]:
+    """Taches d'encre de la zone (composantes connexes) : (centre y, hauteur, largeur)."""
     import cv2
     import numpy as np
-    rangees = encre_case.sum(axis=1)
-    if not rangees.any() or (rangees >= 0.1 * rangees.max()).sum() < hauteur_min:
-        return False
-    colonnes = (encre_case.sum(axis=0) > 0).astype(np.uint8).reshape(1, -1)
-    if not colonnes.any():
-        return False
-    # Les blancs entre les lettres d'un mot sont comblés ; ceux entre les cellules, non.
-    noyau = cv2.getStructuringElement(cv2.MORPH_RECT, (max(1, int(pas_caractere)), 1))
-    pleines = cv2.morphologyEx(colonnes, cv2.MORPH_CLOSE, noyau)
-    return any(b - a + 1 >= largeur_min for a, b in _groupes(np.where(pleines[0] > 0)[0], 1))
+    n, _, stats, centres = cv2.connectedComponentsWithStats(encre.astype(np.uint8), 8)
+    return [(float(centres[i][1]), int(stats[i, cv2.CC_STAT_HEIGHT]),
+             int(stats[i, cv2.CC_STAT_WIDTH])) for i in range(1, n)]
 
 
-def compter_lignes(gris, pas_caractere: float) -> Dict:
+def hauteur_caractere(liste_taches, pas: float) -> Optional[float]:
+    """Hauteur d'un caractère mesurée sur la page : médiane des taches de taille de lettre.
+
+    Les listings sont en capitales et chiffres : presque toutes les taches de 25 % à 100 %
+    du pas sont des caractères entiers ; poussières et points sont plus petits.
+    """
+    from statistics import median
+    hauteurs = [h for _, h, _ in liste_taches if 0.25 * pas <= h <= pas]
+    return float(median(hauteurs)) if hauteurs else None
+
+
+def tache_de_caractere(hauteur: int, largeur: int, h_car: float,
+                       pas: Optional[float] = None) -> bool:
+    """Tache qui a la hauteur d'un caractère (LIGNES_TACHE_HAUTEUR_MIN) : une poussière (plus
+    petite), un reste de trait (plus plat) ou une rayure (trop fine) ne l'est pas, ni un reste
+    de trait vertical plus haut que LIGNES_TACHE_HAUTEUR_MAX_PAS lignes (223111PE012 p. 2 :
+    1 373 px sur 8 de large, entre deux colonnes vides)."""
+    return (hauteur >= Config.LIGNES_TACHE_HAUTEUR_MIN * h_car
+            and largeur >= Config.LIGNES_TACHE_LARGEUR_MIN * h_car
+            and (pas is None or hauteur <= Config.LIGNES_TACHE_HAUTEUR_MAX_PAS * pas))
+
+
+def compter_lignes(gris, pas_caractere: Optional[float] = None) -> Dict:
     """Lignes visibles dans la zone du tableau : nombre, pas, phase, régularité, raison.
 
+    Une case de la grille est une ligne si elle contient au moins une tache qui a la hauteur
+    d'un caractère, mesurée sur la page même (223111PE012 p. 139 : la ligne « 7 VE », seule
+    dans sa colonne, était écartée par l'ancienne règle des 2 caractères de large).
+    pas_caractere n'est plus utilisé (gardé pour les appels existants).
     raison non vide = comptage impossible (cadre introuvable, pas non trouvé).
     """
     import cv2
     import numpy as np
     sortie = {'lignes': None, 'pas': None, 'phase': None, 'regularite': None, 'zone': None,
-              'cases': [], 'angle': 0.0, 'raison': None}
+              'cases': [], 'angle': 0.0, 'hauteur_caractere': None, 'raison': None}
     noir = cv2.threshold(gris, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
     angle = inclinaison(noir)
     if angle:
@@ -220,6 +242,10 @@ def compter_lignes(gris, pas_caractere: float) -> Dict:
     traces = vertical.copy()
     for a, b, _ in liste:
         traces[a:b + 1, x0:x1] = 255
+    # Séparateurs de colonnes effacés sur toute la hauteur de la zone : un trait scanné
+    # s'interrompt (223111PE012 p. 4) et ses morceaux ont la taille d'un caractère.
+    for a, b in colonnes:
+        traces[y0:y1, max(0, a - 2):b + 3] = 255
     traces = cv2.dilate(traces, np.ones((7, 7), np.uint8))
     encre = (noir & ~traces)[y0:y1, x0:x1] > 0
     echelle = _echelle(gris)
@@ -228,10 +254,14 @@ def compter_lignes(gris, pas_caractere: float) -> Dict:
     sortie.update(pas=pas, phase=phase + y0, regularite=regularite)
     if regularite < Config.LIGNES_REGULARITE_MIN:
         return dict(sortie, raison=f"lignes non régulières (régularité {regularite:.2f})")
-    largeur_min = Config.LIGNES_LARGEUR_MIN_CARACTERES * pas_caractere
-    hauteur_min = Config.LIGNES_HAUTEUR_MIN_PART * pas
+    liste_taches = taches(encre)
+    h_car = hauteur_caractere(liste_taches, pas)
+    if h_car is None:
+        return dict(sortie, raison="aucune tache de la taille d'un caractère")
+    sortie['hauteur_caractere'] = h_car
+    centres = [y for y, h, w in liste_taches if tache_de_caractere(h, w, h_car, pas)]
     cases = [(a, b) for a, b in cases_grille(encre.shape[0], pas, phase)
-             if case_est_ligne(encre[a:b], largeur_min, pas_caractere, hauteur_min)]
+             if any(a <= y < b for y in centres)]
     sortie['cases'] = [(a + y0, b + y0) for a, b in cases]
     sortie['lignes'] = len(cases)
     return sortie

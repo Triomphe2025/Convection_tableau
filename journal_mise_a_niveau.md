@@ -1412,3 +1412,28 @@ Sur 223111PE011 complet et sur le document jamais vu : classer chaque écart du 
 mesure sur son image annotée — compteur faux, ligne vraiment perdue par la lecture, ou
 douteux (pas besoin d'Excel corrigé). Si les fausses alertes restent sous 5 % des pages :
 `CONTROLE_LIGNES = True`.
+
+## Fidélité de la lecture vectorielle et compteur de lignes, 3e passage (2026-10-13)
+
+Écran de validation essayé par l'utilisateur : résultats attendus obtenus.
+
+Défaut de fidélité trouvé en convertissant 223111PE022 p. 14 (page vectorielle, sans API) : les
+lignes 13 à 16, imprimées deux fois à 1,7 pt, sortaient en « RESERVERESERVE NONNON
+CABLEECABLE » avec la borne seule sur une autre ligne (8 lignes pour 4) ; deux « RESERVE NON
+CABLEE » cachés par le découpage du PDF étaient lus ; les doubles, plus longs, bouchaient la
+gouttière et coupaient les jarretières (« 0 » + « 399N »). Corrigé dans `grille_page` :
+surimpression lue une fois (copie alignée avec les autres colonnes gardée), mot sans encre au
+cœur des lettres non lu (ponctuation seule toujours gardée). La page sort en 31 lignes comme le
+papier, jarretières entières. Recensement sur 85 pages vectorielles : surimpression et texte
+caché sur 2 pages (PE012 p. 164, PE022 p. 14). Trouvé au passage : « NOM DE CABLE » (au lieu
+de « NOM DU CABLE ») ouvrait le pied, page entière perdue : PE012 p. 96, 98, 140, PE022 p. 9 ;
+corrigé (`SECTION_EQUIVALENTS`). Le compteur des pages vectorielles lit les mêmes mots
+visibles. PE021 p. 38 : lecture et Excel justes, appariement de l'outil de mesure corrigé.
+
+Compteur : règle des 2 caractères remplacée par « une tache de la hauteur d'un caractère,
+mesurée sur la page » (PE012 p. 139, « 7 VE », compté) ; bord haut de la feuille scannée
+écarté (PE012 p. 2 à 5, l'en-tête n'est plus compté) ; séparateurs effacés sur toute la
+hauteur (restes de traits verticaux). Rejeu (pages déjà vues) : extraits 21/21 ; 306 pages
+jugées, 0 fausse alerte, 1 alerte (PE022 p. 14, Excel faux probable), 7 comptages incertains,
+0 impossible, garde-fou 20 % jamais déclenché. Excel faux probables : PE022 p. 14 (32 au lieu
+de 31), PE012 p. 164 (33 au lieu de 30, doubles hérités). Détail : `mesures/d1_classement.md`.

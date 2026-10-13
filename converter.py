@@ -508,7 +508,7 @@ class Converter:
 
         from cache_lectures import empreinte_fichier
         from compte_lignes import compter_lignes, lignes_couche_texte
-        from pdf_extractor import VECTORIEL, VIDE, diagnostiquer_page
+        from pdf_extractor import VECTORIEL, VIDE, diagnostiquer_page, mots_visibles
         from positions_scan import dpi_de_rendu, pas_initial
         comptes: Dict[int, Dict] = {}
         empreinte = empreinte_fichier(self.word_file)
@@ -525,7 +525,7 @@ class Converter:
                     pix = page.get_pixmap(dpi=dpi)
                     gris = np.array(Image.frombytes('RGB', (pix.width, pix.height),
                                                     pix.samples).convert('L'))
-                    mots = page.get_text('words')
+                    mots = mots_visibles(page) if nature == VECTORIEL else []
                     if nature == VECTORIEL:
                         largeurs = [(m[2] - m[0]) / len(m[4]) for m in mots
                                     if len(m[4]) >= 3 and m[4].isalnum()]

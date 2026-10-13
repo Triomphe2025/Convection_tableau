@@ -25,6 +25,7 @@ import mesure_c1 as c1  # noqa: E402
 from compte_lignes import compter_lignes, lignes_couche_texte  # noqa: E402
 from mesure_precision import apparier_pages_par_contenu  # noqa: E402
 from mesurer_precision import lire_verite_excel  # noqa: E402
+from pdf_extractor import mots_visibles  # noqa: E402
 from positions_scan import dpi_de_rendu, pas_initial  # noqa: E402
 
 IMAGES = PROJET / 'mesures' / 'd0_images'
@@ -58,7 +59,7 @@ def mesurer_page(doc_pdf, page, numero, lecture):
     dpi = dpi_de_rendu(pdf_page.rect.width, pdf_page.rect.height)
     pix = pdf_page.get_pixmap(dpi=dpi)
     gris = np.array(Image.frombytes('RGB', (pix.width, pix.height), pix.samples).convert('L'))
-    mots_pdf = pdf_page.get_text('words')
+    mots_pdf = mots_visibles(pdf_page) if c0.sorte(page) == 'vectorielle' else []
     vectorielle = c0.sorte(page) == 'vectorielle'
     pas_car = (pas_caractere_texte(mots_pdf, dpi) if vectorielle
                else pas_initial(lecture.mots) if lecture is not None else None)

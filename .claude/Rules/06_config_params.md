@@ -85,6 +85,9 @@ scan ; sinon page ignorée (motif et part d'images journalisés).
 | `PDF_SEUIL_IMAGE_PLEINE_PAGE` | `0.8` | Au-delà, un texte posé sur l'image n'est pas lu en grille (couche OCR, pas le document) |
 | `PDF_MIN_CARS_VECTORIEL` | `20` | Caractères visibles minimum pour lire la page en couche texte |
 | `PDF_GRILLE_TOLERANCE_Y` | `2.0` | Écart vertical (pt) sous lequel deux spans sont sur la même ligne de la grille |
+| `SECTION_EQUIVALENTS` | `{'NOM DU CABLE': ('NOM DE CABLE',)}` | Orthographes équivalentes du mot-clé de section (sinon la ligne ouvrait le pied et la page était perdue) |
+| `PDF_SURIMPRESSION_DX_PAS` / `PDF_SURIMPRESSION_DY_PART` | `0.5` / `0.5` | Même mot à moins d'un demi-caractère et d'une demi-hauteur : texte surimprimé, lu une fois |
+| `PDF_VISIBILITE_DPI` / `PDF_VISIBILITE_GRIS` / `PDF_VISIBILITE_MARGE` | `100` / `220` / `0.15` | Mot à lettre sans encre au cœur des lettres sur la page rendue : caché, non lu |
 
 ## Mesure de précision (section « MESURE DE PRÉCISION »)
 
@@ -176,6 +179,7 @@ le calibrage déjà fait sur `verificateur.py`.
 | `LIGNES_LARGEUR_MIN_CARACTERES` | `2` | Une case est une ligne si son encre couvre au moins 2 caractères de large |
 | `LIGNES_HAUTEUR_MIN_PART` | `0.25` | … et au moins un quart du pas de haut (trait, tache plate) |
 | `LIGNES_REGULARITE_MIN` | `0.25` | En dessous : comptage impossible |
+| `LIGNES_TACHE_HAUTEUR_MIN` / `LIGNES_TACHE_LARGEUR_MIN` / `LIGNES_TACHE_HAUTEUR_MAX_PAS` | `0.7` / `0.15` / `1.5` | Case = ligne si elle contient une tache d'au moins 70 % de la hauteur d'un caractère (médiane sur la page), large d'au moins 15 % de cette hauteur, pas plus haute que 1,5 pas (remplace la règle des 2 caractères) |
 | `LIGNES_PART_TRAIT_VERTICAL` | `0.25` | Longueur minimale d'un trait vertical du cadre (part de la hauteur de la page) |
 | `LIGNES_BLANC_POINTILLES` | `24` | Blanc maximal entre deux tirets d'un trait en pointillés (6A23111PE133 : 18 px) |
 | `LIGNES_INCLINAISON_MAX` / `LIGNES_INCLINAISON_PAS` | `1.5` / `0.05` | Redressement du scan (degrés) |

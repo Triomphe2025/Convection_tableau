@@ -195,6 +195,18 @@ class Config:
     # Écart vertical (points PDF) en dessous duquel deux spans sont sur la
     # même ligne de la grille ; l'interligne des listings est d'environ 11 pt.
     PDF_GRILLE_TOLERANCE_Y = 2.0
+    # Orthographes équivalentes du mot-clé de section d'un modèle (pages vectorielles).
+    SECTION_EQUIVALENTS = {'NOM DU CABLE': ('NOM DE CABLE',)}
+    # Texte tel qu'imprimé (pages vectorielles) : deux mots identiques à moins de
+    # DX_PAS caractères et DY_PART de leur hauteur l'un de l'autre sont un texte surimprimé,
+    # lu une fois (223111PE022 p. 14) ; un mot qui ne laisse aucune encre, même grisée (<
+    # PDF_VISIBILITE_GRIS) au cœur de ses lettres, bords de sa boîte écartés de
+    # PDF_VISIBILITE_MARGE, page rendue à PDF_VISIBILITE_DPI, est caché et n'est pas lu.
+    PDF_SURIMPRESSION_DX_PAS = 0.5
+    PDF_SURIMPRESSION_DY_PART = 0.5
+    PDF_VISIBILITE_DPI = 100
+    PDF_VISIBILITE_GRIS = 220
+    PDF_VISIBILITE_MARGE = 0.15
 
     # ========================================
     # 🔎 VÉRIFICATION DE CONVERSION
@@ -415,9 +427,13 @@ class Config:
     # prend la moitié ou le double du pas sur une page de quelques lignes.
     LIGNES_PAS_MIN = 33
     LIGNES_PAS_MAX = 70
-    # Une case de la grille est une ligne si son encre couvre au moins N caractères de large
-    # (une tache dans une case vide n'est pas une ligne).
-    LIGNES_LARGEUR_MIN_CARACTERES = 2
+    # Une case de la grille est une ligne si elle contient une tache d'au moins cette part de
+    # la hauteur d'un caractère (médiane mesurée sur la page) et de largeur au moins
+    # LIGNES_TACHE_LARGEUR_MIN de cette hauteur : poussière, reste de trait, rayure écartés.
+    LIGNES_TACHE_HAUTEUR_MIN = 0.7
+    LIGNES_TACHE_LARGEUR_MIN = 0.15
+    # Une tache plus haute que N pas de ligne est un reste de trait vertical, pas un caractère.
+    LIGNES_TACHE_HAUTEUR_MAX_PAS = 1.5
     # Régularité minimale du profil d'encre (0 à 1) ; en dessous : comptage impossible.
     LIGNES_REGULARITE_MIN = 0.25
     # Trait vertical du cadre : sur au moins cette part de la hauteur de la page ; un trait à
@@ -443,9 +459,6 @@ class Config:
     # Redressement du scan : angle cherché à ± N degrés, par pas de N degrés.
     LIGNES_INCLINAISON_MAX = 1.5
     LIGNES_INCLINAISON_PAS = 0.05
-    # Hauteur d'encre minimale d'une ligne, en part du pas (un trait ou une tache plate
-    # n'est pas une ligne de texte).
-    LIGNES_HAUTEUR_MIN_PART = 0.25
 
     # ========================================
     # 📏 MESURE DE PRÉCISION (outil de QA sur jeu de test connu)
