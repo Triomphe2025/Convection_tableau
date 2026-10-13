@@ -203,11 +203,17 @@ def _sans_surimpression(mots, pas: float, cle=lambda m: m):
     return gardes
 
 
-def mots_visibles(page) -> List[Tuple[float, float, float, float, str]]:
+def mots_visibles(page, ecartes: Optional[Dict] = None
+                  ) -> List[Tuple[float, float, float, float, str]]:
     """Mots de la couche texte tels qu'imprimés : sens de lecture, sans doubles surimprimés
-    ni texte caché. (x0, y0, x1, y1, texte), en points de la page affichée."""
+    ni texte caché. (x0, y0, x1, y1, texte), en points de la page affichée.
+
+    ecartes : dict rempli de 'doublons' et 'caches' (textes des mots écartés).
+    """
     import fitz
     from collections import Counter
+    if ecartes is not None:
+        ecartes.update(doublons=0, caches=[])
     mots = []
     for m in page.get_text('words'):
         rect = fitz.Rect(m[:4]) * page.rotation_matrix if page.rotation else fitz.Rect(m[:4])
@@ -217,11 +223,16 @@ def mots_visibles(page) -> List[Tuple[float, float, float, float, str]]:
     largeurs = Counter(round((m[2] - m[0]) / len(m[4]), 1) for m in mots if len(m[4]) >= 3)
     pas = largeurs.most_common(1)[0][0] if largeurs else 6.0
     gris, echelle = _rendu_gris(page)
+    tous = len(mots)
     mots = _sans_surimpression(sorted(mots, key=lambda m: (round(m[1]), m[0])), pas)
-    return [m for m in mots if not _a_lettre(m[4]) or mot_visible(gris, echelle, m[:4])]
+    visibles = [m for m in mots if not _a_lettre(m[4]) or mot_visible(gris, echelle, m[:4])]
+    if ecartes is not None:
+        ecartes['doublons'] = tous - len(mots)
+        ecartes['caches'] = [m[4] for m in mots if m not in visibles]
+    return visibles
 
 
-def grille_page(page) -> List[str]:
+def grille_page(page, ecartes: Optional[Dict] = None) -> List[str]:
     """Reconstruit une page de texte vectoriel en lignes à positions exactes.
 
     Chaque MOT est placé d'après sa propre coordonnée x, avec le pas (largeur
@@ -242,9 +253,12 @@ def grille_page(page) -> List[str]:
     Les mots sont regroupés en lignes avec une tolérance en y
     (Config.PDF_GRILLE_TOLERANCE_Y) plutôt que par round(y) : un TENANT posé
     0,7 pt plus haut que sa ligne formait sinon une ligne à lui seul.
+    ecartes : dict rempli de 'doublons' (nombre) et 'caches' (textes) des mots non lus.
     """
     from collections import Counter
     from config import Config
+    if ecartes is not None:
+        ecartes.update(doublons=0, caches=[])
 
     # Un mot : (y du span, x du 1er caractère, x du dernier, texte, n° de span,
     # x de début du span, boîte du mot).
@@ -288,10 +302,15 @@ def grille_page(page) -> List[str]:
     pas_page = positifs[0][0] if positifs else largeurs.most_common(1)[0][0]
     # Texte tel qu'imprimé : un mot écrit deux fois au même endroit n'est lu qu'une fois,
     # un mot caché par le découpage du PDF n'est pas lu.
+    tous = len(mots)
     mots = _sans_surimpression(sorted(mots, key=lambda m: (round(m[0]), m[1])), pas_page,
                                cle=lambda m: (m[6][0], m[6][1], m[6][2], m[6][3], m[3]))
     gris, echelle = _rendu_gris(page)
-    mots = [m for m in mots if not _a_lettre(m[3]) or mot_visible(gris, echelle, m[6])]
+    visibles = [m for m in mots if not _a_lettre(m[3]) or mot_visible(gris, echelle, m[6])]
+    if ecartes is not None:
+        ecartes['doublons'] = tous - len(mots)
+        ecartes['caches'] = [m[3] for m in mots if m not in visibles]
+    mots = visibles
     if not mots:
         return []
     x0 = min(m[1] for m in mots)
@@ -327,15 +346,59 @@ def grille_page(page) -> List[str]:
     return sortie
 
 
-# Libellés de pied de page reconnus dans une grille (repris de
-# outils_reference/comparateur.py) : la détection par mots-clés du modèle
-# rate « P.E.T. : » et « N° PLAN » sur 223400PE137.
-_PIED_GRILLE_RE = re.compile(
-    r"N°\s?PLAN|NO\s?PLAN|P\.?E\.?T\.?\s*:|CABLE\s*:|TYPE\s*:|INDICE\s*:"
-    r"|PAGE\s*:?\s*\d|M\s?A\s?T\s?R\s?A|SIEMENS|JARRETIERAGE",
-    re.IGNORECASE,
-)
 _SEPARATEUR_RE = re.compile(r'^[\s|\-_°=]*$')
+# Début du pied : un libellé fort suivi de « : » (P.E.T., N° PLAN, INDICE, PAGE). « CABLE : » et
+# « TYPE : » sont aussi des libellés de pied, mais seulement juste au-dessus d'une ligne à
+# libellé fort : seuls, ils prenaient « NOM DE CABLE : DI/BO » pour le pied et toute la suite
+# de la page y passait (223111PE022 p. 9).
+_PIED_FORT_RE = re.compile(
+    r"N°\s?PLAN|NO\s?PLAN|P\.?\s?E\.?\s?T\.?\s*:|INDICE\s*:|PAGE\s*:", re.IGNORECASE)
+_PIED_FAIBLE_RE = re.compile(
+    r"CABLE\s*:|TYPE\s*:|M\s?A\s?T\s?R\s?A|SIEMENS|JARRETIERAGE", re.IGNORECASE)
+
+
+def zone_tableau_texte(mots, colonnes: List[str]) -> Optional[Tuple[float, float, float, float]]:
+    """Zone du tableau d'une page vectorielle sans cadre, d'après son texte (points PDF).
+
+    Sous la ligne d'en-tête (au moins deux noms de colonnes du modèle sur une même ligne),
+    au-dessus de la première ligne à libellé fort du pied ; toute la largeur. None si
+    l'en-tête n'est pas trouvé.
+    """
+    from config import Config
+    noms = {c.upper() for c in colonnes}
+    lignes: Dict[float, List] = {}
+    for m in sorted(mots, key=lambda m: m[1]):
+        cle = next((y for y in lignes if abs(y - m[1]) <= Config.PDF_GRILLE_TOLERANCE_Y), m[1])
+        lignes.setdefault(cle, []).append(m)
+    entete = next((y for y in sorted(lignes)
+                   if sum(1 for m in lignes[y] if m[4].upper().strip('|.') in noms) >= 2), None)
+    if entete is None:
+        return None
+    bas_entete = max(m[3] for m in lignes[entete])
+    pied = next((y for y in sorted(lignes) if y > entete
+                 and _PIED_FORT_RE.search(' '.join(m[4] for m in lignes[y]))), None)
+    return (min(m[0] for m in mots), max(m[2] for m in mots), bas_entete,
+            pied if pied is not None else max(m[3] for m in mots))
+
+
+def debut_du_pied(lignes: List[str], est_section) -> int:
+    """Indice de la première ligne du pied dans les lignes sous l'en-tête (len si aucun).
+
+    Première ligne à libellé fort, puis, en remontant, les lignes à libellé faible juste
+    au-dessus (séparateurs sautés), jamais une ligne de section.
+    """
+    fort = next((i for i, lg in enumerate(lignes) if _PIED_FORT_RE.search(lg)), None)
+    if fort is None:
+        return len(lignes)
+    debut = fort
+    for i in range(fort - 1, -1, -1):
+        lg = lignes[i]
+        if _SEPARATEUR_RE.match(lg):
+            continue
+        if est_section(lg.upper()) or not _PIED_FAIBLE_RE.search(lg):
+            break
+        debut = i
+    return debut
 
 
 def _mot_cle(texte: str) -> str:
@@ -667,7 +730,8 @@ class PdfTableExtractor:
         """
         colonnes = list(self._tpl.columns)
         n = len(colonnes)
-        lignes = grille_page(page)
+        ecartes: Dict = {}
+        lignes = grille_page(page, ecartes)
 
         idx_entete, entete = None, None
         for i, lg in enumerate(lignes):
@@ -684,23 +748,29 @@ class PdfTableExtractor:
                 result['metadata'] = {'REVISIONS': revisions}
             return result
 
-        # Lignes de section (« NOM DU CABLE : GAT/CA 01 ») testées AVANT le pied :
-        # « CABLE : » est aussi un libellé de pied, et la section suit l'en-tête.
-        corps, pied, sections = [], [], {}
-        for lg in lignes[idx_entete + 1:]:
-            if not pied and self._is_section(lg.upper()):
+        # Le pied se reconnaît à ses libellés ; une ligne qu'on ne sait pas classer reste
+        # dans le corps (gardée et signalée), jamais jetée avec la suite de la page.
+        sous_entete = lignes[idx_entete + 1:]
+        fin_corps = debut_du_pied(sous_entete, self._is_section)
+        pied = sous_entete[fin_corps:]
+        corps, sections = [], {}
+        for lg in sous_entete[:fin_corps]:
+            if self._is_section(lg.upper()):
                 sections[len(corps)] = ' '.join(lg.split())
-            elif pied or _PIED_GRILLE_RE.search(lg) or self._is_footer(lg.upper()):
-                pied.append(lg)
             elif not _SEPARATEUR_RE.match(lg):
                 corps.append(lg)
 
         a_cadre = lignes[idx_entete].count('|') >= n + 1
+        non_decoupees = set()
         if a_cadre:
             cellules_par_ligne = []
             for lg in corps:
                 segments = lg.split('|')[1:-1]
                 if len(segments) != n:
+                    # Gardée telle quelle dans la 1re colonne, et signalée.
+                    non_decoupees.add(len(cellules_par_ligne))
+                    cellules_par_ligne.append([' '.join(lg.replace('|', ' ').split())]
+                                              + [''] * (n - 1))
                     continue
                 cellules_par_ligne.append([
                     (s[1:] if s.startswith(' ') else s).rstrip() for s in segments
@@ -722,14 +792,25 @@ class PdfTableExtractor:
                 for c in cellules_par_ligne:
                     c[k] = c[k][retrait:]
 
-        rows = []
+        rows, a_verifier = [], []
         for i, cellules in enumerate(cellules_par_ligne):
             if i in sections:
                 rows.append({'type': 'section', 'text': sections[i]})
             if any(c.strip() for c in cellules):
+                if i in non_decoupees:
+                    a_verifier.append({
+                        'ligne': len(rows), 'colonne': 0, 'type': 'ligne non classée',
+                        'message': "ligne non découpée en colonnes, gardée telle quelle",
+                        'lecture': None})
                 rows.append({'type': 'data', 'cells': cellules, 'confidence': [100] * n})
         if len(cellules_par_ligne) in sections:
             rows.append({'type': 'section', 'text': sections[len(cellules_par_ligne)]})
+        if ecartes.get('caches'):
+            a_verifier.append({
+                'ligne': None, 'colonne': None, 'type': 'information',
+                'message': f"{len(ecartes['caches'])} mots cachés dans le PDF ignorés "
+                           f"(invisibles à l'impression)",
+                'lecture': None, 'commentaire': ' '.join(ecartes['caches'])})
         pied_brut = nettoyer_lignes_pied(pied, self._tpl.footer_left_label)
         meta = analyser_pied(pied_brut, decor=self._decor_pied())
         meta['PIED_BRUT'] = pied_brut
@@ -747,6 +828,7 @@ class PdfTableExtractor:
             'metadata': meta,
             'detection_method': 'pdf-grille',
             'blur_pct': 0.0,
+            'a_verifier': a_verifier,
         }
 
     # -- OCR de repli pour les pages raster ------------------------------

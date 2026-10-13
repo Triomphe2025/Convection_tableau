@@ -40,8 +40,9 @@ def _mode_ocr_tesseract():
 
 
 def nombre_alertes(result: Dict) -> int:
-    """Alertes d'une page pour l'ordre de validation : cellules, plus 1 si scan dégradé."""
-    return (len(result.get('a_verifier') or [])
+    """Alertes d'une page pour l'ordre de validation : cellules, plus 1 si scan dégradé ;
+    une ligne d'information (mots cachés ignorés) n'est pas une alerte."""
+    return (sum(1 for a in result.get('a_verifier') or [] if a.get('type') != 'information')
             + bool((result.get('controle_page') or {}).get('degradee')))
 
 
@@ -207,8 +208,9 @@ class Converter:
         self._a_valider = []
 
         source_ext = self.word_file.suffix.lower()
-        self._compte_lignes = (self._lancer_compte_lignes()
-                               if source_ext == '.pdf' and Config.CONTROLE_LIGNES else None)
+        self._compte_lignes = (
+            self._lancer_compte_lignes() if source_ext == '.pdf' and (
+                Config.CONTROLE_LIGNES or Config.CONTROLE_LIGNES_VECTORIEL) else None)
 
         if source_ext == '.pdf':
             _ocr_mode = getattr(Config, 'OCR_MODE', 'tesseract').lower()
@@ -508,7 +510,8 @@ class Converter:
 
         from cache_lectures import empreinte_fichier
         from compte_lignes import compter_lignes, lignes_couche_texte
-        from pdf_extractor import VECTORIEL, VIDE, diagnostiquer_page, mots_visibles
+        from pdf_extractor import (VECTORIEL, VIDE, diagnostiquer_page, mots_visibles,
+                                   zone_tableau_texte)
         from positions_scan import dpi_de_rendu, pas_initial
         comptes: Dict[int, Dict] = {}
         empreinte = empreinte_fichier(self.word_file)
@@ -534,12 +537,16 @@ class Converter:
                         pas_car = pas_initial(self._lecture_tesseract(doc, numero,
                                                                       empreinte).mots)
                     resultat = compter_lignes(gris, pas_car or 0.6 * 50 * max(gris.shape) / 3508)
-                    visibles = resultat['lignes']
-                    # Page vectorielle : la couche texte donne le compte exact de la zone.
-                    if nature == VECTORIEL and resultat['zone']:
-                        x0, x1, y0, y1 = (v * 72 / dpi for v in resultat['zone'])
-                        visibles = lignes_couche_texte(mots, (x0, x1, y0, y1))
-                    comptes[numero] = {'visibles': visibles, 'raison': resultat['raison'],
+                    visibles, raison = resultat['lignes'], resultat['raison']
+                    # Page vectorielle : la couche texte donne le compte exact de la zone ;
+                    # sans cadre (223400PE137, pages TP2), la zone vient du texte même.
+                    if nature == VECTORIEL:
+                        zone = (tuple(v * 72 / dpi for v in resultat['zone'])
+                                if resultat['zone']
+                                else zone_tableau_texte(mots, list(self.template.columns)))
+                        if zone is not None:
+                            visibles, raison = lignes_couche_texte(mots, zone), None
+                    comptes[numero] = {'visibles': visibles, 'raison': raison,
                                        'pas': resultat['pas'], 'nature': nature,
                                        'duree': time.monotonic() - debut}
                 except Exception as exc:
@@ -555,12 +562,19 @@ class Converter:
                                                        for c in r.get('cells') or [])))
 
     def _controle_lignes(self, resultats: List[Dict]) -> None:
-        """Lignes visibles contre lignes lues : journal et fichier de mesure ; en mode True,
-        alertes de page dans A VERIFIER (ordre de validation), jamais en mode 'ombre'."""
+        """Lignes visibles contre lignes lues : journal et fichier de mesure ; alertes de page
+        dans A VERIFIER (ordre de validation) pour les pages dont le mode est True.
+
+        Pages vectorielles (CONTROLE_LIGNES_VECTORIEL) : compte exact de la couche texte, tout
+        écart est une alerte, sans garde-fou. Scans (CONTROLE_LIGNES) : alerte pour 1 ou 2
+        lignes, comptage incertain au-delà, synthèse au-delà de 20 % des pages. Une page dont
+        des lignes sont visibles et aucune n'est lue est toujours une alerte, même en ombre.
+        """
         import datetime
         import json
 
         from compte_lignes import decisions
+        from pdf_extractor import VECTORIEL
         try:
             comptes = self._compte_lignes.result()
         except Exception as exc:
@@ -568,39 +582,65 @@ class Converter:
             return
         self._comptes_lignes = comptes
         pages = [r for r in resultats if r.get('success') and r.get('_page_pdf') in comptes]
-        verdict = decisions([{'visibles': comptes[r['_page_pdf']]['visibles'],
-                              'lues': self._lignes_lues(r)} for r in pages])
-        ombre = Config.CONTROLE_LIGNES == 'ombre'
-        prefixe = "nombre de lignes (mode ombre)" if ombre else "nombre de lignes"
-        impossibles = [r for r in pages if comptes[r['_page_pdf']]['visibles'] is None]
-        self._log(f"  {prefixe} : {len(pages) - len(impossibles)} page(s) comptée(s), "
-                  f"{sum(1 for d in verdict['pages'] if d['type'] == 'alerte')} écart(s) de 1 "
-                  f"ou 2 lignes, {sum(1 for d in verdict['pages'] if d['type'] == 'incertain')} "
-                  f"comptage(s) incertain(s), {len(impossibles)} impossible(s)")
-        if verdict['synthese']:
-            self._log(f"  ℹ {prefixe} : {verdict['synthese']}")
+        vectorielles = [r for r in pages if comptes[r['_page_pdf']]['nature'] == VECTORIEL]
+        scans = [r for r in pages if r not in vectorielles]
+        verdicts: Dict[int, Dict] = {}
+        for r in vectorielles:
+            visibles, lues = comptes[r['_page_pdf']]['visibles'], self._lignes_lues(r)
+            verdicts[id(r)] = ({'type': None, 'message': None}
+                               if visibles is None or visibles == lues
+                               else {'type': 'alerte',
+                                     'message': f"{visibles} lignes visibles, {lues} lues"})
+        verdict_scans = decisions([{'visibles': comptes[r['_page_pdf']]['visibles'],
+                                    'lues': self._lignes_lues(r)} for r in scans])
+        verdicts.update({id(r): d for r, d in zip(scans, verdict_scans['pages'])})
+        for r in scans:
+            visibles = comptes[r['_page_pdf']]['visibles']
+            if visibles and not self._lignes_lues(r):
+                # Page entière perdue : jamais un simple « comptage incertain ».
+                verdicts[id(r)] = {'type': 'perdue',
+                                   'message': f"{visibles} lignes visibles, aucune lue"}
+        for genre, groupe, mode in (('pages vectorielles', vectorielles,
+                                     Config.CONTROLE_LIGNES_VECTORIEL),
+                                    ('scans', scans, Config.CONTROLE_LIGNES)):
+            if not groupe or not mode:
+                continue
+            ombre = mode == 'ombre'
+            prefixe = f"nombre de lignes, {genre}{' (mode ombre)' if ombre else ''}"
+            impossibles = [r for r in groupe if comptes[r['_page_pdf']]['visibles'] is None]
+            types = [verdicts[id(r)]['type'] for r in groupe]
+            self._log(f"  {prefixe} : {len(groupe) - len(impossibles)} page(s) comptée(s), "
+                      f"{types.count('alerte') + types.count('perdue')} écart(s) en alerte, "
+                      f"{types.count('incertain')} comptage(s) incertain(s), "
+                      f"{len(impossibles)} impossible(s)")
+            if groupe is scans and verdict_scans['synthese']:
+                self._log(f"  ℹ {prefixe} : {verdict_scans['synthese']}")
+                if not ombre:
+                    groupe[0].setdefault('syntheses_lignes', []).append(
+                        {'type': 'nombre de lignes', 'message': verdict_scans['synthese']})
+            for r in groupe:
+                c, d = comptes[r['_page_pdf']], verdicts[id(r)]
+                numero = numero_page(r)
+                alerte = d['type'] == 'perdue' or (d['type'] == 'alerte' and not ombre)
+                if c['visibles'] is None:
+                    self._log(f"  ℹ {prefixe} p. {numero} : comptage impossible "
+                              f"({c['raison']})")
+                elif alerte:
+                    self._log(f"  ⚠ p. {numero} : {d['message']}")
+                    r.setdefault('a_verifier', []).append({
+                        'ligne': None, 'colonne': None, 'type': 'nombre de lignes',
+                        'message': d['message'], 'lecture': None, 'lignes': True})
+                elif d['type']:
+                    self._log(f"  ℹ {prefixe} p. {numero} : {d['message']}")
         mesures = []
-        for r, d in zip(pages, verdict['pages']):
-            c = comptes[r['_page_pdf']]
-            numero = numero_page(r)
-            if c['visibles'] is None:
-                self._log(f"  ℹ {prefixe} p. {numero} : comptage impossible ({c['raison']})")
-            elif d['type'] == 'alerte' and not ombre:
-                self._log(f"  ⚠ p. {numero} : {d['message']}")
-                r.setdefault('a_verifier', []).append({
-                    'ligne': None, 'colonne': None, 'type': 'nombre de lignes',
-                    'message': d['message'], 'lecture': None, 'lignes': True})
-            elif d['type']:
-                self._log(f"  ℹ {prefixe} p. {numero} : {d['message']}")
-            mesures.append({'page_pdf': r['_page_pdf'], 'page': numero,
+        for r in pages:
+            c, d = comptes[r['_page_pdf']], verdicts[id(r)]
+            mesures.append({'page_pdf': r['_page_pdf'], 'page': numero_page(r),
                             'methode': r.get('detection_method'), 'nature': c['nature'],
                             'visibles': c['visibles'], 'lues': self._lignes_lues(r),
                             'decision': d['type'], 'message': d['message'],
                             'raison': c['raison'], 'pas': c['pas'],
                             'duree_s': round(c['duree'], 2)})
-        if verdict['synthese'] and not ombre and pages:
-            pages[0].setdefault('syntheses_lignes', []).append(
-                {'type': 'nombre de lignes', 'message': verdict['synthese']})
         try:
             dossier = Path(Config.LIGNES_OMBRE_DOSSIER)
             dossier.mkdir(parents=True, exist_ok=True)
@@ -609,7 +649,7 @@ class Converter:
             with open(fichier, 'w', encoding='utf-8') as f:
                 for m in mesures:
                     f.write(json.dumps(dict(m, document=self.word_file.name,
-                                            synthese=verdict['synthese']),
+                                            synthese=verdict_scans['synthese']),
                                        ensure_ascii=False) + '\n')
             self._log(f"  mesures du nombre de lignes : {fichier}")
         except OSError as exc:
@@ -721,10 +761,15 @@ class Converter:
         """Page relue : son alerte de nombre de lignes refaite avec la nouvelle lecture."""
         from compte_lignes import decision_page
         compte = self._comptes_lignes.get(result.get('_page_pdf'))
-        if compte is None or Config.CONTROLE_LIGNES is not True:
+        if compte is None:
             return
+        lues = self._lignes_lues(result)
         # Décision de la page seule : le garde-fou des 20 % porte sur le document entier.
-        d = decision_page(compte['visibles'], self._lignes_lues(result))
+        d = decision_page(compte['visibles'], lues)
+        if compte['visibles'] and not lues:
+            d = {'type': 'alerte', 'message': f"{compte['visibles']} lignes visibles, aucune lue"}
+        elif Config.CONTROLE_LIGNES is not True:
+            return
         if d['type'] == 'alerte':
             result.setdefault('a_verifier', []).append({
                 'ligne': None, 'colonne': None, 'type': 'nombre de lignes',

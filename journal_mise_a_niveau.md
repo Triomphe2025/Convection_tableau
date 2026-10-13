@@ -1437,3 +1437,26 @@ hauteur (restes de traits verticaux). Rejeu (pages déjà vues) : extraits 21/21
 jugées, 0 fausse alerte, 1 alerte (PE022 p. 14, Excel faux probable), 7 comptages incertains,
 0 impossible, garde-fou 20 % jamais déclenché. Excel faux probables : PE022 p. 14 (32 au lieu
 de 31), PE012 p. 164 (33 au lieu de 30, doubles hérités). Détail : `mesures/d1_classement.md`.
+
+## Lecture vectorielle : pied, mots cachés signalés, compteur vectoriel actif (2026-10-13)
+
+1. Banc complet (mesure C1, 3 extraits, vérité cellule par cellule) rejoué après la correction
+   de la surimpression puis après tous les points ci-dessous : rapport identique octet pour
+   octet (3 cellules fausses, mêmes alertes, mêmes 33/50 erreurs injectées).
+2. Mots écartés sur les 85 pages vectorielles des 5 documents : seulement 223111PE012 p. 164
+   (3 doublons, 6 cachés) et 223111PE022 p. 14 (12 doublons, 6 cachés). Chaque page à mots
+   cachés porte une ligne d'information dans A VERIFIER, « N mots cachés dans le PDF ignorés
+   (invisibles à l'impression) », les mots en commentaire ; hors de l'ordre de validation.
+3. Pages « NOM DE CABLE » avant correction : aucune alerte sur la perte ; l'Excel montrait un
+   tableau vide sous son en-tête et tout le texte du tableau dans la case du pied. Cause : toute
+   ligne contenant « CABLE : » ouvrait le pied, et tout ce qui suivait y passait. Le pied se
+   reconnaît maintenant à ses libellés forts suivis de « : » (P.E.T., N° PLAN, INDICE, PAGE), et
+   aux lignes « CABLE : » / « TYPE : » / logo juste au-dessus ; une ligne non classée est gardée
+   (1re colonne) et signalée. Trouvé en comparant les 136 pages vectorielles : 223111PE022 p. 35
+   et 36 impriment « NON DU CABLE » et perdaient 41 et 5 lignes dans le pied ; ajouté aux
+   équivalents ; la règle du pied seule les garde aussi. Une page dont des lignes sont visibles
+   et aucune n'est lue est une alerte (compteur), même en mode ombre sur un scan.
+4. `CONTROLE_LIGNES_VECTORIEL = True` (scans : `CONTROLE_LIGNES = 'ombre'`) : tout écart est une
+   alerte, sans garde-fou ; zone par le cadre, sinon par le texte (pages TP2 de 223400PE137
+   sans cadre). Vérifié sur 130 pages vectorielles de tableau (5 documents, PE137, 3 extraits) :
+   0 alerte, 0 comptage impossible.

@@ -124,3 +124,92 @@ class TestTexteCache(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestPiedReconnuASesLibelles(unittest.TestCase):
+
+    def test_debut_du_pied_libelle_fort_et_lignes_faibles_au_dessus(self):
+        from pdf_extractor import debut_du_pied
+        lignes = ['NOM DU CABLE : GAT/CA', '01  1 G  SIG', 'CABLE : ARMQ1/BO02',
+                  'TYPE  : 3/RO2V', 'N° PLAN : 223111PE021   INDICE : R   PAGE : 9']
+        est_section = lambda t: 'NOM DU CABLE' in t  # noqa: E731
+        self.assertEqual(debut_du_pied(lignes, est_section), 2)
+
+    def test_ligne_cable_seule_n_ouvre_pas_le_pied(self):
+        from pdf_extractor import debut_du_pied
+        lignes = ['NOM DE CABLE : DI/BO', '01  1 G  SIG', 'P.E.T. : BOURG   BORNIER : PK']
+        self.assertEqual(debut_du_pied(lignes, lambda t: False), 2)
+
+    def test_sans_libelle_fort_pas_de_pied(self):
+        from pdf_extractor import debut_du_pied
+        self.assertEqual(debut_du_pied(['01 A', 'CABLE : X'], lambda t: False), 2)
+
+    def test_section_mal_orthographiee_page_gardee(self):
+        from unittest.mock import patch
+        from config import Config
+        with patch.object(Config, 'SECTION_EQUIVALENTS', {}):
+            r = _lire(1)
+        donnees = [x['cells'] for x in r['rows'] if x['type'] == 'data']
+        self.assertGreaterEqual(len(donnees), 28)
+        self.assertEqual(r['metadata'].get('NO_PLAN'), '223111 PE 022')
+        self.assertIsNone(r['metadata'].get('COMPLEMENT'))
+
+    def test_ligne_non_decoupee_gardee_et_signalee(self):
+        def dessiner(page):
+            for y, texte in ((60, '|BORNE |COULEUR |SIGNAL |JARRETIERES |'),
+                             (72, '|01    |1 G     |SIG A  |0815N       |'),
+                             (84, 'NOTE MANUSCRITE RECOPIEE'),
+                             (96, '|02    |1 BC    |SIG B  |0816N       |'),
+                             (130, 'N° PLAN : 223111PE022   INDICE : TP4   PAGE : 1')):
+                page.insert_text((20, y), texte, fontsize=9, fontname='cour')
+        r = PdfTableExtractor(TPL).extract_page_grille(_pdf(dessiner), 0)
+        self.assertEqual([x['cells'][0] for x in r['rows']], ['01', 'NOTE MANUSCRITE RECOPIEE',
+                                                              '02'])
+        self.assertEqual([(a['ligne'], a['type']) for a in r['a_verifier']],
+                         [(1, 'ligne non classée')])
+
+
+class TestMotsCachesSignales(unittest.TestCase):
+
+    def test_ligne_d_information_avec_les_mots(self):
+        info = [a for a in _lire(0)['a_verifier'] if a['type'] == 'information']
+        self.assertEqual(len(info), 1)
+        self.assertEqual(info[0]['message'],
+                         "6 mots cachés dans le PDF ignorés (invisibles à l'impression)")
+        self.assertEqual(info[0]['commentaire'], 'RESERVE NON CABLEE RESERVE NON CABLEE')
+
+    def test_page_sans_mot_cache_sans_information(self):
+        self.assertEqual(_lire(1)['a_verifier'], [])
+
+    def test_a_verifier_commentaire_des_mots(self):
+        import contextlib
+        import io
+        import openpyxl
+        from generer_classeur import generer_excel
+        sortie = Path(tempfile.mkdtemp()) / 's.xlsx'
+        with contextlib.redirect_stdout(io.StringIO()):
+            generer_excel([_lire(0)], PdfTableExtractor(TPL), sortie, on_log=lambda m: None)
+        ws = openpyxl.load_workbook(sortie)['A VERIFIER']
+        ligne = next(r for r in ws.iter_rows() if r[3].value == 'information')
+        self.assertIn('6 mots cachés', ligne[4].value)
+        self.assertEqual(ligne[4].comment.text, 'RESERVE NON CABLEE RESERVE NON CABLEE')
+
+    def test_ecartes_comptes(self):
+        ecartes = {}
+        with fitz.open(str(FIXTURE)) as doc:
+            grille_page(doc[0], ecartes)
+        self.assertEqual((ecartes['doublons'], len(ecartes['caches'])), (12, 6))
+
+
+class TestZoneTexte(unittest.TestCase):
+
+    def test_zone_sous_l_entete_au_dessus_du_pied(self):
+        from pdf_extractor import zone_tableau_texte
+        mots = [(20, 50, 60, 60, 'BORNE'), (100, 50, 150, 60, 'SIGNAL'),
+                (20, 70, 40, 80, '01'), (20, 200, 60, 210, 'PAGE'), (62, 200, 66, 210, ':')]
+        x0, x1, y0, y1 = zone_tableau_texte(mots, ['BORNE', 'COULEUR', 'SIGNAL', 'JARRETIERES'])
+        self.assertEqual((y0, y1), (60, 200))
+
+    def test_sans_entete(self):
+        from pdf_extractor import zone_tableau_texte
+        self.assertIsNone(zone_tableau_texte([(20, 70, 40, 80, '01')], ['BORNE', 'SIGNAL']))

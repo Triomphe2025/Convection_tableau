@@ -121,10 +121,10 @@ class TestModeOmbre(unittest.TestCase):
         comptes, resultats = self._documents()
         _, journal = self._controler('ombre', comptes, resultats)
         self.assertFalse(any(r.get('a_verifier') for r in resultats))
-        self.assertIn("  ℹ nombre de lignes (mode ombre) p. 2 : 47 lignes visibles, 46 lues",
-                      journal)
-        self.assertIn("  ℹ nombre de lignes (mode ombre) p. 3 : comptage incertain (écart de "
-                      "3 lignes : 13 visibles, 10 lues)", journal)
+        prefixe = "  ℹ nombre de lignes, scans (mode ombre)"
+        self.assertIn(f"{prefixe} p. 2 : 47 lignes visibles, 46 lues", journal)
+        self.assertIn(f"{prefixe} p. 3 : comptage incertain (écart de 3 lignes : 13 visibles, "
+                      "10 lues)", journal)
         self.assertTrue(any('p. 4 : comptage impossible' in m for m in journal))
 
     def test_ombre_fichier_de_mesure(self):
@@ -185,3 +185,72 @@ class TestModeOmbre(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestPagesVectoriellesEtPagesPerdues(unittest.TestCase):
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._patch = patch.object(Config, 'LIGNES_OMBRE_DOSSIER', Path(self._tmp.name))
+        self._patch.start()
+
+    def tearDown(self):
+        self._patch.stop()
+        self._tmp.cleanup()
+
+    def _controler(self, comptes, resultats, scans='ombre', vect=True):
+        journal = []
+        conv = _converter(journal)
+        conv._compte_lignes = _future(comptes)
+        with patch.object(Config, 'CONTROLE_LIGNES', scans), \
+                patch.object(Config, 'CONTROLE_LIGNES_VECTORIEL', vect):
+            conv._controle_lignes(resultats)
+        return journal
+
+    @staticmethod
+    def _vect(visibles):
+        return dict(_compte(visibles), nature='vectoriel')
+
+    def test_vectoriel_tout_ecart_est_une_alerte_sans_garde_fou(self):
+        comptes = {1: self._vect(30), 2: self._vect(35), 3: self._vect(10)}
+        resultats = [_resultat(1, 0), _resultat(2, 30), _resultat(3, 10)]
+        self._controler(comptes, resultats)
+        self.assertEqual(resultats[0]['a_verifier'][0]['message'], '30 lignes visibles, 0 lues')
+        self.assertEqual(resultats[1]['a_verifier'][0]['message'], '35 lignes visibles, 30 lues')
+        self.assertFalse(resultats[2].get('a_verifier'))
+        self.assertFalse(any(r.get('syntheses_lignes') for r in resultats))
+
+    def test_scan_page_perdue_alerte_meme_en_ombre(self):
+        comptes = {k: _compte(10) for k in range(1, 6)}
+        comptes[3] = _compte(28)
+        resultats = [_resultat(k, 10) for k in range(1, 6)]
+        resultats[2] = _resultat(3, 0)
+        journal = self._controler(comptes, resultats, scans='ombre')
+        self.assertEqual(resultats[2]['a_verifier'][0]['message'],
+                         '28 lignes visibles, aucune lue')
+        self.assertIn('  ⚠ p. 3 : 28 lignes visibles, aucune lue', journal)
+
+    def test_scan_ombre_ecart_ordinaire_rien_dans_les_resultats(self):
+        comptes = {k: _compte(10) for k in range(1, 11)}
+        comptes[2] = _compte(11)
+        resultats = [_resultat(k, 10) for k in range(1, 11)]
+        self._controler(comptes, resultats, scans='ombre')
+        self.assertFalse(any(r.get('a_verifier') for r in resultats))
+
+    def test_vectoriel_coupe(self):
+        comptes = {1: self._vect(30)}
+        resultats = [_resultat(1, 0)]
+        self._controler(comptes, resultats, vect=False)
+        self.assertFalse(resultats[0].get('a_verifier'))
+
+    def test_information_pas_une_alerte_dans_l_ordre(self):
+        from converter import nombre_alertes
+        r = _resultat(1, 3)
+        r['a_verifier'] = [{'ligne': None, 'type': 'information'}]
+        self.assertEqual(nombre_alertes(r), 0)
+        r['a_verifier'].append({'ligne': None, 'type': 'nombre de lignes'})
+        self.assertEqual(nombre_alertes(r), 1)
+
+    def test_defauts(self):
+        self.assertEqual((Config.CONTROLE_LIGNES, Config.CONTROLE_LIGNES_VECTORIEL),
+                         ('ombre', True))

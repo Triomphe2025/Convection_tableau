@@ -195,8 +195,9 @@ class Config:
     # Écart vertical (points PDF) en dessous duquel deux spans sont sur la
     # même ligne de la grille ; l'interligne des listings est d'environ 11 pt.
     PDF_GRILLE_TOLERANCE_Y = 2.0
-    # Orthographes équivalentes du mot-clé de section d'un modèle (pages vectorielles).
-    SECTION_EQUIVALENTS = {'NOM DU CABLE': ('NOM DE CABLE',)}
+    # Orthographes équivalentes du mot-clé de section d'un modèle (pages vectorielles) : le
+    # texte reste tel qu'imprimé (223111PE022 p. 35 et 36 impriment « NON DU CABLE »).
+    SECTION_EQUIVALENTS = {'NOM DU CABLE': ('NOM DE CABLE', 'NON DU CABLE')}
     # Texte tel qu'imprimé (pages vectorielles) : deux mots identiques à moins de
     # DX_PAS caractères et DY_PART de leur hauteur l'un de l'autre sont un texte surimprimé,
     # lu une fois (223111PE022 p. 14) ; un mot qui ne laisse aucune encre, même grisée (<
@@ -419,6 +420,9 @@ class Config:
     # alertes de page (A VERIFIER, ordre de validation). Contre-épreuve D1 : 10,5 % de
     # fausses alertes (bornes de la zone) → ombre en v1.8, jugé à l'étape 10.
     CONTROLE_LIGNES = 'ombre'
+    # Pages vectorielles : le compte vient de la couche texte, il est exact (0 fausse alerte
+    # sur les 85 pages vues) → alertes actives ; tout écart est une alerte, sans garde-fou.
+    CONTROLE_LIGNES_VECTORIEL = True
     # Fichiers de mesure du mode ombre (un par document), hors des dossiers de l'utilisateur.
     LIGNES_OMBRE_DOSSIER = Path(os.environ.get('LOCALAPPDATA', Path.home())) / \
         'TriosSeconverter' / 'ombre_lignes'

@@ -527,7 +527,8 @@ def entrees_cellules(valides: List[Dict]) -> List[Dict]:
                             'colonne': entetes[k] if k is not None and k < len(entetes)
                             else None,
                             'type': a['type'], 'message': a['message'],
-                            'lecture': a.get('lecture'), 'cible': (i, a['ligne'], k)})
+                            'lecture': a.get('lecture'), 'cible': (i, a['ligne'], k),
+                            'commentaire': a.get('commentaire')})
     return entrees
 
 
@@ -624,6 +625,10 @@ def ecrire_a_verifier(wb, entrees: List[Dict], valides: List[Dict], debuts: List
     for e in entrees:
         ws.append([e['page'], e['ligne'], e['colonne'], e['type'], e['message'],
                    e['lecture'], None])
+        if e.get('commentaire'):
+            # Mots cachés écartés de la lecture : montrés, pour qu'une erreur du test se voie.
+            ws.cell(row=ws.max_row, column=5).comment = Comment(e['commentaire'],
+                                                                'TriosSeconverter')
         if e['cible'] is None:
             continue
         i, rang, k = e['cible']

@@ -85,7 +85,7 @@ scan ; sinon page ignorée (motif et part d'images journalisés).
 | `PDF_SEUIL_IMAGE_PLEINE_PAGE` | `0.8` | Au-delà, un texte posé sur l'image n'est pas lu en grille (couche OCR, pas le document) |
 | `PDF_MIN_CARS_VECTORIEL` | `20` | Caractères visibles minimum pour lire la page en couche texte |
 | `PDF_GRILLE_TOLERANCE_Y` | `2.0` | Écart vertical (pt) sous lequel deux spans sont sur la même ligne de la grille |
-| `SECTION_EQUIVALENTS` | `{'NOM DU CABLE': ('NOM DE CABLE',)}` | Orthographes équivalentes du mot-clé de section (sinon la ligne ouvrait le pied et la page était perdue) |
+| `SECTION_EQUIVALENTS` | `{'NOM DU CABLE': ('NOM DE CABLE', 'NON DU CABLE')}` | Orthographes équivalentes du mot-clé de section (sinon la ligne ouvrait le pied et la page était perdue) |
 | `PDF_SURIMPRESSION_DX_PAS` / `PDF_SURIMPRESSION_DY_PART` | `0.5` / `0.5` | Même mot à moins d'un demi-caractère et d'une demi-hauteur : texte surimprimé, lu une fois |
 | `PDF_VISIBILITE_DPI` / `PDF_VISIBILITE_GRIS` / `PDF_VISIBILITE_MARGE` | `100` / `220` / `0.15` | Mot à lettre sans encre au cœur des lettres sur la page rendue : caché, non lu |
 
@@ -169,6 +169,7 @@ le calibrage déjà fait sur `verificateur.py`.
 | Paramètre | Valeur défaut | Rôle |
 |-----------|--------------|------|
 | `CONTROLE_LIGNES` | `'ombre'` | `False` coupé ; `'ombre'` : compteur en parallèle de la lecture, journal + fichier de mesure, rien dans l'Excel ni l'écran de validation ; `True` : alerte de page dans A VERIFIER et l'ordre de validation (décidé à l'étape 10) |
+| `CONTROLE_LIGNES_VECTORIEL` | `True` | Pages vectorielles : compte exact de la couche texte (zone par le cadre, sinon par le texte), tout écart est une alerte, sans garde-fou (0 fausse alerte sur 130 pages) |
 | `LIGNES_OMBRE_DOSSIER` | `%LOCALAPPDATA%\TriosSeconverter\ombre_lignes` | Fichiers de mesure du mode ombre (un `.jsonl` par conversion) ; les tests le redirigent |
 | `LIGNES_MARGE_BORD` | `0.015` | Trait vertical à moins de cette part de la largeur du bord = bord noir du scan, écarté |
 | `LIGNES_EPAISSEUR_TRAIT` / `LIGNES_FENETRE_TRAIT` | `12` / `6` | Trait horizontal : bande mince, mesurée sur une fenêtre de rangées (trait scanné ondulé) |
