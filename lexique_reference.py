@@ -5,10 +5,16 @@ corrigés par l'utilisateur (QUALITE_LEXIQUE_DOSSIER, feuille QUALITE_LEXIQUE_FE
 Ces Excel contiennent eux-mêmes des erreurs : le lexique ne sert qu'à signaler et proposer,
 jamais à modifier. Pour mesurer sans tricher, un document peut être exclu (`exclure`).
 Un Excel corrigé s'ajoute au lexique par `ajouter_au_lexique` (bouton « Ajouter au lexique »).
+Au build, les classeurs de référence sont compilés (`compiler_lexique`, formes seules) dans un
+fichier embarqué dans l'exe ; à l'exécution, `lexique_complet` réunit ces formes et celles des
+classeurs ajoutés par l'utilisateur.
 """
+import hashlib
+import json
 import shutil
+from datetime import date
 from pathlib import Path
-from typing import Dict, Optional, Set
+from typing import Dict, Optional, Set, Tuple
 
 from config import Config
 from controle_qualite import formes
@@ -94,3 +100,62 @@ def ajouter_au_lexique(source: Path, dossier: Optional[Path] = None,
     shutil.copyfile(source, cible)
     return {'chemin': cible, 'formes': len(apportees), 'ajoutees': len(apportees - connues),
             'remplace': remplacer}
+
+
+def compiler_lexique(dossier: Path, sortie: Path, feuille: Optional[str] = None) -> Dict:
+    """Formes des classeurs de référence, par classeur (nom, empreinte), dans un fichier JSON
+    embarqué dans l'exe : l'exe n'a pas besoin des Excel pour avoir le lexique."""
+    dossier, sortie = Path(dossier), Path(sortie)
+    entetes = _entetes_connus()
+    sources = {}
+    for chemin in sorted(dossier.glob('*.xlsx')):
+        sources[chemin.name] = {
+            'empreinte': hashlib.sha256(chemin.read_bytes()).hexdigest(),
+            'formes': sorted(formes_classeur(chemin, feuille, entetes)),
+        }
+    contenu = {'compile_le': date.today().isoformat(), 'sources': sources}
+    sortie.parent.mkdir(parents=True, exist_ok=True)
+    sortie.write_text(json.dumps(contenu, ensure_ascii=False, indent=1), encoding='utf-8')
+    return contenu
+
+
+def lire_lexique_compile(chemin: Path) -> Dict:
+    """Contenu d'un lexique compilé ; {} si le fichier manque ou est illisible."""
+    try:
+        return json.loads(Path(chemin).read_text('utf-8'))
+    except (OSError, ValueError):
+        return {}
+
+
+def lexique_complet(compile: Path, dossier_ajouts: Path, reference: Optional[Path] = None,
+                    feuille: Optional[str] = None) -> Tuple[Set[str], str]:
+    """(formes, bilan lisible) : lexique compilé (sinon, en développement, les classeurs de
+    référence lus directement) + classeurs ajoutés par l'utilisateur."""
+    contenu = lire_lexique_compile(compile)
+    if contenu.get('sources'):
+        integrees = {f for s in contenu['sources'].values() for f in s['formes']}
+        origine = (f"{len(integrees)} formes intégrées ({len(contenu['sources'])} classeurs, "
+                   f"compilé le {contenu.get('compile_le', '?')})")
+    elif reference is not None and Path(reference).is_dir():
+        integrees = charger_lexique(reference, feuille=feuille)
+        origine = f"{len(integrees)} formes des classeurs de référence (non compilés)"
+    else:
+        integrees, origine = set(), "aucune forme intégrée"
+    ajoutees = charger_lexique(dossier_ajouts, feuille=feuille)
+    return integrees | ajoutees, (f"{origine} + {len(ajoutees - integrees)} ajoutée(s) "
+                                  f"(dossier {dossier_ajouts})")
+
+
+if __name__ == '__main__':
+    # Build (build_exe.bat) : python lexique_reference.py --compiler
+    import sys
+    if sys.argv[1:] == ['--compiler']:
+        from config import chemin_ressource
+        bilan = compiler_lexique(Config.QUALITE_LEXIQUE_REFERENCE,
+                                 chemin_ressource(Config.QUALITE_LEXIQUE_COMPILE))
+        formes_total = len({f for s in bilan['sources'].values() for f in s['formes']})
+        print(f"Lexique compilé : {formes_total} formes, {len(bilan['sources'])} classeurs "
+              f"({', '.join(bilan['sources'])})")
+        sys.exit(0 if bilan['sources'] else 1)
+    print("Usage : python lexique_reference.py --compiler")
+    sys.exit(2)

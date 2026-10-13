@@ -22,6 +22,20 @@ from typing import Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 
+def docling_disponible() -> bool:
+    """Docling est installé (il n'est pas inclus dans l'exe : plusieurs Go avec torch)."""
+    import importlib.util
+    return importlib.util.find_spec('docling') is not None
+
+
+def message_docling_absent() -> str:
+    import sys
+    if hasattr(sys, '_MEIPASS'):
+        return ("Le mode Docling n'est pas inclus dans cette version de l'application. "
+                "Choisissez le mode Tesseract ou Claude.")
+    return "Le mode Docling demande le paquet « docling » : pip install docling."
+
+
 class DoclingExtractor:
     """Extracteur de tableaux via Docling (IBM Research)."""
 

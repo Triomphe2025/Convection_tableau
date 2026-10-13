@@ -186,6 +186,15 @@ le calibrage déjà fait sur `verificateur.py`.
 | `LIGNES_BLANC_POINTILLES` | `24` | Blanc maximal entre deux tirets d'un trait en pointillés (6A23111PE133 : 18 px) |
 | `LIGNES_INCLINAISON_MAX` / `LIGNES_INCLINAISON_PAS` | `1.5` / `0.05` | Redressement du scan (degrés) |
 
+## Livraison (étape 10)
+
+| Paramètre | Valeur défaut | Rôle |
+|-----------|--------------|------|
+| `DOSSIER_UTILISATEUR` | `%LOCALAPPDATA%\TriosSeconverter` | Cache, mesures du mode ombre, modèles créés, ajouts au lexique ; jamais à côté de l'exe |
+| `MODELES_UTILISATEUR` | `…\templates.json` | Modèles créés par l'utilisateur ; les modèles livrés (code + templates.json de l'appli) sont relus à chaque version |
+| `TESSERACT_PATH` / `TESSERACT_CHEMINS_HABITUELS` / `TESSERACT_TROUVE` | chemin trouvé | Variable TESSERACT_PATH, chemin configuré, Program Files, PATH ; absent : une ligne au journal |
+| `QUALITE_LEXIQUE_REFERENCE` / `QUALITE_LEXIQUE_COMPILE` / `QUALITE_LEXIQUE_DOSSIER` | `references\excels_valides` / `lexique_compile.json` / `…\lexique` | Classeurs compilés au build (`python lexique_reference.py --compiler`, embarqué) + ajouts de l'utilisateur |
+
 ## Ajouter un nouveau paramètre
 
 1. Ajouter dans `Config` (class dans config.py) avec valeur par défaut

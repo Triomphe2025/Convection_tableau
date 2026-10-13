@@ -43,7 +43,7 @@ def _norm(texte):
 
 def convertir(doc, stem, gabarit):
     """Pages du rejeu (contrôles compris) et lectures Tesseract par page du PDF."""
-    lexique = charger_lexique(Config.QUALITE_LEXIQUE_DOSSIER, exclure=doc)
+    lexique = charger_lexique(Config.QUALITE_LEXIQUE_REFERENCE, exclure=doc)
     convertisseurs = []
     init = Converter.__init__
 
@@ -136,7 +136,7 @@ def mesurer_c1():
                      'couverture': (len(formes_verite & lexique), len(formes_verite))}
 
     sortie += ['## Lexique de référence', '', "Fichiers : " + ', '.join(
-        f.name for f in sorted(Config.QUALITE_LEXIQUE_DOSSIER.glob('*.xlsx'))) + '.', '']
+        f.name for f in sorted(Config.QUALITE_LEXIQUE_REFERENCE.glob('*.xlsx'))) + '.', '']
     for nom, d in docs.items():
         a, b = d['couverture']
         sortie.append(f"- {nom} (sans {d['doc']}) : {len(d['lexique'])} formes ; couverture de "

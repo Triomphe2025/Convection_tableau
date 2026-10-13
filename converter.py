@@ -208,6 +208,7 @@ class Converter:
         self._a_valider = []
 
         source_ext = self.word_file.suffix.lower()
+        self._verifier_moteurs()
         self._compte_lignes = (
             self._lancer_compte_lignes() if source_ext == '.pdf' and (
                 Config.CONTROLE_LIGNES or Config.CONTROLE_LIGNES_VECTORIEL) else None)
@@ -488,6 +489,23 @@ class Converter:
 
     # ── Nombre de lignes visibles (compte_lignes.py) ──────────────────
 
+    def _verifier_moteurs(self) -> None:
+        """Moteurs absents dits une fois, clairement, avant de lire la première page."""
+        mode = getattr(Config, 'OCR_MODE', 'tesseract').lower()
+        if mode == 'docling':
+            from docling_ocr import docling_disponible, message_docling_absent
+            if not docling_disponible():
+                raise RuntimeError(message_docling_absent())
+        if Config.TESSERACT_TROUVE:
+            return
+        cherches = ', '.join([Config.TESSERACT_PATH, *Config.TESSERACT_CHEMINS_HABITUELS])
+        message = (f"Tesseract OCR introuvable (cherché : {cherches}, et le PATH) : installez "
+                   f"Tesseract OCR ou indiquez son chemin dans la variable TESSERACT_PATH")
+        # Pas d'arrêt : un PDF vectoriel se lit sans Tesseract ; les pages qui en ont besoin
+        # (scans) échouent ensuite une par une, ce message dit pourquoi.
+        self._log(f"  ⚠ {message} ; pages scannées non lisibles en mode Tesseract, positions "
+                  f"d'origine et contrôles des pages scannées impossibles")
+
     def _lancer_compte_lignes(self):
         """Compteur de lignes de toutes les pages du PDF dans un fil à part (comme Tesseract)."""
         from concurrent.futures import ThreadPoolExecutor
@@ -691,17 +709,22 @@ class Converter:
                 'proposition': a.get('proposition')})
 
     def _charger_lexique(self) -> set:
-        """Lexique de référence ; dossier absent, vide ou illisible : cohérence seule."""
-        from lexique_reference import charger_lexique
-        dossier = Path(Config.QUALITE_LEXIQUE_DOSSIER)
+        """Lexique compilé de l'appli + classeurs ajoutés ; illisible : cohérence seule."""
+        from config import chemin_ressource
+        from lexique_reference import lexique_complet
         try:
-            lexique = charger_lexique(dossier, feuille=Config.QUALITE_LEXIQUE_FEUILLE)
+            lexique, bilan = lexique_complet(
+                chemin_ressource(Config.QUALITE_LEXIQUE_COMPILE),
+                Path(Config.QUALITE_LEXIQUE_DOSSIER), Config.QUALITE_LEXIQUE_REFERENCE,
+                Config.QUALITE_LEXIQUE_FEUILLE)
         except Exception as exc:
-            self._log(f"  ⚠ lexique de référence illisible ({dossier}) : {exc} ; contrôle "
-                      f"de cohérence sur le document seul")
+            self._log(f"  ⚠ lexique de référence illisible : {exc} ; contrôle de cohérence "
+                      f"sur le document seul")
             return set()
-        if not lexique:
-            self._log(f"  lexique de référence absent ou vide ({dossier}) : contrôle de "
+        if lexique:
+            self._log(f"  lexique de référence : {bilan}")
+        else:
+            self._log(f"  lexique de référence absent ou vide ({bilan}) : contrôle de "
                       f"cohérence sur le document seul")
         return lexique
 

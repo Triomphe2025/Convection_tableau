@@ -6,6 +6,37 @@ Modifiez ce fichier pour personnaliser le comportement sans toucher au code prin
 
 import os
 from pathlib import Path
+from typing import Optional
+
+
+def chemin_ressource(nom: str) -> Path:
+    """Fichier livré avec l'appli : dans l'exe (dossier _MEIPASS de PyInstaller), sinon à côté
+    du code. En lecture seule : ce que l'utilisateur crée va dans DOSSIER_UTILISATEUR."""
+    import sys
+    if hasattr(sys, '_MEIPASS'):
+        return Path(sys._MEIPASS) / nom
+    return Path(__file__).parent / nom
+
+
+def trouver_tesseract(configure: str, habituels) -> Optional[str]:
+    """Premier tesseract.exe trouvé : variable TESSERACT_PATH, chemin configuré, chemins
+    d'installation habituels, PATH ; None si aucun (message clair à l'utilisateur)."""
+    import shutil
+    for chemin in [os.environ.get('TESSERACT_PATH'), configure, *habituels]:
+        if chemin and Path(chemin).is_file():
+            return str(chemin)
+    return shutil.which('tesseract')
+
+
+_DOSSIER_UTILISATEUR = (Path(os.environ.get('LOCALAPPDATA') or Path.home() / 'AppData' / 'Local')
+                        / 'TriosSeconverter')
+_TESSERACT_CONFIGURE = r"C:\Tesseract\TesseractOCR\tesseract.exe"
+_TESSERACT_HABITUELS = (
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+    r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+    str(Path(os.environ.get('LOCALAPPDATA') or '') / 'Programs' / 'Tesseract-OCR'
+        / 'tesseract.exe'),
+)
 
 
 class Config:
@@ -79,10 +110,17 @@ class Config:
     # Activer le traitement OCR des images extraites
     ENABLE_OCR = True
 
-    # Chemin vers Tesseract OCR (laisser None pour auto-détection)
-    # Windows: r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-    # Linux/Mac: généralement dans le PATH
-    TESSERACT_PATH = r"C:\Tesseract\TesseractOCR\tesseract.exe"
+    # Dossier de l'utilisateur (jamais à côté de l'exe, qui peut être en lecture seule) :
+    # cache Tesseract, mesures du mode ombre, modèles créés, ajouts au lexique.
+    DOSSIER_UTILISATEUR = _DOSSIER_UTILISATEUR
+
+    # Tesseract OCR, installé à part sur chaque poste : chemin configuré, sinon les chemins
+    # d'installation habituels, sinon le PATH. Introuvable : TESSERACT_TROUVE = False, le
+    # journal et l'interface le disent (le chemin configuré est gardé pour le message).
+    TESSERACT_CHEMINS_HABITUELS = _TESSERACT_HABITUELS
+    TESSERACT_PATH = (trouver_tesseract(_TESSERACT_CONFIGURE, _TESSERACT_HABITUELS)
+                      or _TESSERACT_CONFIGURE)
+    TESSERACT_TROUVE = Path(TESSERACT_PATH).is_file()
 
     # Langue pour l'OCR
     OCR_LANGUAGE = "fra"
@@ -130,6 +168,8 @@ class Config:
     PIED_LIBELLES_UN_MOT = ("TYPE", "CABLE", "INDICE", "PAGE", "BORNIER")
     # Logos du bloc gauche du pied, écrits sans blancs (« M A T R A » imprimé espacé) : une
     # cellule qui n'en porte qu'un appartient au pied (reformatage d'un Excel).
+    # Modèles créés par l'utilisateur (les modèles livrés sont relus à chaque version).
+    MODELES_UTILISATEUR = _DOSSIER_UTILISATEUR / 'templates.json'
     PIED_LOGOS = ("MATRA", "SIEMENS", "MTI", "ALSTOM", "SCHNEIDER")
     # Seuls libellés derrière lesquels « n/m » est un compteur de pages ; ailleurs
     # « 6/10 » est un diamètre de conducteur (dixièmes de mm), donc du COMPLEMENT.
@@ -304,10 +344,7 @@ class Config:
     # Lectures Tesseract gardées pour la double lecture et le contrôle de conservation, sans
     # 2e OCR : dans un dossier de l'appli, jamais à côté des fichiers de l'utilisateur (et
     # loin des 260 caractères de chemin de Windows). Clé = empreinte du PDF + page + réglages.
-    POSITIONS_CACHE_DOSSIER = (
-        Path(os.environ.get('LOCALAPPDATA') or Path.home() / 'AppData' / 'Local')
-        / 'TriosSeconverter' / 'cache'
-    )
+    POSITIONS_CACHE_DOSSIER = _DOSSIER_UTILISATEUR / 'cache'
     # Purge à chaque écriture : plus vieux que N jours, puis les plus anciens tant que le
     # dossier dépasse la taille maximale.
     POSITIONS_CACHE_AGE_MAX_JOURS = 30
@@ -353,8 +390,12 @@ class Config:
     # Forme majoritaire : au moins N occurrences et RATIO fois la forme suspecte.
     QUALITE_MIN_MAJORITE = 2
     QUALITE_RATIO_MAJORITE = 1.5
-    # Lexique de référence : Excel déjà corrigés par l'utilisateur (hors de git).
-    QUALITE_LEXIQUE_DOSSIER = Path(__file__).parent / 'references' / 'excels_valides'
+    # Lexique de référence : Excel déjà corrigés par l'utilisateur (hors de git), compilés
+    # au build (formes seules, QUALITE_LEXIQUE_COMPILE, embarqué dans l'exe) ; à l'exécution,
+    # + les classeurs ajoutés avec « Ajouter au lexique » dans QUALITE_LEXIQUE_DOSSIER.
+    QUALITE_LEXIQUE_REFERENCE = Path(__file__).parent / 'references' / 'excels_valides'
+    QUALITE_LEXIQUE_COMPILE = 'lexique_compile.json'
+    QUALITE_LEXIQUE_DOSSIER = _DOSSIER_UTILISATEUR / 'lexique'
     QUALITE_LEXIQUE_FEUILLE = 'Listing'
     # Dictionnaire en alerte, par mode ; jamais sur une page vectorielle (texte exact).
     # 'claude' = moteurs vision (décidé par la mesure C0), 'ocr' = Tesseract, Docling, Word.
@@ -427,8 +468,7 @@ class Config:
     # sur les 85 pages vues) → alertes actives ; tout écart est une alerte, sans garde-fou.
     CONTROLE_LIGNES_VECTORIEL = True
     # Fichiers de mesure du mode ombre (un par document), hors des dossiers de l'utilisateur.
-    LIGNES_OMBRE_DOSSIER = Path(os.environ.get('LOCALAPPDATA', Path.home())) / \
-        'TriosSeconverter' / 'ombre_lignes'
+    LIGNES_OMBRE_DOSSIER = _DOSSIER_UTILISATEUR / 'ombre_lignes'
     # Pas de ligne cherché entre ces bornes, en pixels d'une page rendue à 300 DPI : les
     # listings mesurés sont à 6 lignes par pouce (46,7 à 50 px) ; plus large, la recherche
     # prend la moitié ou le double du pas sur une page de quelques lignes.

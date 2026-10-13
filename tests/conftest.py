@@ -17,6 +17,10 @@ _CACHE_TESTS = tempfile.TemporaryDirectory(prefix='triosseconverter_cache_tests_
 Config.POSITIONS_CACHE_DOSSIER = Path(_CACHE_TESTS.name)
 # Mesures du compteur de lignes (mode ombre) : jamais dans le dossier de l'appli de la machine.
 Config.LIGNES_OMBRE_DOSSIER = Path(_CACHE_TESTS.name) / 'ombre_lignes'
+# Modèles créés et ajouts au lexique de l'utilisateur : ceux de la machine ne sont ni lus ni
+# écrits par les tests.
+Config.MODELES_UTILISATEUR = Path(_CACHE_TESTS.name) / 'templates.json'
+Config.QUALITE_LEXIQUE_DOSSIER = Path(_CACHE_TESTS.name) / 'lexique'
 
 import hashlib  # noqa: E402
 import shutil  # noqa: E402

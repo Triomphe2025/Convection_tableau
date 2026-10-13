@@ -14,6 +14,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Modèles livrés avec l'appli (relus à chaque version) ; ceux de l'utilisateur sont dans
+# Config.MODELES_UTILISATEUR. Dans l'exe, ce fichier est dans le dossier de l'appli.
 TEMPLATES_FILE = Path(__file__).parent / "templates.json"
 
 
@@ -173,31 +175,49 @@ class TemplateManager:
 
     # ── Persistance ───────────────────────────────────────────────────
 
+    @staticmethod
+    def _lire(chemin: Path) -> Dict[str, TableTemplate]:
+        if not chemin.exists():
+            return {}
+        try:
+            with open(chemin, encoding='utf-8') as f:
+                return {nom: TableTemplate.from_dict(td) for nom, td in json.load(f).items()}
+        except Exception as e:
+            logger.warning(f"Impossible de charger {chemin} : {e}")
+            return {}
+
     def _load(self) -> None:
+        """Modèles livrés (code, puis templates.json livré), puis ceux de l'utilisateur.
+
+        Un modèle livré est toujours relu tel que livré : une nouvelle version le met à jour.
+        Un modèle créé par l'utilisateur, d'un autre nom, est gardé d'une version à l'autre.
+        """
+        from config import Config, chemin_ressource
         self._templates = {
             "Bornier standard": DEFAULT_TEMPLATE,
             "Répartiteur":      REPARTITEUR_TEMPLATE,
         }
-        if TEMPLATES_FILE.exists():
-            try:
-                with open(TEMPLATES_FILE, encoding='utf-8') as f:
-                    data = json.load(f)
-                for name, td in data.items():
-                    if name != "Bornier standard":
-                        self._templates[name] = TableTemplate.from_dict(td)
-            except Exception as e:
-                logger.warning(f"Impossible de charger templates.json : {e}")
+        livres = self._lire(chemin_ressource(TEMPLATES_FILE.name))
+        livres.pop("Bornier standard", None)
+        self._templates.update(livres)
+        self._livres = set(self._templates)
+        for nom, modele in self._lire(Path(Config.MODELES_UTILISATEUR)).items():
+            if nom not in self._livres:
+                self._templates[nom] = modele
+
+    def est_livre(self, name: str) -> bool:
+        """Modèle livré avec l'appli (non supprimable, remis à jour à chaque version)."""
+        return name in self._livres
 
     def save(self) -> None:
+        """Modèles de l'utilisateur dans son dossier ; les modèles livrés n'y vont pas."""
+        from config import Config
         try:
-            # "Bornier standard" est toujours chargé depuis le code → jamais dans le fichier.
-            # Tous les autres (y compris "Répartiteur" modifié) sont persistés dans JSON.
-            data = {
-                name: t.to_dict()
-                for name, t in self._templates.items()
-                if name != "Bornier standard"
-            }
-            with open(TEMPLATES_FILE, 'w', encoding='utf-8') as f:
+            chemin = Path(Config.MODELES_UTILISATEUR)
+            chemin.parent.mkdir(parents=True, exist_ok=True)
+            data = {name: t.to_dict() for name, t in self._templates.items()
+                    if name not in self._livres}
+            with open(chemin, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except Exception as e:
             logger.error(f"Erreur sauvegarde templates : {e}")
@@ -209,7 +229,7 @@ class TemplateManager:
         self.save()
 
     def delete(self, name: str) -> None:
-        if name in ("Bornier standard", "Répartiteur"):
+        if name in self._livres:
             return
         self._templates.pop(name, None)
         self.save()

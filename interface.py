@@ -3745,10 +3745,10 @@ class TriosSeconverterApp(tk.Tk):
 
     def _delete_template(self):
         name = self._tpl_var.get()
-        protected = ("Bornier standard", "Répartiteur", "REPARTITEUR")
-        if name in protected:
+        if self._tpl_manager.est_livre(name):
             messagebox.showinfo("Modèle protégé",
-                                f"Le modèle '{name}' ne peut pas être supprimé.")
+                                f"Le modèle '{name}' est livré avec l'appli : il ne peut pas "
+                                f"être supprimé.")
             return
         if messagebox.askyesno("Supprimer le modèle",
                                f"Supprimer « {name} » ?"):
@@ -7075,6 +7075,16 @@ class TemplateEditorDialog(tk.Toplevel):
             [f['label'] for f in fld_fields] +
             self._tpl.footer_detect_keywords
         ))
+
+        if self._mgr.est_livre(name):
+            # Un modèle livré est relu tel que livré à chaque version : la modification
+            # serait perdue au prochain lancement.
+            messagebox.showwarning(
+                "Modèle livré avec l'appli",
+                f"« {name} » est livré avec l'appli et remis à jour à chaque version.\n"
+                f"Enregistrez vos modifications sous un autre nom.",
+                parent=self)
+            return
 
         tpl = TableTemplate(
             name=name,

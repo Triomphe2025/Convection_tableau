@@ -1483,3 +1483,27 @@ lignes, PE133 5 de 59, PE012 7 de 64, pied de 2 lignes partout.
 
 Banc : `tests/test_reformatage.py` (réponses Claude des 3 extraits dans
 `tests/fixtures/rejeu_claude/`, sans API) ; avec l'ancien reformatage, 15 contrôles échouent.
+
+## Étape 10, préparation de l'exe (2026-10-13)
+
+Décisions de l'utilisateur : Docling exclu de l'exe (message clair), scipy exclu (repli de
+curve_fitter), lexique embarqué (équipe seule), dossier `%LOCALAPPDATA%\TriosSeconverter`.
+
+- `config.chemin_ressource` : fichier livré lu dans l'exe (_MEIPASS) ou à côté du code ;
+  `DOSSIER_UTILISATEUR` pour tout ce que l'utilisateur crée.
+- Modèles : livrés (code + templates.json livré) relus à chaque version, non supprimables, non
+  modifiables sur place (« enregistrez sous un autre nom ») ; modèles créés dans
+  `MODELES_UTILISATEUR`, gardés d'une version à l'autre.
+- Dictionnaire figé lu depuis l'exe ; liste en attente dans le dossier utilisateur.
+- Lexique : `python lexique_reference.py --compiler` (lancé par build_exe.bat) écrit
+  `lexique_compile.json` (formes par classeur, empreinte, date ; hors de git), embarqué ; à
+  l'exécution, + les classeurs ajoutés ; une ligne au journal (10 053 formes, 5 classeurs).
+- Tesseract : variable TESSERACT_PATH, chemin configuré, Program Files, PATH ; absent, une
+  ligne claire au journal (pas d'arrêt : un PDF vectoriel se lit sans Tesseract).
+- `.spec` : 24 modules du projet + package cad (imports suivis depuis interface.py), fitz,
+  ezdxf, shapely, skimage, sknw, networkx, sous-modules d'anthropic ; exclus docling, torch,
+  transformers, scipy ; fichiers livrés icon, templates.json, data_dictionary.json, lexique.
+- build_exe.bat : env\ du projet, vérifie PyInstaller sans rien installer, compile le
+  lexique, build. PyInstaller absent de env\ (pourtant dans requirements.txt) : accord de
+  l'utilisateur demandé avant de l'installer.
+Banc C1 identique ; 1261 tests.

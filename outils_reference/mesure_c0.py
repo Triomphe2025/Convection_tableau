@@ -306,7 +306,7 @@ def mesurer_c0():
     for nom, doc, stem, gabarit in DOCUMENTS:
         verite, colonnes = lire_verite_excel(FIX / f'{doc}_extrait_verite.xlsx')
         pages = convertir(stem, gabarit, 'claude')
-        lexique = charger_lexique(Config.QUALITE_LEXIQUE_DOSSIER, exclure=doc)
+        lexique = charger_lexique(Config.QUALITE_LEXIQUE_REFERENCE, exclure=doc)
         fausses, pleines, numeros = comparer_a_la_verite(pages, verite)
         formes_verite = {f for p in verite for r in p['rows'] if r['type'] == 'data'
                          for c in r['cells'] for f in cq.formes(c)}
@@ -323,9 +323,9 @@ def mesurer_c0():
               " lue différemment de la vérité (ou colonne vide à tort) ; une synthèse « motif non"
               " reconnu » compte comme fausse.", '']
     sortie += ['## Lexique de référence', '',
-               f"Dossier : `{Config.QUALITE_LEXIQUE_DOSSIER}` (hors de git) ; "
+               f"Dossier : `{Config.QUALITE_LEXIQUE_REFERENCE}` (hors de git) ; "
                "fichiers : " + ', '.join(
-                   p.name for p in sorted(Config.QUALITE_LEXIQUE_DOSSIER.glob('*.xlsx'))) + '.',
+                   p.name for p in sorted(Config.QUALITE_LEXIQUE_REFERENCE.glob('*.xlsx'))) + '.',
                '']
     for nom, c in contextes.items():
         a, b = c['couverture']

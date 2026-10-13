@@ -68,3 +68,6 @@ ocr_debug.log
 
 # Verrou de tâches planifiées Claude Code (état d'exécution local)
 .claude/scheduled_tasks.lock
+
+# Lexique compilé au build (formes des Excel corrigés : données de travail)
+lexique_compile.json

@@ -77,6 +77,7 @@ tests/
   test_dictionnaire_isole.py         → Les tests travaillent sur une copie temporaire du dictionnaire (tests/conftest.py, toute la session) ; le vrai data_dictionary.json est contrôlé identique avant et après la suite
   test_compte_lignes.py              → compte_lignes.py sur pages fabriquées : compte, tache dans une case vide, pointillés entre deux câbles, scan penché, cadre ou trait d'en-tête absents, bords noirs du scan, pied dans le cadre, trait trouvé seulement dans le pied ; traits par couverture ; pas et phase, cases, largeur et hauteur minimales, couche texte ; décisions (alerte, incertain, synthèse 20 %, page seule)
   test_texte_imprime.py              → Lecture vectorielle telle qu'imprimée : 223111PE022 p. 14 (31 lignes, lignes surimprimées lues une fois avec leur borne, jarretières entières, texte caché non lu), p. 9 (« NOM DE CABLE », page lue) ; surimpression, masque blanc, point seul gardé (pages fabriquées) ; pied reconnu à ses libellés (ligne inconnue gardée et signalée, « NOM DE CABLE » sans équivalent : page gardée), information « mots cachés » avec les mots en commentaire, zone du tableau par le texte (pages sans cadre)
+  test_livraison.py                  → Livraison v1.8 : ressource dans l'exe ou à côté du code, Tesseract dans les chemins habituels (absent : une ligne au journal), modèles livrés relus à chaque version et protégés, modèles de l'utilisateur gardés dans son dossier, lexique compilé égal à la lecture directe + classeurs ajoutés, Docling absent dit clairement
   test_reformatage.py                → Reformatage (« Formater Excel ») d'un extrait par modèle converti en rejeu (réponses Claude dans fixtures/rejeu_claude/, sans API) : même nombre de tableaux, blocs à la taille du plus grand, 2 lignes de pied en bas, valeurs, couleurs et commentaires conservés, liens d'A VERIFIER sur la même valeur, LEGENDE recopiée ; pied reconnu (logo « M A T R A », « CABLE : … TYPE : … »)
   test_lignes_converter.py           → Compteur dans le convertisseur : fil à part sur un PDF vectoriel fabriqué, mode ombre (journal, fichier de mesure, rien dans les résultats), mode True (alerte de page dans A VERIFIER, synthèse, page relue), défaut 'ombre' ; pages vectorielles : tout écart en alerte sans garde-fou ; scan : page perdue (lignes visibles, aucune lue) en alerte même en ombre ; information hors de l'ordre de validation
   test_lexique_reference.py          → lexique_reference.py : formes, en-têtes et pieds écartés, document mesuré exclu, dossier absent ; ajout au lexique (copie, formes ajoutées, sans feuille Listing refusé, même nom = confirmation, dictionnaire intact)
@@ -101,7 +102,7 @@ tests/
   test_claude_opus5.py               → claude_ocr sur Opus 5 / 5.5 : table de capacités, paramètres envoyés, refus avec catégorie, bloc de réflexion, effort refusé, images PNG ≤ 2576 px
 ```
 
-**1244 tests passent** (`pytest tests\`, relevé le 2026-10-13), aucun échec attendu, plus 1 test lent
+**1261 tests passent** (`pytest tests\`, relevé le 2026-10-13), aucun échec attendu, plus 1 test lent
 facultatif (`VERIF_TEST_LENT=1`, relecture du scan de 15 pages, ~30 s). Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.
 

@@ -7,24 +7,33 @@ echo   TriosSeconverter  -  Build executable
 echo ====================================================
 echo.
 
-:: Activer l'environnement virtuel si present
-if exist venv\Scripts\activate.bat (
-    call venv\Scripts\activate.bat
-    echo [OK] Environnement virtuel active.
+:: Environnement du projet (env\, cree par install.bat)
+if exist env\Scripts\activate.bat (
+    call env\Scripts\activate.bat
+    echo [OK] Environnement env\ active.
 ) else (
-    echo [INFO] Pas d'environnement virtuel - utilisation du Python systeme.
-)
-echo.
-
-:: Installer PyInstaller
-echo [1/3] Installation de PyInstaller...
-pip install pyinstaller --quiet
-if errorlevel 1 (
-    echo [ERREUR] Impossible d'installer PyInstaller.
+    echo [ERREUR] Environnement env\ absent : lancez d'abord install.bat.
     pause
     exit /b 1
 )
-echo [OK] PyInstaller pret.
+echo.
+
+:: PyInstaller doit etre installe dans env\ (requirements.txt) : rien n'est installe ici.
+python -m PyInstaller --version >nul 2>&1
+if errorlevel 1 (
+    echo [ERREUR] PyInstaller absent de env\ : relancez install.bat.
+    pause
+    exit /b 1
+)
+
+:: Lexique compile (formes des Excel corriges), embarque dans l'exe
+echo [1/3] Compilation du lexique de reference...
+python lexique_reference.py --compiler
+if errorlevel 1 (
+    echo [ERREUR] Lexique non compile : references\excels_valides\ vide ou absent.
+    pause
+    exit /b 1
+)
 echo.
 
 :: Nettoyer les anciens builds
@@ -35,8 +44,8 @@ echo [OK] Nettoyage effectue.
 echo.
 
 :: Construire l'executable
-echo [3/3] Construction de l'executable (peut prendre 2-5 minutes)...
-pyinstaller TriosSeconverter.spec --noconfirm
+echo [3/3] Construction de l'executable (peut prendre plusieurs minutes)...
+python -m PyInstaller TriosSeconverter.spec --noconfirm --clean
 if errorlevel 1 (
     echo.
     echo [ERREUR] Build echoue. Verifiez les messages d'erreur ci-dessus.
@@ -50,7 +59,7 @@ echo   Build termine !
 echo.
 echo   Executable : dist\TriosSeconverter\TriosSeconverter.exe
 echo.
-echo   Pour distribuer le logiciel, copiez l'intégralité
+echo   Pour distribuer le logiciel, copiez l'integralite
 echo   du dossier dist\TriosSeconverter\ sur la machine cible.
 echo   Tesseract doit etre installe separement.
 echo ====================================================

@@ -30,8 +30,12 @@ from difflib import get_close_matches
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-DICT_FILE         = Path(__file__).parent / "data_dictionary.json"
-DICT_FILE_PENDING = Path(__file__).parent / "data_dictionary_pending.json"
+from config import Config, chemin_ressource  # noqa: E402
+
+# Dictionnaire figé, livré avec l'appli (dans l'exe : dossier de l'appli, lecture seule) ;
+# la liste en attente, seule écrite (« Rejeter »), va dans le dossier de l'utilisateur.
+DICT_FILE         = chemin_ressource("data_dictionary.json")
+DICT_FILE_PENDING = Config.DOSSIER_UTILISATEUR / "data_dictionary_pending.json"
 
 # Valeurs à ne jamais enregistrer
 _BLACKLIST = frozenset({

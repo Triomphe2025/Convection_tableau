@@ -97,7 +97,9 @@ class TestControlerQualite(unittest.TestCase):
     def test_lexique_absent_une_ligne_au_journal_pas_de_plantage(self):
         journal = []
         with tempfile.TemporaryDirectory() as tmp, \
-                patch.object(Config, 'QUALITE_LEXIQUE_DOSSIER', Path(tmp) / 'absent'):
+                patch.object(Config, 'QUALITE_LEXIQUE_DOSSIER', Path(tmp) / 'absent'), \
+                patch.object(Config, 'QUALITE_LEXIQUE_REFERENCE', Path(tmp) / 'absent'), \
+                patch.object(Config, 'QUALITE_LEXIQUE_COMPILE', 'absent.json'):
             conv = _converter(journal, dossier=True)
             conv._controler_qualite(_document())
         self.assertEqual(conv._lexique, set())
