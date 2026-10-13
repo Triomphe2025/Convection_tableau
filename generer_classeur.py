@@ -575,6 +575,9 @@ def ligne_excel(ligne_debut: int, resultat: Dict, rang: int) -> int:
 
 
 FEUILLE_LEGENDE = 'LEGENDE'
+# Feuilles qui ne sont pas des tableaux de borniers : recopiées telles quelles au reformatage
+# (valeurs, styles, commentaires, liens recalculés), décochées par défaut dans l'interface.
+FEUILLES_TELLES_QUELLES = (FEUILLE_A_VERIFIER, FEUILLE_LEGENDE)
 
 
 def legende_couleurs() -> List[Tuple[str, str]]:
@@ -977,6 +980,16 @@ def reformatter_excel(
         if on_log:
             on_log(msg)
 
+    def _copy_annexes(src, dst):
+        """Commentaire et lien de la cellule : l'explication d'une alerte (cellule colorée
+        commentée) et le lien d'A VERIFIER ne doivent pas disparaître au reformatage."""
+        if src.comment is not None:
+            dst.comment = Comment(src.comment.text, src.comment.author or 'TriosSeconverter')
+        if src.hyperlink is not None:
+            lien = _copy(src.hyperlink)
+            lien.ref = dst.coordinate
+            dst.hyperlink = lien
+
     def _copy_cell(src, dst):
         # has_style omis intentionnellement : certaines cellules avec bordures
         # ne le rapportent pas (style hérité de la ligne/colonne source).
@@ -991,6 +1004,7 @@ def reformatter_excel(
         dst.fill = _copy(src.fill)
         dst.alignment = _copy(src.alignment)
         dst.number_format = src.number_format
+        _copy_annexes(src, dst)
 
     from openpyxl.styles import Side, Border
     from openpyxl.worksheet.properties import WorksheetProperties
@@ -1039,30 +1053,20 @@ def reformatter_excel(
     # Empreintes de fond considérées comme « en-tête »
     GREY_FILLS = {'FFD9D9D9', 'D9D9D9'}
     ORANGE_FILLS = {'FFFFA500', 'FFA500'}
+    from pied_page import ligne_de_pied
+    from template import TemplateManager
     COL_KEYWORDS = {
         'BORNE', 'COULEUR', 'SIGNAL', 'JARRETIERES',
         'TENANT', 'ABOUTISSANT', 'FIL', 'JAR',
         'REPERE', 'DESIGNATION', 'TYPE',
-    }
-    # Marqueurs de pied de page
-    # — Mots courts : correspondance EXACTE de valeur de cellule
-    #   (évite les faux positifs sur les signaux du type "IN_MTI_001",
-    #    "CABLE_ALSTOM_xxx", etc. qui contiennent le mot en sous-chaîne)
-    FOOTER_KWS_EXACT = {'MTI', 'SIEMENS', 'ALSTOM', 'SCHNEIDER'}
-    # — Phrases : recherche en sous-chaîne dans le texte joint (ok car peu
-    #   probable dans un nom de signal)
-    FOOTER_KWS_SUBSTR = {'P.E.T', 'BORNIER :', 'N° PLAN', 'NO PLAN'}
+    } | {c.upper() for n in TemplateManager().names() for c in TemplateManager().get(n).columns}
 
     def _is_footer(row_cells):
-        vals = [str(c.value or '').strip().upper() for c in row_cells]
-        joined = ' '.join(vals)
-        return (
-            any(v for v in vals if v) and
-            (
-                any(mk in vals for mk in FOOTER_KWS_EXACT) or
-                any(mk in joined for mk in FOOTER_KWS_SUBSTR)
-            )
-        )
+        # Pied reconnu comme à la lecture (pied_page.ligne_de_pied) : le logo est imprimé
+        # tel quel (« M A T R A ») et le pied de REPARTITEUR 2 commence par « CABLE : … TYPE :
+        # … » ; l'ancienne liste figée ne voyait que la ligne N° PLAN et chaque tableau
+        # prenait deux pages, le pied coupé en deux.
+        return ligne_de_pied(c.value for c in row_cells)
 
     def _has_value(row_cells):
         return any(
@@ -1099,8 +1103,12 @@ def reformatter_excel(
         return len(main_rows_m), n_footer
 
     total_tables = 0
+    # Ligne source → ligne reformatée, par feuille : pour recalculer les liens d'A VERIFIER.
+    renvois: Dict[str, Dict[int, int]] = {}
 
     for sheet_name in wb_in.sheetnames:
+        if sheet_name in FEUILLES_TELLES_QUELLES:
+            continue
         if sheets is not None and sheet_name not in sheets:
             _log(f"  ○ Feuille « {sheet_name} » ignorée.")
             continue
@@ -1121,7 +1129,9 @@ def reformatter_excel(
             non_empty = [v for v in vals if v]
             if len(non_empty) < 2:
                 continue
-            has_kw = any(v in COL_KEYWORDS for v in vals)
+            # Deux mots-clés de colonne au moins : une alerte d'A VERIFIER sur une cellule
+            # SIGNAL (« … | SIGNAL | … ») ressemblait à un en-tête.
+            has_kw = sum(1 for v in vals if v in COL_KEYWORDS) >= 2
             has_grey = any(
                 c.fill and c.fill.fgColor and
                 str(c.fill.fgColor.rgb).upper() in GREY_FILLS | ORANGE_FILLS
@@ -1188,6 +1198,7 @@ def reformatter_excel(
 
         # ── Créer la feuille de sortie ─────────────────────────────────
         ws_out = wb_out.create_sheet(title=sheet_name)
+        renvoi = renvois.setdefault(sheet_name, {})
         ws_out.page_setup.paperSize = 9
         ws_out.page_setup.orientation = 'portrait'
         ws_out.page_setup.scale = None   # désactiver le pourcentage fixe
@@ -1292,6 +1303,8 @@ def reformatter_excel(
                         pass
             for i, row in enumerate(main_rows):
                 dst_r = out_row + i
+                if row:
+                    renvoi[row[0].row] = dst_r
                 for cell in row:
                     if cell.column > tbl_n_cols:   # ne pas écrire hors du tableau
                         break
@@ -1319,6 +1332,8 @@ def reformatter_excel(
                 # survivent à la fusion dans le XML final.
                 for i, row in enumerate(footer_rows):
                     dst_r = foot_dst_start + i
+                    if row:
+                        renvoi[row[0].row] = dst_r
                     for cell in row:
                         if (not isinstance(cell, MergedCell)
                                 and cell.column <= tbl_n_cols):
@@ -1328,6 +1343,7 @@ def reformatter_excel(
                             dst.fill = _copy(cell.fill)
                             dst.alignment = _copy(cell.alignment)
                             dst.number_format = cell.number_format
+                            _copy_annexes(cell, dst)
 
                 # B — bordures complètes sur toutes les positions du pied
                 # (avant fusion, toutes les cellules sont encore accessibles)
@@ -1367,12 +1383,64 @@ def reformatter_excel(
         # Zone d'impression
         ws_out.print_area = f"A1:{get_column_letter(tbl_n_cols)}{out_row - 1}"
 
+    for sheet_name in wb_in.sheetnames:
+        if sheet_name in FEUILLES_TELLES_QUELLES:
+            _log(f"  Feuille « {sheet_name} » recopiée telle quelle.")
+            _copier_feuille(wb_in[sheet_name], wb_out.create_sheet(title=sheet_name),
+                            _copy_cell, renvois)
+    # Ordre des feuilles du classeur d'origine.
+    ordre = {nom: i for i, nom in enumerate(wb_in.sheetnames)}
+    wb_out._sheets.sort(key=lambda f: ordre.get(f.title, len(ordre)))
+
     try:
         wb_out.save(str(output_path))
     finally:
         wb_in.close()   # ferme le verrou Windows sur le fichier source
     _log(f"\n  ✓ Fichier reformaté : {output_path.name}  ({total_tables} tableau(x))")
     return total_tables
+
+
+def lien_reformate(lieu: str, renvois: Dict[str, Dict[int, int]]) -> str:
+    """Lien interne « 'Borniers'!B123 » vers la ligne reformatée de la même cellule.
+
+    Ligne absente du renvoi (rembourrage retiré) : la dernière ligne reformatée au-dessus.
+    Feuille inconnue : lien inchangé.
+    """
+    import bisect
+    m = re.match(r"^'?(?P<feuille>[^!']+)'?!(?P<col>[A-Z]+)(?P<ligne>\d+)$", lieu or '')
+    if not m or m['feuille'] not in renvois or not renvois[m['feuille']]:
+        return lieu
+    renvoi = renvois[m['feuille']]
+    ligne = int(m['ligne'])
+    if ligne not in renvoi:
+        sources = sorted(renvoi)
+        k = bisect.bisect_right(sources, ligne) - 1
+        ligne = sources[max(k, 0)]
+    return f"'{m['feuille']}'!{m['col']}{renvoi[ligne]}"
+
+
+def _copier_feuille(ws_in, ws_out, copier_cellule, renvois) -> None:
+    """Feuille recopiée telle quelle (valeurs, styles, commentaires, fusions, largeurs) ;
+    ses liens internes pointent vers les lignes reformatées."""
+    for ligne in ws_in.iter_rows():
+        for cell in ligne:
+            copier_cellule(cell, ws_out.cell(row=cell.row, column=cell.column))
+    for plage in ws_in.merged_cells.ranges:
+        ws_out.merge_cells(str(plage))
+    for lettre, dim in ws_in.column_dimensions.items():
+        ws_out.column_dimensions[lettre].width = dim.width
+    for numero, dim in ws_in.row_dimensions.items():
+        if dim.height:
+            ws_out.row_dimensions[numero].height = dim.height
+    for ligne in ws_out.iter_rows():
+        for cell in ligne:
+            if cell.hyperlink is None or not cell.hyperlink.location:
+                continue
+            nouveau = lien_reformate(cell.hyperlink.location, renvois)
+            if nouveau != cell.hyperlink.location:
+                cell.hyperlink.location = nouveau
+                if isinstance(cell.value, str) and cell.value.startswith('→ '):
+                    cell.value = '→ ' + nouveau.split('!', 1)[1]
 
 
 # ──────────────────────────────────────────────────────────────────────

@@ -26,6 +26,7 @@ Config.TESSERACT_PATH   # référencer uniquement
 | `MARQUEUR_ILLISIBLE` | `??` | Écrit par Claude à la place d'un caractère illisible (prompt) ; gardé dans l'Excel |
 | `COULEUR_ILLISIBLE` | `FFC7CE` | Fond des cellules contenant le marqueur (distinct du jaune « confiance basse ») |
 | `PIED_LIBELLES_UN_MOT` | `TYPE, CABLE, INDICE, PAGE, BORNIER` | Libellés à valeur d'un mot ; la suite va dans COMPLEMENT (les autres gardent tout leur segment) |
+| `PIED_LOGOS` | `MATRA, SIEMENS, MTI, ALSTOM, SCHNEIDER` | Logos du bloc gauche du pied, sans blancs : une cellule qui n'en porte qu'un est du pied (`pied_page.ligne_de_pied`, reformatage) |
 | `PIED_LIBELLES_COMPTEUR` | `PAGE, FOLIO` | Seuls libellés où « n/m » est un compteur ; ailleurs « 6/10 » est un diamètre → COMPLEMENT |
 | `PIED_ENTETES_REVISIONS` | `INDICE, RÉVISION, EDITION…` | En-têtes d'un tableau des révisions (page de garde) |
 | `CHAMPS_CONSTANTS_DEFAUT` | `("PET",)` | Champs constants d'un document (case vide reprise des autres pages si elles sont unanimes) |

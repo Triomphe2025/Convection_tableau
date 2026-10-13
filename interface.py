@@ -3196,8 +3196,10 @@ class TriosSeconverterApp(tk.Tk):
         except ValueError:
             default_ps = 0
 
+        from generer_classeur import FEUILLES_TELLES_QUELLES
         for name in names:
-            var_check = tk.BooleanVar(value=True)
+            # A VERIFIER et LEGENDE ne sont pas des tableaux : recopiées telles quelles.
+            var_check = tk.BooleanVar(value=name not in FEUILLES_TELLES_QUELLES)
             var_cols = tk.StringVar(value=str(default_cols))
             var_ps = tk.StringVar(value=str(default_ps))
             self._format_sheet_vars[name] = var_check

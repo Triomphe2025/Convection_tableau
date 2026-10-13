@@ -28,6 +28,30 @@ def _compact(texte: str) -> str:
     return _ESPACES_RE.sub('', texte or '').upper()
 
 
+# Libellés forts du pied, sur le texte sans blancs : ils ne se trouvent pas dans un tableau.
+_PIED_FORT_RE = re.compile(r"P\.?E\.?T\.?:|N°PLAN|NOPLAN|INDICE:|PAGE:|BORNIER:")
+
+
+def libelle_fort_pied(texte: str) -> bool:
+    """La ligne porte un libellé fort du pied (P.E.T., N° PLAN, INDICE, PAGE, BORNIER)."""
+    return bool(_PIED_FORT_RE.search(_compact(texte)))
+
+
+def ligne_de_pied(valeurs: Iterable[str]) -> bool:
+    """Ligne (valeurs de ses cellules) qui appartient au pied d'un tableau.
+
+    Logo du modèle seul dans sa cellule, blancs retirés (« M A T R A » comme « SIEMENS »),
+    libellé fort, ou « CABLE : » avec « TYPE : » sur la même ligne : une section
+    « NOM DU CABLE : … » n'a pas de « TYPE : », ce n'est pas un pied.
+    """
+    from config import Config
+    valeurs = [str(v or '') for v in valeurs]
+    if any(_compact(v) in Config.PIED_LOGOS for v in valeurs):
+        return True
+    ligne = _compact(' '.join(valeurs))
+    return bool(_PIED_FORT_RE.search(ligne)) or ('CABLE:' in ligne and 'TYPE:' in ligne)
+
+
 def _lettres_logo(texte: str, libelle_gauche: str, seule_lettre: bool = False) -> List[str]:
     """Morceaux du bloc gauche du pied, tels qu'imprimés, si le texte en est un ; sinon [].
 

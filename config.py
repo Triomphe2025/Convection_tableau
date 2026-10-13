@@ -128,6 +128,9 @@ class Config:
     # « CORDON TYPE 40 », « REF CE 8707905 ») va dans COMPLEMENT. Les autres
     # libellés (N° PLAN, P.E.T., libellés inconnus) gardent tout leur segment.
     PIED_LIBELLES_UN_MOT = ("TYPE", "CABLE", "INDICE", "PAGE", "BORNIER")
+    # Logos du bloc gauche du pied, écrits sans blancs (« M A T R A » imprimé espacé) : une
+    # cellule qui n'en porte qu'un appartient au pied (reformatage d'un Excel).
+    PIED_LOGOS = ("MATRA", "SIEMENS", "MTI", "ALSTOM", "SCHNEIDER")
     # Seuls libellés derrière lesquels « n/m » est un compteur de pages ; ailleurs
     # « 6/10 » est un diamètre de conducteur (dixièmes de mm), donc du COMPLEMENT.
     PIED_LIBELLES_COMPTEUR = ("PAGE", "FOLIO")

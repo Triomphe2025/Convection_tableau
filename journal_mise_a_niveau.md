@@ -1460,3 +1460,26 @@ de 31), PE012 p. 164 (33 au lieu de 30, doubles hérités). Détail : `mesures/d
    alerte, sans garde-fou ; zone par le cadre, sinon par le texte (pages TP2 de 223400PE137
    sans cadre). Vérifié sur 130 pages vectorielles de tableau (5 documents, PE137, 3 extraits) :
    0 alerte, 0 comptage impossible.
+
+## Régression du reformatage (« Formater Excel ») corrigée (2026-10-13)
+
+Constat de l'utilisateur sur les Excel du rejeu du 9 octobre, reproduit : sur l'extrait
+223111PE011, 10 tableaux en blocs de 118 lignes, pied coupé en deux (1 ligne de pied vue sur
+2) ; A VERIFIER prise pour des tableaux, liens perdus ; commentaires et liens non copiés.
+
+Cause confirmée avec git : `reformatter_excel` est identique depuis 262c83e (22 septembre) ;
+c'est la sortie de l'étape 7 qui l'a cassé — logo recopié tel qu'imprimé (023f7c3, 0dea82b :
+« M A T R A ») et pied lu tel quel (0bf0704 : ligne « CABLE : … TYPE : … » de REPARTITEUR 2),
+que la liste figée du reformatage (MTI, SIEMENS, ALSTOM, SCHNEIDER exacts ; P.E.T, BORNIER :,
+N° PLAN, NO PLAN) ne reconnaissait pas.
+
+Correction : `pied_page.ligne_de_pied` (texte sans blancs en majuscules : logos `PIED_LOGOS`,
+libellés forts P.E.T, N° PLAN, NO PLAN, INDICE :, PAGE :, BORNIER :, « CABLE : » seulement
+avec « TYPE : »), partagé avec la lecture vectorielle (`libelle_fort_pied`, mêmes libellés) ;
+en-tête = au moins 2 mots-clés de colonne (ou le fond gris) ; A VERIFIER et LEGENDE recopiées
+telles quelles, décochées par défaut, liens d'A VERIFIER recalculés vers les lignes
+reformatées ; commentaires et liens copiés. Excel du 9 octobre : PE011 10 tableaux de 63
+lignes, PE133 5 de 59, PE012 7 de 64, pied de 2 lignes partout.
+
+Banc : `tests/test_reformatage.py` (réponses Claude des 3 extraits dans
+`tests/fixtures/rejeu_claude/`, sans API) ; avec l'ancien reformatage, 15 contrôles échouent.

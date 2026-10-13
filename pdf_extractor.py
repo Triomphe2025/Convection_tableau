@@ -14,8 +14,8 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from pied_page import (analyser_pied, indices_revisions, logo_pied, mots_decor,
-                       nettoyer_lignes_pied)
+from pied_page import (analyser_pied, indices_revisions, libelle_fort_pied, logo_pied,
+                       mots_decor, nettoyer_lignes_pied)
 from template import DEFAULT_TEMPLATE, TableTemplate
 
 logger = logging.getLogger(__name__)
@@ -347,12 +347,10 @@ def grille_page(page, ecartes: Optional[Dict] = None) -> List[str]:
 
 
 _SEPARATEUR_RE = re.compile(r'^[\s|\-_°=]*$')
-# Début du pied : un libellé fort suivi de « : » (P.E.T., N° PLAN, INDICE, PAGE). « CABLE : » et
+# Début du pied : un libellé fort (pied_page.libelle_fort_pied). « CABLE : » et
 # « TYPE : » sont aussi des libellés de pied, mais seulement juste au-dessus d'une ligne à
 # libellé fort : seuls, ils prenaient « NOM DE CABLE : DI/BO » pour le pied et toute la suite
 # de la page y passait (223111PE022 p. 9).
-_PIED_FORT_RE = re.compile(
-    r"N°\s?PLAN|NO\s?PLAN|P\.?\s?E\.?\s?T\.?\s*:|INDICE\s*:|PAGE\s*:", re.IGNORECASE)
 _PIED_FAIBLE_RE = re.compile(
     r"CABLE\s*:|TYPE\s*:|M\s?A\s?T\s?R\s?A|SIEMENS|JARRETIERAGE", re.IGNORECASE)
 
@@ -376,7 +374,7 @@ def zone_tableau_texte(mots, colonnes: List[str]) -> Optional[Tuple[float, float
         return None
     bas_entete = max(m[3] for m in lignes[entete])
     pied = next((y for y in sorted(lignes) if y > entete
-                 and _PIED_FORT_RE.search(' '.join(m[4] for m in lignes[y]))), None)
+                 and libelle_fort_pied(' '.join(m[4] for m in lignes[y]))), None)
     return (min(m[0] for m in mots), max(m[2] for m in mots), bas_entete,
             pied if pied is not None else max(m[3] for m in mots))
 
@@ -387,7 +385,7 @@ def debut_du_pied(lignes: List[str], est_section) -> int:
     Première ligne à libellé fort, puis, en remontant, les lignes à libellé faible juste
     au-dessus (séparateurs sautés), jamais une ligne de section.
     """
-    fort = next((i for i, lg in enumerate(lignes) if _PIED_FORT_RE.search(lg)), None)
+    fort = next((i for i, lg in enumerate(lignes) if libelle_fort_pied(lg)), None)
     if fort is None:
         return len(lignes)
     debut = fort
