@@ -183,6 +183,10 @@ class TestReformatage(unittest.TestCase):
                 [(c.value, str(c.fill.fgColor.rgb)) for c in _cellules(avant[FEUILLE_LEGENDE])],
                 [(c.value, str(c.fill.fgColor.rgb)) for c in _cellules(apres[FEUILLE_LEGENDE])])
 
+    def test_aucun_avertissement_sur_les_extraits(self):
+        for _, _, _, journal in self._chaque():
+            self.assertEqual([m for m in journal if '⚠' in m], [])
+
     def test_ordre_des_feuilles_conserve(self):
         for avant, apres, _, _ in self._chaque():
             self.assertEqual(avant.sheetnames, apres.sheetnames)
@@ -203,3 +207,41 @@ class TestLignesDePied(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestAvertissements(unittest.TestCase):
+
+    def test_pied_court_signale(self):
+        from generer_classeur import avertissements_reformatage
+        alertes = avertissements_reformatage([(40, 2), (40, 1), (30, 2), (40, 1)], 59, 59)
+        self.assertEqual(alertes, [
+            "pied reconnu sur 1 ligne(s) au lieu de 2 : tableaux 2 et 4 ; logo inconnu ? voir "
+            "la liste des logos dans config.py (PIED_LOGOS)"])
+
+    def test_bloc_trop_grand_signale(self):
+        from generer_classeur import avertissements_reformatage
+        alertes = avertissements_reformatage([(58, 2), (116, 2)], 118, 59)
+        self.assertEqual(len(alertes), 1)
+        self.assertIn('bloc uniforme de 118 lignes', alertes[0])
+        self.assertIn('tableau 2 ;', alertes[0])
+
+    def test_rien_a_signaler(self):
+        from generer_classeur import avertissements_reformatage
+        self.assertEqual(avertissements_reformatage([(40, 2), (55, 2)], 59, 59), [])
+
+    def test_logo_inconnu_au_journal_de_la_page_formater(self):
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = 'Borniers'
+        for logo in ('SIEMENS', 'A C M E'):
+            ws.append(['FIL', 'TENANT', 'SIGNAL', 'ABOUTISSANT'])
+            for k in range(3):
+                ws.append([str(k), f'PH A104 0{k}', 'SIG', 'RA B1 17'])
+            ws.append([logo, 'REF CE 8707905'])
+            ws.append(['N°PLAN : 223111PE011', '', 'INDICE : R', 'PAGE : 1'])
+        source = Path(tempfile.mkdtemp()) / 's.xlsx'
+        wb.save(source)
+        journal = []
+        reformatter_excel(source, source.with_name('r.xlsx'), on_log=journal.append)
+        self.assertIn("  ⚠ pied reconnu sur 1 ligne(s) au lieu de 2 : tableau 2 ; logo inconnu ? "
+                      "voir la liste des logos dans config.py (PIED_LOGOS)", journal)

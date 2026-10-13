@@ -170,6 +170,9 @@ class Config:
     # cellule qui n'en porte qu'un appartient au pied (reformatage d'un Excel).
     # Modèles créés par l'utilisateur (les modèles livrés sont relus à chaque version).
     MODELES_UTILISATEUR = _DOSSIER_UTILISATEUR / 'templates.json'
+    # Reformatage : un bloc uniforme de plus de N × PAGE_SIZE lignes est signalé (pied mal
+    # reconnu, chaque tableau prendrait deux pages).
+    REFORMAT_BLOC_MAX_PAGE = 1.5
     PIED_LOGOS = ("MATRA", "SIEMENS", "MTI", "ALSTOM", "SCHNEIDER")
     # Seuls libellés derrière lesquels « n/m » est un compteur de pages ; ailleurs
     # « 6/10 » est un diamètre de conducteur (dixièmes de mm), donc du COMPLEMENT.

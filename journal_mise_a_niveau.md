@@ -1507,3 +1507,10 @@ curve_fitter), lexique embarqué (équipe seule), dossier `%LOCALAPPDATA%\TriosS
   lexique, build. PyInstaller absent de env\ (pourtant dans requirements.txt) : accord de
   l'utilisateur demandé avant de l'installer.
 Banc C1 identique ; 1261 tests.
+
+## Reformatage : avertissement de pied mal reconnu (2026-10-13)
+
+Au journal de la page Formater, par feuille : « pied reconnu sur 1 ligne(s) au lieu de 2 :
+tableaux 3 et 7 ; logo inconnu ? voir la liste des logos dans config.py (PIED_LOGOS) », et
+« bloc uniforme de N lignes, plus de 1,5 fois PAGE_SIZE … » (`REFORMAT_BLOC_MAX_PAGE`).
+Aucun avertissement sur les 3 extraits ; logo inconnu seul sur sa ligne signalé (test).

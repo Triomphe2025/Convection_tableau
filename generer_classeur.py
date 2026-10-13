@@ -1162,15 +1162,19 @@ def reformatter_excel(
         # Garantit que TOUS les tableaux ont exactement le même nombre de
         # lignes : celui du tableau le plus grand (données + en-tête + pied).
         max_content = 0
+        mesures = []
         for _ti, _h_idx in enumerate(header_indices):
             _nxt = header_indices[_ti + 1] if _ti + 1 < n_tables else len(all_rows)
             _n_main, _n_footer = _measure_table(all_rows[_h_idx:_nxt])
+            mesures.append((_n_main, _n_footer))
             max_content = max(max_content, _n_main + _n_footer)
         uniform_block_size = max(_page_size, max_content)
         _log(
             f"  → Bloc uniforme : {uniform_block_size} lignes / tableau"
             f" (max contenu={max_content}, page_size={_page_size})"
         )
+        for alerte in avertissements_reformatage(mesures, uniform_block_size, _page_size):
+            _log(f"  ⚠ {alerte}")
 
         # Largeur réelle du tableau : override manuel > auto depuis l'en-tête.
         # L'override par feuille prend la priorité sur l'override global.
@@ -1398,6 +1402,40 @@ def reformatter_excel(
         wb_in.close()   # ferme le verrou Windows sur le fichier source
     _log(f"\n  ✓ Fichier reformaté : {output_path.name}  ({total_tables} tableau(x))")
     return total_tables
+
+
+def _liste_tableaux(numeros: List[int]) -> str:
+    noms = [str(n) for n in numeros]
+    return noms[0] if len(noms) == 1 else ', '.join(noms[:-1]) + ' et ' + noms[-1]
+
+
+def avertissements_reformatage(mesures: List[Tuple[int, int]], bloc: int,
+                               page_size: int) -> List[str]:
+    """Signes d'un pied mal reconnu au reformatage, tableaux numérotés à partir de 1.
+
+    mesures : (lignes du corps, lignes du pied) de chaque tableau d'une feuille. Un pied
+    reconnu sur moins de lignes que d'autres tableaux, ou un bloc de plus de
+    REFORMAT_BLOC_MAX_PAGE × page_size lignes : le prochain logo inconnu se voit tout de
+    suite, au lieu de doubler les pages (223111PE011 : « M A T R A », blocs de 118 lignes).
+    """
+    alertes = []
+    pieds = [pied for _, pied in mesures]
+    plein = max(pieds, default=0)
+    courts = [i + 1 for i, pied in enumerate(pieds) if pied < plein]
+    if courts:
+        tailles = sorted({pieds[i - 1] for i in courts})
+        alertes.append(
+            f"pied reconnu sur {' ou '.join(map(str, tailles))} ligne(s) au lieu de {plein} : "
+            f"{'tableau' if len(courts) == 1 else 'tableaux'} {_liste_tableaux(courts)} ; "
+            f"logo inconnu ? voir la liste des logos dans config.py (PIED_LOGOS)")
+    limite = Config.REFORMAT_BLOC_MAX_PAGE * page_size
+    if bloc > limite:
+        longs = [i + 1 for i, (corps, pied) in enumerate(mesures) if corps + pied > limite]
+        alertes.append(
+            f"bloc uniforme de {bloc} lignes, plus de {Config.REFORMAT_BLOC_MAX_PAGE} fois "
+            f"PAGE_SIZE ({page_size}) : {'tableau' if len(longs) == 1 else 'tableaux'} "
+            f"{_liste_tableaux(longs)} ; pied non reconnu ? chaque tableau prendrait 2 pages")
+    return alertes
 
 
 def lien_reformate(lieu: str, renvois: Dict[str, Dict[int, int]]) -> str:
