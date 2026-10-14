@@ -7,12 +7,15 @@ Lancement :
 """
 import contextlib
 import io
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import openpyxl
 
+from config import Config
 from ligne_de_commande import main
 
 FIX = Path(__file__).parent / 'fixtures'
@@ -51,6 +54,24 @@ class TestLigneDeCommande(unittest.TestCase):
         excel = self.dossier / 'sortie' / '223111PE022_extrait_surimpression.xlsx'
         self.assertTrue(excel.exists())
         self.assertIn('Excel :', self._lire_journal())
+
+    def test_cle_lue_dans_l_environnement_en_memoire(self):
+        vues = []
+
+        class Faux:
+            def __init__(self, **kw):
+                pass
+
+            def run(self):
+                vues.append(Config.CLAUDE_API_KEY)
+                return {'excel': 'x.xlsx'}
+
+        with patch.dict(os.environ, {'ANTHROPIC_API_KEY': ' cle-du-terminal '}), \
+                patch.object(Config, 'CLAUDE_API_KEY', ''), patch('converter.Converter', Faux):
+            self.assertEqual(_lancer('--journal', str(self.journal), 'convertir', 'doc.pdf',
+                                     str(self.dossier)), 0)
+        self.assertEqual(vues, ['cle-du-terminal'])
+        self.assertNotIn('cle-du-terminal', self._lire_journal())
 
     def test_formater(self):
         wb = openpyxl.Workbook()

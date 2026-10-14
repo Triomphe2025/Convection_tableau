@@ -13,6 +13,7 @@ Exemples :
     TriosSeconverter.exe dxf plan.tif sortie_dxf
 """
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import Callable, List, Optional
@@ -56,6 +57,10 @@ def _convertir(args, log) -> int:
     from template import TemplateManager
     if args.mode:
         Config.OCR_MODE = args.mode
+    # Clé saisie dans le terminal (variable d'environnement) : gardée en mémoire seulement.
+    cle = os.environ.get('ANTHROPIC_API_KEY', '').strip()
+    if cle and not getattr(Config, 'CLAUDE_API_KEY', '').strip():
+        Config.CLAUDE_API_KEY = cle
     resultat = Converter(word_file=Path(args.source), output_dir=Path(args.sortie),
                          template=TemplateManager().get(args.modele), on_log=log).run()
     log(f"Excel : {resultat.get('excel')}")
