@@ -71,3 +71,6 @@ ocr_debug.log
 
 # Lexique compilé au build (formes des Excel corrigés : données de travail)
 lexique_compile.json
+
+# Consigne Claude encodée au build (texte lisible dans ressources/prompt_claude.txt)
+prompt_claude.dat

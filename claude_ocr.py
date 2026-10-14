@@ -10,6 +10,7 @@ import datetime
 import json
 import logging
 import re
+import sys
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
@@ -186,57 +187,24 @@ def _build_prompt(template) -> str:
                          f"       → colonne {i+1} : {col}")
     rules_str = '\n'.join(rules)
 
-    return (
-        "Tu analyses une image issue d'un document électrique industriel.\n\n"
-        "ÉTAPE 1 — TYPE DE PAGE (première ligne obligatoire) :\n"
-        "  TYPE_PAGE: listing      ← la page contient un tableau de câblage /\n"
-        "                             bornier avec des colonnes de données électriques\n"
-        "  TYPE_PAGE: non-listing  ← page de garde, feuille de modifications /\n"
-        "                             révisions, table des matières, schéma,\n"
-        "                             texte descriptif sans tableau de données\n"
-        "En cas de doute, choisis listing.\n"
-        "Si non-listing : écris uniquement la ligne META ci-dessous,"
-        " sans aucune ligne de données. Si la page porte un tableau des révisions"
-        " (indices, éditions), ajoute une ligne REVISIONS: suivie des indices lus"
-        " dans sa 1re colonne, séparés par des espaces (ex : REVISIONS: 00 A 02 R R1 TP1)."
-        "\n\n"
-        "ÉTAPE 2 — EXTRACTION (seulement si TYPE_PAGE: listing) :\n"
-        f"Colonnes dans l'ordre visuel (de gauche à droite) : {col_zones}\n\n"
-        "RÈGLE FONDAMENTALE — INSERTION PAR POSITION :\n"
-        "Les colonnes sont délimitées par les barres verticales visibles dans l'image. et non les trop rand espace visible \n"
-        "Recopie EXACTEMENT ce que tu lis dans chaque colonne, sans interpréter ni corriger :\n"
-        f"{rules_str}\n\n"
-        f"Pour chaque ligne de données visible, écris sur une seule ligne :\n"
-        f"  {example_line}\n\n"
-        "Règles :\n"
-        f"- Si un caractère est illisible, écris {marqueur} à sa place. Ne devine jamais,"
-        " ne corrige jamais un mot, recopie exactement.\n"
-        "- Une ligne visuelle = une ligne de sortie\n"
-        "- Cellule vide = rien entre les pipes (ex : \"val1 | | val3 | val4\")\n"
-        "- Si une cellule contient plusieurs sous-parties visuelles,"
-        " concatène-les avec un espace\n"
-        f"- Ne pas inclure l'en-tête ni les lignes de pied de page ({footer_kws_str})\n"
-        f"- Une ligne de séparation « {section_kw} : … » (elle traverse le tableau) :"
-        " recopie-la telle qu'imprimée, à sa place parmi les lignes de données, sur une"
-        f" ligne précédée de SECTION: et sans barre verticale (ex : SECTION: {section_kw}"
-        " : WPHR/A105)\n\n"
-        f"Après TOUTES les lignes de données, ajoute une ligne :\n"
-        f"META: {{{meta_json}}}\n"
-        "avec les valeurs trouvées dans le pied de page.\n"
-        "PAGE : recopie le numéro exactement comme imprimé, lettre finale comprise"
-        " (ex : 122a, 44B) ; ne le déduis jamais des pages voisines.\n"
-        "Puis recopie le pied de page exactement comme il est imprimé, une ligne de"
-        " sortie par ligne du document, chacune précédée de PIED_BRUT: — tous les"
-        " libellés, toutes les valeurs et tout texte libre (ex : REF CE 8707905, 8/10),"
-        " sans rien omettre, corriger ni réordonner :\n"
-        "PIED_BRUT: <1re ligne du pied>\n"
-        "PIED_BRUT: <2e ligne du pied>\n"
-        "Enfin, recopie le texte du bloc à gauche du pied (marque, ex : SIEMENS) tel"
-        " qu'il est imprimé, espaces compris ; s'il est écrit verticalement (une lettre"
-        " par ligne), écris ses lettres de haut en bas séparées par une espace"
-        " (ex : M A T R A) ; s'il n'y en a pas, n'écris pas cette ligne :\n"
-        "LOGO: <texte du bloc gauche>\n"
-    )
+    jetons = {
+        '⟦COL_ZONES⟧': col_zones, '⟦RULES⟧': rules_str, '⟦EXAMPLE⟧': example_line,
+        '⟦MARQUEUR⟧': marqueur, '⟦FOOTER_KWS⟧': footer_kws_str,
+        '⟦SECTION_KW⟧': section_kw, '⟦META_JSON⟧': meta_json,
+    }
+    gabarit = _charger_gabarit()
+    for jeton, valeur in jetons.items():
+        gabarit = gabarit.replace(jeton, valeur)
+    return gabarit
+
+
+def _charger_gabarit() -> str:
+    """Gabarit de la consigne Claude : .dat encodé dans l'exe, .txt lisible en développement."""
+    if getattr(sys, 'frozen', False):
+        from config import chemin_ressource
+        from textes_proteges import decoder_fichier
+        return decoder_fichier(chemin_ressource('prompt_claude.dat'))
+    return (Path(__file__).parent / 'ressources' / 'prompt_claude.txt').read_text('utf-8')
 
 
 _FOOTER_MARKERS = frozenset([

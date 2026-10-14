@@ -7150,10 +7150,30 @@ class _SimpleInput(tk.Toplevel):
 
 # ── Point d'entrée ────────────────────────────────────────────────────
 
+def _controler_licence_graphique():
+    """Contrôle la licence de l'exe ; message clair et arrêt si elle manque ou a expiré."""
+    import licence
+    try:
+        preavis = licence.exiger()
+    except licence.LicenceError as erreur:
+        from tkinter import messagebox
+        racine = tk.Tk()
+        racine.withdraw()
+        messagebox.showerror("TriosSeconverter — licence", str(erreur))
+        racine.destroy()
+        raise SystemExit(3)
+    return preavis
+
+
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         # Exe lancé avec des arguments : ligne de commande, sans fenêtre (essais, lots).
         from ligne_de_commande import main as ligne_de_commande
         raise SystemExit(ligne_de_commande(sys.argv[1:]))
+    _preavis_licence = _controler_licence_graphique()
     app = TriosSeconverterApp()
+    if _preavis_licence:
+        from tkinter import messagebox
+        app.after(500, lambda: messagebox.showwarning("TriosSeconverter — licence",
+                                                       _preavis_licence))
     app.mainloop()

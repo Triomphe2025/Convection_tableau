@@ -98,6 +98,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     d.add_argument('sortie', help="Dossier de sortie")
     args = parser.parse_args(argv)
     log = _ecrivain(args.journal)
+    import licence
+    try:
+        preavis = licence.exiger()
+        if preavis:
+            log(f"⚠ {preavis}")
+    except licence.LicenceError as erreur:
+        log(f"✗ {erreur}")
+        return 3
     try:
         return {'infos': lambda: _infos(log), 'convertir': lambda: _convertir(args, log),
                 'formater': lambda: _formater(args, log), 'dxf': lambda: _dxf(args, log)

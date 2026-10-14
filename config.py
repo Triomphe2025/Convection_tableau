@@ -180,6 +180,8 @@ class Config:
     LICENCE_CONTACT = ""
     LICENCE_PREAVIS_JOURS = 15
     LICENCE_RECUL_MAX_JOURS = 1
+    # Nom du fichier de licence posé à côté de l'exe (renouvellement = en poser un nouveau).
+    LICENCE_NOM = "licence.triosse"
     # Reformatage : un bloc uniforme de plus de N × PAGE_SIZE lignes est signalé (pied mal
     # reconnu, chaque tableau prendrait deux pages).
     REFORMAT_BLOC_MAX_PAGE = 1.5

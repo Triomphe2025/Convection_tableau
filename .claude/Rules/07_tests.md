@@ -78,6 +78,9 @@ tests/
   test_compte_lignes.py              → compte_lignes.py sur pages fabriquées : compte, tache dans une case vide, pointillés entre deux câbles, scan penché, cadre ou trait d'en-tête absents, bords noirs du scan, pied dans le cadre, trait trouvé seulement dans le pied ; traits par couverture ; pas et phase, cases, largeur et hauteur minimales, couche texte ; décisions (alerte, incertain, synthèse 20 %, page seule)
   test_texte_imprime.py              → Lecture vectorielle telle qu'imprimée : 223111PE022 p. 14 (31 lignes, lignes surimprimées lues une fois avec leur borne, jarretières entières, texte caché non lu), p. 9 (« NOM DE CABLE », page lue) ; surimpression, masque blanc, point seul gardé (pages fabriquées) ; pied reconnu à ses libellés (ligne inconnue gardée et signalée, « NOM DE CABLE » sans équivalent : page gardée), information « mots cachés » avec les mots en commentaire, zone du tableau par le texte (pages sans cadre)
   test_ligne_de_commande.py          → ligne_de_commande.py : infos, conversion d'un PDF vectoriel, reformatage, erreur au journal avec le code 2
+  test_ed25519_verif.py              → ed25519_verif.py : vecteurs officiels RFC 8032, altérations et entrées mal formées rejetées
+  test_licence.py                    → licence.py (signature simulée) : licence du poste valable, signature invalide, autre poste, expirée, forme fausse ; identifiant stable ; garde d'horloge (recul refusé, avance ok) ; préavis 15 j ; exiger hors exe / sans licence / valable / expirée
+  test_prompt_claude.py              → consigne Claude externalisée (ressources/prompt_claude.txt) + encodée (textes_proteges) : sortie identique au golden des 4 modèles, aucun jeton restant, .dat sans texte en clair, aller-retour d'encodage
   test_dossiers_travail.py           → dossiers_travail.py : dossier dans l'appli (pas à côté du document), même nom dans deux dossiers séparés, purge (âge, taille, plus anciens d'abord, document en cours gardé) ; conversion Tesseract d'une page scannée : rien à côté du PDF ni dans la sortie
   test_livraison.py                  → Livraison v1.8 : ressource dans l'exe ou à côté du code, Tesseract dans les chemins habituels (absent : une ligne au journal), modèles livrés relus à chaque version et protégés, modèles de l'utilisateur gardés dans son dossier, lexique compilé égal à la lecture directe + classeurs ajoutés, Docling absent dit clairement
   test_reformatage.py                → Reformatage (« Formater Excel ») d'un extrait par modèle converti en rejeu (réponses Claude dans fixtures/rejeu_claude/, sans API) : même nombre de tableaux, blocs à la taille du plus grand, 2 lignes de pied en bas, valeurs, couleurs et commentaires conservés, liens d'A VERIFIER sur la même valeur, LEGENDE recopiée ; pied reconnu (logo « M A T R A », « CABLE : … TYPE : … ») ; avertissement au journal si un pied est reconnu sur moins de lignes ou si le bloc dépasse 1,5 × PAGE_SIZE, aucun sur les extraits
@@ -104,7 +107,7 @@ tests/
   test_claude_opus5.py               → claude_ocr sur Opus 5 / 5.5 : table de capacités, paramètres envoyés, refus avec catégorie, bloc de réflexion, effort refusé, images PNG ≤ 2576 px
 ```
 
-**1281 tests passent** (`pytest tests\`, relevé le 2026-10-13), aucun échec attendu, plus 1 test lent
+**1310 tests passent** (`pytest tests\`, relevé le 2026-10-14), aucun échec attendu, plus 1 test lent
 facultatif (`VERIF_TEST_LENT=1`, relecture du scan de 15 pages, ~30 s). Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.
 

@@ -1,0 +1,39 @@
+Tu analyses une image issue d'un document électrique industriel.
+
+ÉTAPE 1 — TYPE DE PAGE (première ligne obligatoire) :
+  TYPE_PAGE: listing      ← la page contient un tableau de câblage /
+                             bornier avec des colonnes de données électriques
+  TYPE_PAGE: non-listing  ← page de garde, feuille de modifications /
+                             révisions, table des matières, schéma,
+                             texte descriptif sans tableau de données
+En cas de doute, choisis listing.
+Si non-listing : écris uniquement la ligne META ci-dessous, sans aucune ligne de données. Si la page porte un tableau des révisions (indices, éditions), ajoute une ligne REVISIONS: suivie des indices lus dans sa 1re colonne, séparés par des espaces (ex : REVISIONS: 00 A 02 R R1 TP1).
+
+ÉTAPE 2 — EXTRACTION (seulement si TYPE_PAGE: listing) :
+Colonnes dans l'ordre visuel (de gauche à droite) : ⟦COL_ZONES⟧
+
+RÈGLE FONDAMENTALE — INSERTION PAR POSITION :
+Les colonnes sont délimitées par les barres verticales visibles dans l'image. et non les trop rand espace visible 
+Recopie EXACTEMENT ce que tu lis dans chaque colonne, sans interpréter ni corriger :
+⟦RULES⟧
+
+Pour chaque ligne de données visible, écris sur une seule ligne :
+  ⟦EXAMPLE⟧
+
+Règles :
+- Si un caractère est illisible, écris ⟦MARQUEUR⟧ à sa place. Ne devine jamais, ne corrige jamais un mot, recopie exactement.
+- Une ligne visuelle = une ligne de sortie
+- Cellule vide = rien entre les pipes (ex : "val1 | | val3 | val4")
+- Si une cellule contient plusieurs sous-parties visuelles, concatène-les avec un espace
+- Ne pas inclure l'en-tête ni les lignes de pied de page (⟦FOOTER_KWS⟧)
+- Une ligne de séparation « ⟦SECTION_KW⟧ : … » (elle traverse le tableau) : recopie-la telle qu'imprimée, à sa place parmi les lignes de données, sur une ligne précédée de SECTION: et sans barre verticale (ex : SECTION: ⟦SECTION_KW⟧ : WPHR/A105)
+
+Après TOUTES les lignes de données, ajoute une ligne :
+META: {⟦META_JSON⟧}
+avec les valeurs trouvées dans le pied de page.
+PAGE : recopie le numéro exactement comme imprimé, lettre finale comprise (ex : 122a, 44B) ; ne le déduis jamais des pages voisines.
+Puis recopie le pied de page exactement comme il est imprimé, une ligne de sortie par ligne du document, chacune précédée de PIED_BRUT: — tous les libellés, toutes les valeurs et tout texte libre (ex : REF CE 8707905, 8/10), sans rien omettre, corriger ni réordonner :
+PIED_BRUT: <1re ligne du pied>
+PIED_BRUT: <2e ligne du pied>
+Enfin, recopie le texte du bloc à gauche du pied (marque, ex : SIEMENS) tel qu'il est imprimé, espaces compris ; s'il est écrit verticalement (une lettre par ligne), écris ses lettres de haut en bas séparées par une espace (ex : M A T R A) ; s'il n'y en a pas, n'écris pas cette ligne :
+LOGO: <texte du bloc gauche>

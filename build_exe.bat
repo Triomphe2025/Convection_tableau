@@ -34,6 +34,14 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
+
+:: Consigne Claude encodee (pas de texte en clair dans l'exe ; source lisible : ressources\prompt_claude.txt)
+python textes_proteges.py ressources\prompt_claude.txt prompt_claude.dat
+if errorlevel 1 (
+    echo [ERREUR] Consigne Claude non encodee.
+    pause
+    exit /b 1
+)
 echo.
 
 :: Nettoyer les anciens builds
