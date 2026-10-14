@@ -192,6 +192,7 @@ le calibrage déjà fait sur `verificateur.py`.
 | Paramètre | Valeur défaut | Rôle |
 |-----------|--------------|------|
 | `DOSSIER_UTILISATEUR` | `%LOCALAPPDATA%\TriosSeconverter` | Cache, mesures du mode ombre, modèles créés, ajouts au lexique ; jamais à côté de l'exe |
+| `TRAVAIL_DOSSIER` / `TRAVAIL_AGE_MAX_JOURS` / `TRAVAIL_TAILLE_MAX_MO` | `…\travail` / `7` / `1000` | Images de travail des conversions (images de documents clients), un dossier par document ; purge par âge puis taille, jamais le document en cours |
 | `MODELES_UTILISATEUR` | `…\templates.json` | Modèles créés par l'utilisateur ; les modèles livrés (code + templates.json de l'appli) sont relus à chaque version |
 | `TESSERACT_PATH` / `TESSERACT_CHEMINS_HABITUELS` / `TESSERACT_TROUVE` | chemin trouvé | Variable TESSERACT_PATH, chemin configuré, Program Files, PATH ; absent : une ligne au journal |
 | `QUALITE_LEXIQUE_REFERENCE` / `QUALITE_LEXIQUE_COMPILE` / `QUALITE_LEXIQUE_DOSSIER` | `references\excels_valides` / `lexique_compile.json` / `…\lexique` | Classeurs compilés au build (`python lexique_reference.py --compiler`, embarqué) + ajouts de l'utilisateur |

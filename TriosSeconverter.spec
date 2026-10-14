@@ -16,7 +16,7 @@ block_cipher = None
 MODULES_PROJET = [
     'agent_ocr', 'audit_claude', 'cache_lectures', 'claude_ocr', 'compte_lignes', 'config',
     'ligne_de_commande',
-    'controle_conservation', 'controle_qualite', 'converter', 'data_dictionary',
+    'controle_conservation', 'controle_qualite', 'converter', 'data_dictionary', 'dossiers_travail',
     'docling_ocr', 'generer_classeur', 'hybrid_ocr', 'lexique_reference', 'ocr_processor',
     'ollama_ocr', 'pdf_extractor', 'pied_page', 'positions_scan', 'recuperer_image',
     'relecture_scan', 'template', 'verificateur', 'word_table_importer',

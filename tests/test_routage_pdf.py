@@ -19,6 +19,7 @@ import fitz
 import pdf_extractor as pe
 from config import Config
 from converter import Converter
+from dossiers_travail import dossier_travail
 from template import TemplateManager
 
 FIXTURES = Path(__file__).parent / 'fixtures'
@@ -467,10 +468,9 @@ class TestRoutageConverter(_BaseConverter):
         self.assertEqual(methodes, ['claude-vision', 'pdf-grille', 'claude-vision'])
 
     def test_images_d_un_passage_precedent_non_relues(self):
-        images = Path(self.tmp) / 'sortie' / 'images_pdf'
-        images.mkdir(parents=True)
-        (images / 'page_001.png').write_bytes(b'ancienne')
         pdf = _pdf_compose(self.tmp, [(PE137, 6)])
+        images = dossier_travail(pdf, 'images_pdf')
+        (images / 'page_001.png').write_bytes(b'ancienne')
         self._extraire(pdf, 'REPARTITEUR', vision=_vision_interdite)
         self.assertFalse((images / 'page_001.png').exists())
 

@@ -166,13 +166,19 @@ class Config:
     # « CORDON TYPE 40 », « REF CE 8707905 ») va dans COMPLEMENT. Les autres
     # libellés (N° PLAN, P.E.T., libellés inconnus) gardent tout leur segment.
     PIED_LIBELLES_UN_MOT = ("TYPE", "CABLE", "INDICE", "PAGE", "BORNIER")
-    # Logos du bloc gauche du pied, écrits sans blancs (« M A T R A » imprimé espacé) : une
-    # cellule qui n'en porte qu'un appartient au pied (reformatage d'un Excel).
     # Modèles créés par l'utilisateur (les modèles livrés sont relus à chaque version).
     MODELES_UTILISATEUR = _DOSSIER_UTILISATEUR / 'templates.json'
+    # Images de travail (pages rendues, prétraitées, relues) : ce sont des images de documents
+    # clients, jamais à côté des PDF ni dans le dossier de sortie de l'utilisateur. Un dossier
+    # par document ; les plus anciens sont supprimés (âge, puis taille), jamais celui en cours.
+    TRAVAIL_DOSSIER = _DOSSIER_UTILISATEUR / 'travail'
+    TRAVAIL_AGE_MAX_JOURS = 7
+    TRAVAIL_TAILLE_MAX_MO = 1000
     # Reformatage : un bloc uniforme de plus de N × PAGE_SIZE lignes est signalé (pied mal
     # reconnu, chaque tableau prendrait deux pages).
     REFORMAT_BLOC_MAX_PAGE = 1.5
+    # Logos du bloc gauche du pied, écrits sans blancs (« M A T R A » imprimé espacé) : une
+    # cellule qui n'en porte qu'un appartient au pied (reformatage d'un Excel).
     PIED_LOGOS = ("MATRA", "SIEMENS", "MTI", "ALSTOM", "SCHNEIDER")
     # Seuls libellés derrière lesquels « n/m » est un compteur de pages ; ailleurs
     # « 6/10 » est un diamètre de conducteur (dixièmes de mm), donc du COMPLEMENT.

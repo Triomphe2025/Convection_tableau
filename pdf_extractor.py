@@ -14,6 +14,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from dossiers_travail import dossier_travail
 from pied_page import (analyser_pied, indices_revisions, libelle_fort_pied, logo_pied,
                        mots_decor, nettoyer_lignes_pied)
 from template import DEFAULT_TEMPLATE, TableTemplate
@@ -494,8 +495,9 @@ class PdfTableExtractor:
         """
         import fitz
         pdf_path = Path(pdf_path)
-        self._ocr_dir = pdf_path.parent / (pdf_path.stem + '_ocr_pages')
-        self._preprocess_dir = pdf_path.parent / (pdf_path.stem + '_images_pretaitees')
+        # Images de pages clientes : dossier de l'appli, jamais à côté du PDF de l'utilisateur.
+        self._ocr_dir = dossier_travail(pdf_path, 'ocr_pages')
+        self._preprocess_dir = dossier_travail(pdf_path, 'images_pretaitees')
 
         self._last_bounds = None  # Réinitialiser pour chaque nouveau document
         doc = fitz.open(str(pdf_path))

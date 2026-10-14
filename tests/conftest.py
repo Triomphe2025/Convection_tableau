@@ -21,6 +21,8 @@ Config.LIGNES_OMBRE_DOSSIER = Path(_CACHE_TESTS.name) / 'ombre_lignes'
 # écrits par les tests.
 Config.MODELES_UTILISATEUR = Path(_CACHE_TESTS.name) / 'templates.json'
 Config.QUALITE_LEXIQUE_DOSSIER = Path(_CACHE_TESTS.name) / 'lexique'
+# Images de travail des conversions : jamais dans le dossier de l'appli de la machine.
+Config.TRAVAIL_DOSSIER = Path(_CACHE_TESTS.name) / 'travail'
 
 import hashlib  # noqa: E402
 import shutil  # noqa: E402

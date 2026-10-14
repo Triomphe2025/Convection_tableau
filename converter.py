@@ -20,6 +20,7 @@ from recuperer_image import ImageExtractor, ImageStorage
 from generer_classeur import generer_excel, numero_page
 from ocr_processor import BornierTableExtractor
 from config import Config
+from dossiers_travail import dossier_travail
 from template import TableTemplate, DEFAULT_TEMPLATE
 
 
@@ -395,8 +396,7 @@ class Converter:
         )
         self._progress(0.03, "Rastérisation du PDF en images…")
 
-        images_dir = self.output_dir / "images_pdf"
-        images_dir.mkdir(parents=True, exist_ok=True)
+        images_dir = dossier_travail(self.word_file, 'images_pdf')
         if routage:
             # _extraire_avec_progres relit toutes les images du dossier : celles
             # d'un passage précédent renverraient des pages vectorielles en vision.
@@ -808,7 +808,7 @@ class Converter:
             with fitz.open(str(self.word_file)) as doc:
                 if not 0 < page <= len(doc):
                     return ''
-                image = self.output_dir / f"_retry_page_{page}.png"
+                image = dossier_travail(self.word_file, 'relecture') / f"page_{page}.png"
                 doc[page - 1].get_pixmap(matrix=fitz.Matrix(2, 2)).save(str(image))
             self._log(f"  → Image PDF rendue pour retry : {image.name}")
             return str(image)
@@ -1150,7 +1150,7 @@ class Converter:
             img_extractor = ImageExtractor(str(self.word_file))
             storage = ImageStorage('images_borniers')
             images_dir = storage.create_output_folder(
-                base_path=str(self.output_dir)
+                base_path=str(dossier_travail(self.word_file))
             )
             raw_images = img_extractor.extract_images()
             saved, total_images = 0, len(raw_images)
