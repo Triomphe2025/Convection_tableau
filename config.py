@@ -174,6 +174,12 @@ class Config:
     TRAVAIL_DOSSIER = _DOSSIER_UTILISATEUR / 'travail'
     TRAVAIL_AGE_MAX_JOURS = 7
     TRAVAIL_TAILLE_MAX_MO = 1000
+    # Licence de l'exe protégé (PyArmor, à brancher après la décision d'achat) : contact
+    # affiché au préavis et à l'expiration (à remplir), préavis avant l'échéance de la clé,
+    # recul d'horloge toléré par rapport à la date la plus récente déjà vue sur le poste.
+    LICENCE_CONTACT = ""
+    LICENCE_PREAVIS_JOURS = 15
+    LICENCE_RECUL_MAX_JOURS = 1
     # Reformatage : un bloc uniforme de plus de N × PAGE_SIZE lignes est signalé (pied mal
     # reconnu, chaque tableau prendrait deux pages).
     REFORMAT_BLOC_MAX_PAGE = 1.5
