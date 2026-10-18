@@ -1,4 +1,4 @@
-# TriosSeconverter — Guide utilisateur v1.7
+# TriosSeconverter — Guide utilisateur v1.8
 
 Convertit des tableaux de borniers électriques (Word, PDF, images) en classeur Excel formaté.
 
@@ -190,6 +190,24 @@ campagne s'arrête avant un passage si le coût cumulé atteint `CAMPAGNE_BUDGET
 
 ---
 
+## Licence
+
+L'exécutable livré est protégé par une **licence par poste** : un fichier `licence.triosse` posé
+à côté de l'exe autorise son usage sur ce poste, jusqu'à une date d'échéance.
+
+- **Obtenir sa clé** : au premier lancement sans licence, l'exe affiche un **identifiant de poste**.
+  Transmettez-le à votre correspondant TriosSeconverter ; il vous renvoie un fichier `licence.triosse`
+  à poser dans le dossier de l'exe. Le logiciel démarre alors normalement.
+- **Renouveler** : avant l'échéance, l'exe affiche un avertissement pendant 15 jours. Demandez une
+  nouvelle clé (même identifiant de poste) et remplacez `licence.triosse` — **sans réinstaller** l'exe.
+- **Changement de poste** : l'identifiant change si Windows est réinstallé ou le disque remplacé ;
+  il faut alors une nouvelle clé.
+
+> La licence contrôle **l'usage** du logiciel. Le code du programme n'est pas encore compilé en code
+> machine dans cette version : cette protection du code est prévue pour la v1.9.
+
+---
+
 ## Compiler en exécutable (.exe)
 
 ```powershell
@@ -206,7 +224,7 @@ Toujours tester l'exe sur une machine sans Python installé avant livraison.
 
 ```powershell
 env\Scripts\python.exe -m pytest tests\ -v
-# 1266 tests passent, 0 échec (+ 1 test lent facultatif)
+# 1310 tests passent, 0 échec (+ 1 test lent facultatif)
 ```
 
 ---
@@ -242,3 +260,4 @@ env\Scripts\python.exe -m pytest tests\ -v
 | v1.5 | Corrections S↔5/O↔0 bornes, champs footer dynamiques |
 | v1.6 | Fidélité Claude Vision, mode validation manuelle, replay log |
 | v1.7 | Refonte UX en parcours de traitement : accueil à 3 cartes, assistant en 3 étapes, dashboard de conversion |
+| v1.8 | Licence par poste (contrôle d'usage), images de travail hors des dossiers de l'utilisateur |

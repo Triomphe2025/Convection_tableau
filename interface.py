@@ -880,7 +880,7 @@ class TriosSeconverterApp(tk.Tk):
                  fg=FG_MUTED, bg=BG_CARD).pack(side='left', pady=14)
 
         # Badge version
-        tk.Label(hdr, text=" v1.7 ", font=("Segoe UI", 8),
+        tk.Label(hdr, text=" v1.8 ", font=("Segoe UI", 8),
                  fg=FG_TEXT, bg=COL_ACC2,
                  padx=4, pady=2).pack(side='right', padx=20, pady=22)
 

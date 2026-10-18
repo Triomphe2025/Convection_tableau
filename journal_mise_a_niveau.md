@@ -1514,3 +1514,22 @@ Au journal de la page Formater, par feuille : « pied reconnu sur 1 ligne(s) au 
 tableaux 3 et 7 ; logo inconnu ? voir la liste des logos dans config.py (PIED_LOGOS) », et
 « bloc uniforme de N lignes, plus de 1,5 fois PAGE_SIZE … » (`REFORMAT_BLOC_MAX_PAGE`).
 Aucun avertissement sur les 3 extraits ; logo inconnu seul sur sa ligne signalé (test).
+
+## Protection v1.8 : licence signée + consigne encodée ; compilation reportée en v1.9 (2026-10-18)
+
+- Licence Ed25519 liée au poste (MachineGuid) et datée, vérifiée au démarrage de l'exe
+  (`licence.py`, vérif pur Python `ed25519_verif.py` ~6 ms, clé publique seule dans l'exe ;
+  clé privée et outil de fabrication dans `TriosSeconverter_prive\`, hors git/exe). Refus sans
+  clé (identifiant du poste affiché), autre poste, expiré ; préavis 15 j ; garde d'horloge ;
+  renouvellement en posant une nouvelle clé sans reconstruire.
+- Consigne Claude sortie dans `ressources/prompt_claude.txt` (lisible) et encodée au build en
+  `prompt_claude.dat` (`textes_proteges.py`) : plus de texte en clair dans l'exe ; sortie de
+  `_build_prompt` identique à l'octet (test golden).
+- Compilation du code en code machine : **non faite en v1.8** (règle d'arrêt). Nuitka 4.3 +
+  Zig 0.16 compilent nos modules sous Python 3.14 mais les `.pyd` plantent à l'import (access
+  violation, reproduit sur `config.py` seul) ; MinGW64 refusé par Nuitka ≥ 3.13. Donc le code
+  Python de nos modules reste présent dans l'exe (PyInstaller, décompilable) ; seule la licence
+  contrôle l'usage. À reprendre en v1.9.
+- Piste v1.9 gratuite à essayer : **construire sur Python 3.12**, où Nuitka accepte encore son
+  MinGW64 (refusé à partir de 3.13) ; rejouer toute la suite de tests et la batterie d'essais
+  sur 3.12 avant de livrer.
