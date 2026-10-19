@@ -209,6 +209,45 @@ if __name__ == '__main__':
     unittest.main()
 
 
+class TestLargeurUtile(unittest.TestCase):
+    """Feuille gonflée à 16384 colonnes (ligne mise en forme sur toute la largeur dans Excel) :
+    le reformatage doit se borner aux colonnes utiles et ne pas s'enliser (bug 6A23111PE132)."""
+
+    def _classeur_gonfle(self, chemin):
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = 'Listing'
+        ws.append(['TENANT', 'JAR', 'ABOUTISSANT', 'SIGNAL'])
+        for k in range(3):
+            ws.append([f'D{k}T 01A', f'0{k}0', f'C107A 0{k}', 'LIG'])
+        ws.append(['SIEMENS', 'P.E.T. : BOURG   JARRETIERAGE'])
+        ws.append(['N° PLAN : 6A23111PE132', '', 'INDICE : R', 'PAGE : 1'])
+        # Cellule parasite tout à droite/en bas : gonfle la dimension à 16384 colonnes
+        ws.cell(row=5000, column=16384).value = None
+        ws.cell(row=5000, column=16384).border = openpyxl.styles.Border(
+            left=openpyxl.styles.Side(style='thin'))
+        wb.save(chemin)
+
+    def test_largeur_utile_ignore_le_vide(self):
+        from generer_classeur import _largeur_utile
+        source = Path(tempfile.mkdtemp()) / 'gonfle.xlsx'
+        self._classeur_gonfle(source)
+        ws = openpyxl.load_workbook(source)['Listing']
+        self.assertEqual(ws.max_column, 16384)
+        self.assertEqual(_largeur_utile(ws), 4)
+
+    def test_reformatage_ne_s_enlise_pas(self):
+        source = Path(tempfile.mkdtemp()) / 'gonfle.xlsx'
+        self._classeur_gonfle(source)
+        sortie = source.with_name('reformate.xlsx')
+        n = reformatter_excel(source, sortie, on_log=lambda m: None)
+        self.assertEqual(n, 1)
+        ws = openpyxl.load_workbook(sortie)['Listing']
+        self.assertLessEqual(ws.max_column, 8)
+        valeurs = {str(c.value) for r in ws.iter_rows() for c in r if c.value}
+        self.assertIn('D0T 01A', valeurs)
+
+
 class TestAvertissements(unittest.TestCase):
 
     def test_pied_court_signale(self):

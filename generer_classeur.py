@@ -938,6 +938,19 @@ def generer_excel(
 # Reformatage d'un Excel existant
 # ──────────────────────────────────────────────────────────────────────
 
+def _largeur_utile(ws, plancher: int = 1) -> int:
+    """Dernière colonne portant une valeur ; ignore le vide jusqu'à XFD.
+
+    Un classeur édité dans Excel peut déclarer 16384 colonnes (une ligne mise en forme sur
+    toute la largeur crée des cellules vides, parfois une fusion, jusqu'à XFD). Itérer sur
+    cette largeur bloquait le reformatage (ex. 6A23111PE132 : Listing annoncé à 16384 colonnes
+    pour 4 colonnes de données). On se borne aux colonnes réellement remplies.
+    """
+    cols = [c for (_r, c), cell in getattr(ws, '_cells', {}).items()
+            if cell.value not in (None, '')]
+    return max(max(cols, default=0), plancher)
+
+
 def reformatter_excel(
     input_path: Path,
     output_path: Path,
@@ -1116,7 +1129,8 @@ def reformatter_excel(
         _log(f"  Feuille « {sheet_name} »…")
 
         # ── Charger toutes les lignes ──────────────────────────────────
-        all_rows = list(ws_in.iter_rows())
+        # Borné à la largeur utile : une feuille gonflée à 16384 colonnes bloquerait sinon.
+        all_rows = list(ws_in.iter_rows(max_col=_largeur_utile(ws_in)))
         if not all_rows:
             _log("  ⚠  Feuille vide — ignorée.")
             continue
@@ -1460,11 +1474,13 @@ def lien_reformate(lieu: str, renvois: Dict[str, Dict[int, int]]) -> str:
 def _copier_feuille(ws_in, ws_out, copier_cellule, renvois) -> None:
     """Feuille recopiée telle quelle (valeurs, styles, commentaires, fusions, largeurs) ;
     ses liens internes pointent vers les lignes reformatées."""
-    for ligne in ws_in.iter_rows():
+    largeur = _largeur_utile(ws_in)
+    for ligne in ws_in.iter_rows(max_col=largeur):
         for cell in ligne:
             copier_cellule(cell, ws_out.cell(row=cell.row, column=cell.column))
     for plage in ws_in.merged_cells.ranges:
-        ws_out.merge_cells(str(plage))
+        if plage.min_col <= largeur:
+            ws_out.merge_cells(str(plage))
     for lettre, dim in ws_in.column_dimensions.items():
         ws_out.column_dimensions[lettre].width = dim.width
     for numero, dim in ws_in.row_dimensions.items():
