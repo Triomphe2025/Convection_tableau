@@ -143,10 +143,13 @@ class TestParametresModele(_ConfigClaude):
             co._parametres_modele('claude-opus-9')
         self.assertIn('CLAUDE_CAPACITES_MODELES', str(ctx.exception))
 
-    def test_config_par_defaut_opus55_effort_medium(self):
-        self.assertEqual(self._sauve['CLAUDE_OCR_MODEL'], 'claude-opus-5-5')
+    def test_config_par_defaut_sonnet55_effort_medium(self):
+        # Défaut passé à Sonnet 5.5 (campagne : qualité = Opus 5.5, ~2x moins cher).
+        self.assertEqual(self._sauve['CLAUDE_OCR_MODEL'], 'claude-sonnet-5-5')
         self.assertEqual(self._sauve['CLAUDE_EFFORT'], 'medium')
         self.assertIn(self._sauve['CLAUDE_OCR_MODEL'], Config.CLAUDE_CAPACITES_MODELES)
+        # Opus 5.5 reste disponible comme second choix.
+        self.assertIn('claude-opus-5-5', Config.CLAUDE_CAPACITES_MODELES)
 
     def test_valeurs_inconnues_refusees(self):
         Config.CLAUDE_EFFORT = 'maximum'

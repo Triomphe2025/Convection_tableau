@@ -768,6 +768,7 @@ class TriosSeconverterApp(tk.Tk):
         from config import Config
         self._ocr_mode = tk.StringVar(value=getattr(Config, 'OCR_MODE', 'tesseract'))
         self._claude_key = tk.StringVar(value=getattr(Config, 'CLAUDE_API_KEY', ''))
+        self._claude_model = tk.StringVar(value=getattr(Config, 'CLAUDE_OCR_MODEL', ''))
         self._agent_session_id = tk.StringVar(
             value=getattr(Config, 'CLAUDE_AGENT_SESSION_ID', '')
         )
@@ -2743,6 +2744,7 @@ class TriosSeconverterApp(tk.Tk):
 
     def _build_page_ocr(self, parent) -> tk.Frame:
         """Page Mode OCR : choix du moteur + journal d'exécution."""
+        from config import Config
         page = tk.Frame(parent, bg=BG_MAIN)
 
         tk.Label(page, text="Mode OCR", font=FONT_H2,
@@ -2800,6 +2802,22 @@ class TriosSeconverterApp(tk.Tk):
         tk.Label(
             self._api_key_frame,
             text="  Obtenir sur console.anthropic.com",
+            font=("Segoe UI", 8), fg=FG_MUTED, bg=BG_PANEL,
+        ).pack(side='left')
+
+        # Modèle Claude : Sonnet 5.5 par défaut (qualité = Opus 5.5, ~2× moins cher) ;
+        # Opus 5.5 reste sélectionnable pour un document difficile.
+        self._claude_model_frame = tk.Frame(engine_frame, bg=BG_PANEL)
+        tk.Label(self._claude_model_frame, text="Modèle Claude :",
+                 font=FONT_BOLD, fg=FG_WARN, bg=BG_PANEL).pack(side='left', padx=(12, 0))
+        ttk.Combobox(
+            self._claude_model_frame, textvariable=self._claude_model,
+            values=list(getattr(Config, 'CLAUDE_CAPACITES_MODELES', {}).keys()),
+            state='readonly', width=28,
+        ).pack(side='left', padx=(8, 0))
+        tk.Label(
+            self._claude_model_frame,
+            text="  défaut Sonnet 5.5 ; Opus 5.5 pour un document difficile",
             font=("Segoe UI", 8), fg=FG_MUTED, bg=BG_PANEL,
         ).pack(side='left')
 
@@ -3691,6 +3709,13 @@ class TriosSeconverterApp(tk.Tk):
                 self._api_key_frame.pack(fill='x', padx=0, pady=(0, 4))
             else:
                 self._api_key_frame.pack_forget()
+        # Modèle Claude : utile aux modes claude et hybrid (pas agent, où le modèle
+        # est réglé côté Anthropic).
+        if hasattr(self, '_claude_model_frame'):
+            if mode in ('claude', 'hybrid'):
+                self._claude_model_frame.pack(fill='x', padx=0, pady=(0, 4))
+            else:
+                self._claude_model_frame.pack_forget()
         if hasattr(self, '_agent_session_frame'):
             if needs_agent:
                 self._agent_session_frame.pack(fill='x', padx=0, pady=(0, 8))
@@ -3869,6 +3894,10 @@ class TriosSeconverterApp(tk.Tk):
                 self.configure(cursor="")
                 return
             Config.CLAUDE_API_KEY = api_key
+        if ocr_mode in ('claude', 'hybrid'):
+            modele = self._claude_model.get().strip()
+            if modele:
+                Config.CLAUDE_OCR_MODEL = modele
         if ocr_mode == 'agent':
             session_id = self._agent_session_id.get().strip()
             if not session_id:

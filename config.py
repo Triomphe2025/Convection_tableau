@@ -700,11 +700,13 @@ class Config:
     #   "claude-sonnet-5"           — précis, coût intermédiaire
     #   "claude-opus-5"             — 5 $ / 25 $ par million de tokens
     #   "claude-opus-5-5"           — recommandé (défaut), 4 $ / 20 $ ; réflexion toujours active
-    #   "claude-opus-5-5"           — recommandé (défaut), 4 $ / 20 $ ; réflexion toujours active
-    #   "claude-sonnet-5-5"         — rapide, 2 $ / 10 $ ; réflexion adaptative (non désactivable)
-    #   "claude-haiku-5-5"          — le moins cher, 0,10 $ / 0,50 $ ; réflexion adaptative
+    #   "claude-sonnet-5-5"         — DÉFAUT, 2 $ / 10 $ ; qualité = Opus 5.5 sur les 3 extraits
+    #                                mesurés (campagne), ~2× moins cher ; réflexion adaptative
+    #   "claude-opus-5-5"           — second choix pour un document difficile, 4 $ / 20 $
+    #   "claude-haiku-5-5"          — le moins cher, 0,10 $ / 0,50 $ ; parfait sur les documents
+    #                                simples, un peu moins sûr sur les denses (PE011)
     #   "claude-fable-5-1"          — le plus capable ; réflexion toujours active
-    CLAUDE_OCR_MODEL = "claude-opus-5-5"
+    CLAUDE_OCR_MODEL = "claude-sonnet-5-5"
 
     # Ce que chaque modèle accepte :
     #   "thinking" : True  → le champ thinking est envoyé selon CLAUDE_THINKING ;
