@@ -11,10 +11,42 @@ import json
 import logging
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+
+def _erreur_reseau(exc) -> bool:
+    """Erreur transitoire justifiant une nouvelle tentative : connexion, 429, 5xx, 529."""
+    statut = getattr(exc, 'status_code', None)
+    if statut in (429, 500, 502, 503, 529):
+        return True
+    return type(exc).__name__ in (
+        'APIConnectionError', 'APITimeoutError', 'RateLimitError',
+        'InternalServerError', 'OverloadedError', 'ServiceUnavailableError',
+    )
+
+
+def _enregistrer_cache(source, cache_actif, cle_cache, raw, modele_servi, id_reponse, usage):
+    """Garde une lecture Claude RÉUSSIE (vrai appel seulement), page par page, de façon atomique.
+
+    Une lecture servie par le cache (source != 'api') n'est pas réécrite. Jamais d'erreur
+    bloquante : un échec d'écriture laisse simplement la page hors cache.
+    """
+    if source != 'api' or not cache_actif or not cle_cache:
+        return
+    import cache_claude
+    cache_claude.ecrire(cle_cache, {
+        'raw': raw,
+        'model': modele_servi,
+        'id_origine': id_reponse,
+        'date': datetime.datetime.now().isoformat(timespec='seconds'),
+        'usage_origine': usage,
+        'stop_reason': 'end_turn',
+    })
+
 
 _api_log_path: Optional[Path] = None
 
@@ -440,6 +472,73 @@ class ClaudeVisionExtractor:
         self._cached_mapping_key = cache_key
         return mapping
 
+    def _prompt_page(self, feedback=None, context_data=None) -> str:
+        """Prompt envoyé pour une page (mode hybride Ollama, feedback, ou standard)."""
+        if context_data:
+            # Mode hybride v4 : Ollama a déjà classé les colonnes.
+            # Claude corrige uniquement les caractères mal lus.
+            col_names = ' | '.join(self._tpl.columns)
+            n_cols = len(self._tpl.columns)
+            all_meta = ['PAGE', 'BORNIER', 'PET', 'NO_PLAN', 'INDICE']
+            footer_fields = getattr(self._tpl, 'footer_extract_fields', [])
+            for fd in footer_fields:
+                k = fd.get('key', '')
+                if k and k not in all_meta:
+                    all_meta.append(k)
+            meta_json = ', '.join(f'"{k}": ""' for k in all_meta)
+            return (
+                "TYPE_PAGE: listing\n\n"
+                "DONNÉES EXTRAITES PAR OLLAMA "
+                "(classification visuelle des colonnes déjà réalisée) :\n"
+                "──────────────────────────────────────────────────────────\n"
+                f"{context_data}\n"
+                "──────────────────────────────────────────────────────────\n\n"
+                "TON RÔLE UNIQUE — CORRECTION DES CARACTÈRES :\n"
+                "La classification des colonnes d'Ollama est DÉJÀ CORRECTE.\n"
+                "Ne change ni l'ordre ni l'attribution des colonnes.\n\n"
+                "Pour chaque ligne, regarde l'image et corrige uniquement les\n"
+                "erreurs de lecture OCR :\n"
+                "  • confusion de caractères (O↔0, l↔1, S↔5, B↔8, rn↔m…)\n"
+                "  • caractères manquants ou en trop\n"
+                "  • casse si clairement visible\n\n"
+                "Règles de sortie OBLIGATOIRES :\n"
+                f"1. Il y a exactement {n_cols} colonnes : {col_names}\n"
+                "2. UNE ligne de sortie par ligne de données, dans le MÊME ORDRE.\n"
+                "3. Format pipe strict :  val1 | val2 | val3 | val4\n"
+                "4. Si Ollama a omis une ligne visible dans l'image, ajoute-la.\n"
+                "5. Après TOUTES les lignes de données, ajoute :\n"
+                f"   META: {{{meta_json}}}\n"
+                "   avec les valeurs lues dans le pied de page de l'image.\n"
+            )
+        if feedback:
+            # Le feedback est placé EN TÊTE du prompt : Claude lit de haut en bas
+            # et donne plus de poids aux instructions placées en premier.
+            return (
+                "⚠ CORRECTION REQUISE — À LIRE EN PRIORITÉ ABSOLUE :\n"
+                f"{feedback}\n"
+                "Applique cette correction sur l'image avant toute autre règle.\n\n"
+                + _build_prompt(self._tpl)
+            )
+        return _build_prompt(self._tpl)
+
+    def cle_cache(self, image_path: Path, feedback=None, context_data=None):
+        """Clé de cache de cette page (sans appel API), ou None si elle ne peut être calculée.
+
+        Sert au pré-scan de reprise : compter les pages déjà en cache avant de lancer la lecture.
+        """
+        from config import Config
+        try:
+            import cache_claude
+            model = getattr(Config, 'CLAUDE_OCR_MODEL', 'claude-opus-5')
+            parametres = _parametres_modele(model)
+            image_data, media_type = _preparer_image_claude(
+                image_path, getattr(Config, 'CLAUDE_IMAGE_MAX_PX', 2576))
+            prompt = self._prompt_page(feedback, context_data)
+            return cache_claude.cle(image_data, media_type, prompt, model,
+                                    parametres, _limite_tokens(parametres))
+        except Exception:
+            return None
+
     def extract(
         self,
         image_path: Path,
@@ -494,61 +593,17 @@ class ClaudeVisionExtractor:
         except Exception as e:
             return {'success': False, 'error': f"Lecture image impossible : {e}"}
 
+        prompt = self._prompt_page(feedback, context_data)
         if context_data:
-            # Mode hybride v4 : Ollama a déjà classé les colonnes.
-            # Claude corrige uniquement les caractères mal lus.
-            col_names = ' | '.join(self._tpl.columns)
-            n_cols = len(self._tpl.columns)
-            all_meta = ['PAGE', 'BORNIER', 'PET', 'NO_PLAN', 'INDICE']
-            footer_fields = getattr(self._tpl, 'footer_extract_fields', [])
-            for fd in footer_fields:
-                k = fd.get('key', '')
-                if k and k not in all_meta:
-                    all_meta.append(k)
-            meta_json = ', '.join(f'"{k}": ""' for k in all_meta)
-            prompt = (
-                "TYPE_PAGE: listing\n\n"
-                "DONNÉES EXTRAITES PAR OLLAMA "
-                "(classification visuelle des colonnes déjà réalisée) :\n"
-                "──────────────────────────────────────────────────────────\n"
-                f"{context_data}\n"
-                "──────────────────────────────────────────────────────────\n\n"
-                "TON RÔLE UNIQUE — CORRECTION DES CARACTÈRES :\n"
-                "La classification des colonnes d'Ollama est DÉJÀ CORRECTE.\n"
-                "Ne change ni l'ordre ni l'attribution des colonnes.\n\n"
-                "Pour chaque ligne, regarde l'image et corrige uniquement les\n"
-                "erreurs de lecture OCR :\n"
-                "  • confusion de caractères (O↔0, l↔1, S↔5, B↔8, rn↔m…)\n"
-                "  • caractères manquants ou en trop\n"
-                "  • casse si clairement visible\n\n"
-                "Règles de sortie OBLIGATOIRES :\n"
-                f"1. Il y a exactement {n_cols} colonnes : {col_names}\n"
-                "2. UNE ligne de sortie par ligne de données, dans le MÊME ORDRE.\n"
-                "3. Format pipe strict :  val1 | val2 | val3 | val4\n"
-                "4. Si Ollama a omis une ligne visible dans l'image, ajoute-la.\n"
-                "5. Après TOUTES les lignes de données, ajoute :\n"
-                f"   META: {{{meta_json}}}\n"
-                "   avec les valeurs lues dans le pied de page de l'image.\n"
-            )
             logger.info(
                 f"Claude Vision — mode correction Ollama "
                 f"({len(context_data.splitlines())} lignes) : {image_path.name}"
             )
         elif feedback:
-            # Le feedback est placé EN TÊTE du prompt : Claude lit de haut en bas
-            # et donne plus de poids aux instructions placées en premier.
-            prompt = (
-                "⚠ CORRECTION REQUISE — À LIRE EN PRIORITÉ ABSOLUE :\n"
-                f"{feedback}\n"
-                "Applique cette correction sur l'image avant toute autre règle.\n\n"
-                + _build_prompt(self._tpl)
-            )
             logger.info(
                 f"Claude Vision — feedback inclus "
                 f"({len(feedback)} car.) : {image_path.name}"
             )
-        else:
-            prompt = _build_prompt(self._tpl)
 
         max_tokens = _limite_tokens(parametres)
         requete = dict(
@@ -570,37 +625,88 @@ class ClaudeVisionExtractor:
                 ],
             }],
         )
-        try:
-            client = anthropic.Anthropic(api_key=api_key)
-            # Ni temperature, ni top_p, ni top_k : refusés (erreur 400) par Opus 5.
-            if max_tokens > getattr(Config, 'CLAUDE_MAX_TOKENS', 16000):
-                # Le SDK refuse sans streaming une requête estimée à plus de 10 min
-                # (au-delà de ~21 000 tokens) ; le message final est le même objet.
-                with client.messages.stream(**requete) as flux:
-                    response = flux.get_final_message()
-            else:
-                response = client.messages.create(**requete)
-        except Exception as e:
-            _write_api_log({
-                'ts':      datetime.datetime.now().isoformat(timespec='seconds'),
-                'image':   image_path.name,
-                'model':   getattr(Config, 'CLAUDE_OCR_MODEL', '?'),
-                'error':   str(e),
-                'success': False,
-            })
-            return {'success': False, 'error': f"Appel API Claude échoué : {e}"}
+        # Cache : si la même demande exacte a déjà une lecture réussie, on la réutilise
+        # sans appel ni coût (relance d'un document, reprise après coupure).
+        cache_actif = (getattr(Config, 'CLAUDE_CACHE_LECTURES', False)
+                       and not getattr(Config, 'CLAUDE_FORCER_RELECTURE', False))
+        cle_cache = None
+        entree_cache = None
+        if cache_actif:
+            import cache_claude
+            cle_cache = cache_claude.cle(image_data, media_type, prompt, model,
+                                         parametres, max_tokens)
+            entree_cache = cache_claude.lire(cle_cache)
 
-        raw = _texte_reponse(response)
-        usage = _consommation(response)
-        modele_servi = getattr(response, 'model', model)
-        # Identifiant de la réponse : prouve qu'un passage a fait de vrais appels
-        # (deux passages ne peuvent pas partager un même identifiant).
-        id_reponse = getattr(response, 'id', '') or ''
+        source = 'api'
+        id_origine = ''
+        if entree_cache is not None:
+            raw = entree_cache['raw']
+            usage = {'input_tokens': 0, 'output_tokens': 0,
+                     'cache_read_input_tokens': 0, 'cache_creation_input_tokens': 0}
+            modele_servi = entree_cache.get('model', model)
+            id_reponse = ''                       # pas de vrai appel : « id » reste vide
+            id_origine = entree_cache.get('id_origine', '')
+            stop_reason = 'end_turn'
+            source = 'cache'
+            logger.info(f"Claude — lecture réutilisée (cache) : {image_path.name}")
+        else:
+            response = None
+            derniere_erreur = None
+            delais = list(getattr(Config, 'CLAUDE_RETRY_DELAIS', ()))
+            for tentative in range(len(delais) + 1):
+                try:
+                    client = anthropic.Anthropic(api_key=api_key)
+                    # Ni temperature, ni top_p, ni top_k : refusés (erreur 400) par Opus 5.
+                    if max_tokens > getattr(Config, 'CLAUDE_MAX_TOKENS', 16000):
+                        # Le SDK refuse sans streaming une requête estimée à plus de 10 min
+                        # (au-delà de ~21 000 tokens) ; le message final est le même objet.
+                        with client.messages.stream(**requete) as flux:
+                            response = flux.get_final_message()
+                    else:
+                        response = client.messages.create(**requete)
+                    derniere_erreur = None
+                    break
+                except Exception as e:
+                    derniere_erreur = e
+                    if _erreur_reseau(e) and tentative < len(delais):
+                        attente = delais[tentative]
+                        logger.warning(
+                            f"Claude indisponible ({type(e).__name__}) — nouvelle tentative "
+                            f"dans {attente} s ({image_path.name})"
+                        )
+                        time.sleep(attente)
+                        continue
+                    break
+            if derniere_erreur is not None:
+                reseau = _erreur_reseau(derniere_erreur)
+                _write_api_log({
+                    'ts':      datetime.datetime.now().isoformat(timespec='seconds'),
+                    'image':   image_path.name,
+                    'model':   getattr(Config, 'CLAUDE_OCR_MODEL', '?'),
+                    'error':   str(derniere_erreur),
+                    'source':  'api',
+                    'success': False,
+                })
+                res = {'success': False,
+                       'error': f"Appel API Claude échoué : {derniere_erreur}"}
+                if reseau:
+                    # Coupure persistante : la conversion doit s'arrêter proprement
+                    # (converter.py compose le message et conserve les pages déjà lues).
+                    res['connexion_perdue'] = True
+                return res
+
+            raw = _texte_reponse(response)
+            usage = _consommation(response)
+            modele_servi = getattr(response, 'model', model)
+            # Identifiant de la réponse : prouve qu'un passage a fait de vrais appels
+            # (deux passages ne peuvent pas partager un même identifiant).
+            id_reponse = getattr(response, 'id', '') or ''
+            stop_reason = response.stop_reason
         logger.info(
             f"Claude {modele_servi} — {image_path.name} : "
             f"{usage['input_tokens']} tokens en entrée, {usage['output_tokens']} en sortie"
         )
-        if response.stop_reason == 'refusal':
+        if stop_reason == 'refusal':
             details = getattr(response, 'stop_details', None)
             categorie = getattr(details, 'category', None) or 'non précisée'
             explication = getattr(details, 'explanation', None) or ''
@@ -624,7 +730,7 @@ class ClaudeVisionExtractor:
                 'error': f"Claude a refusé la page {image_path.name} (catégorie : {categorie})",
                 'api_usage': dict(usage, model=modele_servi),
             }
-        if response.stop_reason == 'max_tokens':
+        if stop_reason == 'max_tokens':
             # Les dernières lignes de la page manqueraient sans que rien ne le signale.
             logger.error(
                 f"Réponse tronquée (limite de {max_tokens} tokens atteinte) : {image_path.name}"
@@ -671,11 +777,15 @@ class ClaudeVisionExtractor:
             logger.info(
                 f"⊘ Page non-listing ignorée : {image_path.name}"
             )
+            _enregistrer_cache(source, cache_actif, cle_cache, raw, modele_servi,
+                               id_reponse, usage)
             _write_api_log({
                 'ts':       datetime.datetime.now().isoformat(timespec='seconds'),
                 'image':    image_path.name,
                 'model':    modele_servi,
                 'id':    id_reponse,
+                'id_origine': id_origine,
+                'source':   source,
                 'usage':    usage,
                 'raw':      raw,
                 'rows':     0,
@@ -689,6 +799,7 @@ class ClaudeVisionExtractor:
                 'image_path': str(image_path),
                 'metadata': metadata,
                 'detection_method': 'claude-vision',
+                'lecture_cache': source == 'cache',
                 'api_usage': dict(usage, model=modele_servi),
             }
 
@@ -696,11 +807,15 @@ class ClaudeVisionExtractor:
             f"✓ Claude Vision : {len(rows)} lignes depuis {image_path.name} "
             f"(modèle {modele_servi})"
         )
+        _enregistrer_cache(source, cache_actif, cle_cache, raw, modele_servi,
+                           id_reponse, usage)
         _write_api_log({
             'ts':        datetime.datetime.now().isoformat(timespec='seconds'),
             'image':     image_path.name,
             'model':     modele_servi,
             'id':     id_reponse,
+            'id_origine': id_origine,
+            'source':    source,
             'usage':     usage,
             'raw':       raw,
             'rows':      len(rows),
@@ -716,6 +831,7 @@ class ClaudeVisionExtractor:
             'image_path':       str(image_path),
             'blur_pct':         0.0,
             'detection_method': 'claude-vision',
+            'lecture_cache':    source == 'cache',
             'api_usage':        dict(usage, model=modele_servi),
         }
 

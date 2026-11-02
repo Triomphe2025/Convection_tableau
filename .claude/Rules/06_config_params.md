@@ -50,6 +50,11 @@ Config.TESSERACT_PATH   # référencer uniquement
 | `CAMPAGNE_BUDGET_MAX_USD` | `10` | Plafond d'une campagne : arrêt avant un passage si le coût cumulé l'atteint |
 | `CLAUDE_MAX_TOKENS_EFFORT_ELEVE` | `64000` | Limite à effort `xhigh`/`max` (appel en streaming) ; une réponse tronquée met toujours la page en erreur |
 | `CLAUDE_IMAGE_MAX_PX` | `2576` | Grand côté maximal des images envoyées à Claude (PNG) |
+| `CLAUDE_CACHE_LECTURES` | `True` | Réutilise une lecture Claude réussie quand la même demande exacte se représente (relance, reprise après coupure) — ni relue ni repayée ; `cache_claude.py` |
+| `CLAUDE_FORCER_RELECTURE` | `False` | Ignore le cache (vrais appels) ; piloté par la case « Forcer la relecture » de l'interface |
+| `CLAUDE_CACHE_DOSSIER` | `…\cache_claude` | Un JSON par clé (écriture atomique), dans le dossier de l'utilisateur ; les tests le redirigent |
+| `CLAUDE_CACHE_AGE_MAX_JOURS` / `CLAUDE_CACHE_TAILLE_MAX_MO` | `90` / `200` | Purge du cache (âge puis taille) |
+| `CLAUDE_RETRY_DELAIS` | `(5, 15, 30, 45, 60)` | Délais (s) entre tentatives sur coupure réseau / 429 / 5xx / 529 ; épuisés → arrêt propre `ConnexionPerdue` |
 
 ## Vérification de conversion (section « VÉRIFICATION DE CONVERSION »)
 

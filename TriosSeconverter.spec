@@ -14,7 +14,7 @@ block_cipher = None
 # Modules du projet charges depuis l'interface, y compris ceux importes dans une fonction
 # (liste calculee en suivant les imports depuis interface.py).
 MODULES_PROJET = [
-    'agent_ocr', 'audit_claude', 'cache_lectures', 'claude_ocr', 'compte_lignes', 'config',
+    'agent_ocr', 'audit_claude', 'cache_claude', 'cache_lectures', 'claude_ocr', 'compte_lignes', 'config',
     'ligne_de_commande',
     'controle_conservation', 'controle_qualite', 'converter', 'data_dictionary', 'dossiers_travail',
     'ed25519_verif', 'licence',

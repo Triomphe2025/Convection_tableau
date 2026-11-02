@@ -24,6 +24,13 @@ from dossiers_travail import dossier_travail
 from template import TableTemplate, DEFAULT_TEMPLATE
 
 
+class ConnexionPerdue(RuntimeError):
+    """Coupure réseau / API persistante : la conversion s'arrête, les pages lues sont gardées.
+
+    Message prêt à montrer tel quel ; aucun classeur Excel n'est écrit pour ce document.
+    """
+
+
 @contextmanager
 def _mode_ocr_tesseract():
     """Force OCR_MODE='tesseract' le temps d'une lecture, puis le restaure.
@@ -148,7 +155,10 @@ class Converter:
             SCAN: "scan → OCR",
         }
         if nature in libelles:
-            self._log(f"  Page {numero}/{total} : {libelles[nature]}, images = {images} %")
+            illisibles = diagnostic.get('illisibles', 0)
+            note = (f", {illisibles} caractères en police sans table Unicode (décodés en local, "
+                    f"sans appel API)" if nature == VECTORIEL and illisibles else "")
+            self._log(f"  Page {numero}/{total} : {libelles[nature]}, images = {images} %{note}")
         else:
             self._log(
                 f"  page {numero} ignorée : {motif_page_ignoree(diagnostic)}, "
@@ -464,6 +474,8 @@ class Converter:
                 results_ocr, extractor = self._extraire_avec_progres(
                     images_dir, len(pages_image)
                 )
+            except ConnexionPerdue:
+                raise                      # message propre, pages déjà lues gardées
             except Exception as exc:
                 raise RuntimeError(f"OCR échoué : {exc}") from exc
             # Même ordre que _extraire_avec_progres : images triées par numéro de page.
@@ -1129,6 +1141,8 @@ class Converter:
 
         try:
             results, extractor = self._extraire_avec_progres(images_dir, 0)
+        except ConnexionPerdue:
+            raise
         except Exception as exc:
             raise RuntimeError(f"OCR échoué : {exc}") from exc
 
@@ -1179,6 +1193,8 @@ class Converter:
 
         try:
             ocr_results, extractor = self._extraire_avec_progres(images_dir, saved)
+        except ConnexionPerdue:
+            raise
         except Exception as exc:
             raise RuntimeError(f"OCR échoué : {exc}") from exc
 
@@ -1188,6 +1204,22 @@ class Converter:
         return saved, ocr_results, extractor
 
     # ── OCR avec progression ──────────────────────────────────────────
+
+    def _annoncer_reprise(self, vision_extractor, images) -> None:
+        """Compte sans appel les pages déjà en cache et l'écrit au journal (reprise)."""
+        if (not getattr(Config, 'CLAUDE_CACHE_LECTURES', False)
+                or getattr(Config, 'CLAUDE_FORCER_RELECTURE', False)
+                or not hasattr(vision_extractor, 'cle_cache')):
+            return
+        try:
+            import cache_claude
+            deja = sum(1 for img in images
+                       if (c := vision_extractor.cle_cache(img)) and cache_claude.existe(c))
+        except Exception:
+            return
+        if deja:
+            self._log(f"  reprise : {deja} page(s) servie(s) par le cache "
+                      "(ni relues ni repayées).")
 
     def _extraire_avec_progres(
         self, images_dir: Path, total_hint: int
@@ -1296,7 +1328,13 @@ class Converter:
             'agent-vision':  '✓ Agent Image Data Extractor',
         }
 
+        # Reprise : annoncer dès le début combien de pages sont déjà en cache (relance d'un
+        # document, reprise après coupure) — elles ne seront ni relues ni repayées.
+        if vision_extractor is not None:
+            self._annoncer_reprise(vision_extractor, images)
+
         results = []
+        pages_cache = 0
         for i, img in enumerate(images):
             if self._est_annule():
                 self._log(f"  ⏹ Conversion arrêtée — {i}/{total} images traitées.")
@@ -1310,17 +1348,30 @@ class Converter:
             else:
                 result = extractor.extract(img)
 
+            # Coupure réseau / API persistante : arrêt propre, pages déjà lues gardées
+            # (aucun classeur Excel incomplet n'est écrit pour ce document).
+            if result.get('connexion_perdue'):
+                raise ConnexionPerdue(
+                    f"Connexion perdue à la page {i + 1}. Les pages déjà lues sont gardées : "
+                    "relancez la même conversion pour reprendre, elles ne seront ni relues "
+                    "ni repayées."
+                )
+
             method = result.get('detection_method', '')
             label = _METHOD_LABEL.get(method, method)
             blur = result.get('blur_pct', 0.0)
             blur_s = f"  flou {blur:.0f}%" if blur > 60 else ""
             self._log(f"    → {label}{blur_s}")
-            conso = result.get('api_usage')
-            if conso:
-                self._log(
-                    f"      {conso.get('model', '?')} : {conso.get('input_tokens', 0)} tokens "
-                    f"en entrée, {conso.get('output_tokens', 0)} en sortie"
-                )
+            if result.get('lecture_cache'):
+                pages_cache += 1
+                self._log("      lecture réutilisée, 0 token")
+            else:
+                conso = result.get('api_usage')
+                if conso:
+                    self._log(
+                        f"      {conso.get('model', '?')} : {conso.get('input_tokens', 0)} "
+                        f"tokens en entrée, {conso.get('output_tokens', 0)} en sortie"
+                    )
 
             # Validation interactive : après lecture et contrôle du document entier.
             if self._on_validation is not None and result.get('success'):
@@ -1334,6 +1385,9 @@ class Converter:
                     'page_pdf': None})
 
             results.append(result)
+
+        if pages_cache:
+            self._log(f"  → {pages_cache} page(s) servie(s) par le cache (0 token, 0 $).")
 
         return results, extractor
 

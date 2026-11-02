@@ -40,10 +40,23 @@ Le **Doc. 2** (optionnel) est un fichier Word contenant des tableaux structurés
 - Meilleure précision sur tableaux complexes ou mal scannés
 - Nécessite une clé API Anthropic (champ dans l'interface)
 - Chaque image = 1 appel API (coût en tokens) ; les pages PDF à texte vectoriel sont lues sans appel
-- Modèle par défaut : `claude-opus-5-5` (`CLAUDE_OCR_MODEL`), effort réglable (`CLAUDE_EFFORT`,
-  `medium` par défaut) ; ce que chaque modèle accepte est dans `CLAUDE_CAPACITES_MODELES` ;
+- Modèle par défaut : `claude-sonnet-5-5` (`CLAUDE_OCR_MODEL`), effort réglable (`CLAUDE_EFFORT`,
+  `medium` par défaut) ; Opus 5.5 sélectionnable (liste « Modèle Claude » de la page Mode OCR)
+  pour un document difficile ; ce que chaque modèle accepte est dans `CLAUDE_CAPACITES_MODELES` ;
   modèle et tokens consommés affichés par page
 - Journal des appels sauvegardé : `*_claude.jsonl` (permet de rejouer sans repayer)
+
+#### Cache des lectures (relance et reprise sans repayer)
+- Chaque page lue avec succès est gardée (`CLAUDE_CACHE_LECTURES`, activé par défaut). Relancer
+  un document — test d'un correctif, reprise après une coupure — **ne relit ni ne repaie** les
+  pages déjà lues : la même demande exacte (image, prompt, modèle, paramètres) est réutilisée.
+  Le journal affiche « lecture réutilisée, 0 token » et un bilan des pages servies par le cache.
+- **Coupure réseau / crédit épuisé** : après plusieurs tentatives, la conversion s'arrête
+  proprement (« Connexion perdue à la page N… relancez la même conversion pour reprendre »).
+  Aucun classeur incomplet n'est enregistré ; à la relance, la lecture reprend là où elle s'était
+  arrêtée.
+- Pour forcer de vrais appels (vraiment tout relire), cocher **« Forcer la relecture (ignorer le
+  cache) »** sur la page Mode OCR.
 
 ### Docling IBM (IA locale)
 - Modèle IA téléchargé automatiquement au premier lancement (~500 Mo)
@@ -224,7 +237,7 @@ Toujours tester l'exe sur une machine sans Python installé avant livraison.
 
 ```powershell
 env\Scripts\python.exe -m pytest tests\ -v
-# 1310 tests passent, 0 échec (+ 1 test lent facultatif)
+# 1342 tests passent, 0 échec (+ 1 test lent facultatif)
 ```
 
 ---
@@ -239,6 +252,7 @@ env\Scripts\python.exe -m pytest tests\ -v
 | `claude_ocr.py` | OCR via API Claude Vision |
 | `docling_ocr.py` | OCR via Docling IBM |
 | `pdf_extractor.py` | Extraction couche texte PDF (PyMuPDF), classement des pages, lecture en grille |
+| `polices_illisibles.py` | Décodage local des polices PDF sans table Unicode (en-têtes et pieds), sans API |
 | `verificateur.py` | Vérification de conversion (compare le scan relu à la conversion) |
 | `mesure_precision.py` | Mesure de précision (compare une sortie à une référence organisée) |
 | `generer_classeur.py` | Génération du classeur Excel |

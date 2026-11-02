@@ -1560,3 +1560,19 @@ texte, 17 pieds justes (bornier, indice, P.E.T., N° PLAN) ; 11 morceaux relus p
 de garde 1 et 3 toujours écartées ; pages 12 et 25 identiques à avant. Pages sans police
 illisible : chemin inchangé. Banc : `tests/test_polices_illisibles.py` (extrait de 4 pages
 `tests/fixtures/223111PE052_extrait_polices_sans_unicode.pdf`). `.spec` : module ajouté.
+
+## Cache des lectures Claude + reprise après coupure (2026-11-02)
+
+- `cache_claude.py` : avant chaque appel, clé SHA-256 de la demande exacte (image envoyée,
+  prompt complet, modèle, paramètres, max_tokens) ; si une lecture réussie existe, reprise
+  sans appel ni coût, même chemin de parsing. Un JSON par clé dans le dossier de l'utilisateur
+  (écriture atomique page par page, purge 90 j / 200 Mo). Gardé uniquement si la réponse est
+  complète (end_turn parsé, « non-listing » compris) : jamais une erreur, un refus, une réponse
+  coupée, ni la clé API. Journal `*_claude.jsonl` : page servie par le cache à 0 token,
+  `source=cache`, id d'origine à part (`id` reste la preuve d'un vrai appel).
+- Reprise après coupure : écriture page par page ; sur coupure réseau / 429 / 5xx / 529,
+  nouvelles tentatives (`CLAUDE_RETRY_DELAIS`, ~2 min) ; épuisées, arrêt propre « Connexion
+  perdue à la page N … relancez la même conversion » (exception `ConnexionPerdue`, aucun Excel
+  incomplet écrit). À la relance : « reprise : N page(s) servie(s) par le cache » dès le début,
+  seules les pages non lues rappellent l'API. `CLAUDE_CACHE_LECTURES`, case « Forcer la
+  relecture » dans l'interface ; `campagne_mesure.py` coupe toujours le cache. 13 tests.

@@ -63,7 +63,8 @@ Tous retournent le même format de résultat (§4).
 | `ocr_processor.py` | `BornierTableExtractor` : prétraitement → OCR → colonnes → cellules → métadonnées | `tesseract` |
 | `pdf_extractor.py` | `PdfTableExtractor` : extraction d'un PDF par couche texte (PyMuPDF), repli OCR Tesseract sur les pages raster ; classement des pages et lecture exacte en grille (routage §3) | *(chemin PDF, voir §3)* |
 | `polices_illisibles.py` | Lettres des polices intégrées sans table Unicode (en-têtes et pieds de 223111PE052) : reconnues par le dessin du glyphe, dans le texte lisible du document sinon par Tesseract en local — aucun appel API | *(lecture en grille)* |
-| `claude_ocr.py` | `ClaudeVisionExtractor` (API Anthropic) + `LogReplayer` (replay d'un journal `*_claude.jsonl` sans appel API) + parseur pipe partagé par les moteurs vision | `claude` |
+| `claude_ocr.py` | `ClaudeVisionExtractor` (API Anthropic) + `LogReplayer` (replay d'un journal `*_claude.jsonl` sans appel API) + parseur pipe partagé par les moteurs vision ; cache des lectures réussies (relance / reprise après coupure sans repayer), retry sur coupure réseau | `claude` |
+| `cache_claude.py` | Cache des lectures Claude réussies : un JSON par clé (image envoyée + prompt + modèle + paramètres + max_tokens) dans `%LOCALAPPDATA%\TriosSeconverter\cache_claude`, écriture atomique, purge par âge/taille — module pur ; jamais d'erreur, de refus, de réponse coupée ni de clé API | — |
 | `ollama_ocr.py` | `OllamaVisionExtractor` : modèle vision local Ollama, sans API externe | `ollama` |
 | `hybrid_ocr.py` | `HybridVisionExtractor` : Ollama classe les colonnes, Claude corrige les caractères (2 passes) | `hybrid` |
 | `agent_ocr.py` | `AgentVisionExtractor` : session Managed Agent Anthropic | `agent` |

@@ -23,6 +23,10 @@ Config.MODELES_UTILISATEUR = Path(_CACHE_TESTS.name) / 'templates.json'
 Config.QUALITE_LEXIQUE_DOSSIER = Path(_CACHE_TESTS.name) / 'lexique'
 # Images de travail des conversions : jamais dans le dossier de l'appli de la machine.
 Config.TRAVAIL_DOSSIER = Path(_CACHE_TESTS.name) / 'travail'
+# Cache des lectures Claude : dossier temporaire, et coupé par défaut pour les tests (ceux
+# du cache l'activent explicitement) — les autres tests ne sont pas perturbés.
+Config.CLAUDE_CACHE_DOSSIER = Path(_CACHE_TESTS.name) / 'cache_claude'
+Config.CLAUDE_CACHE_LECTURES = False
 
 import hashlib  # noqa: E402
 import shutil  # noqa: E402

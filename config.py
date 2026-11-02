@@ -772,6 +772,28 @@ class Config:
     # est réduite avant l'envoi (limite de résolution des modèles actuels).
     CLAUDE_IMAGE_MAX_PX = 2576
 
+    # ---- Cache des lectures Claude (évite de repayer une page déjà lue) ----
+    # True : avant chaque appel, si une lecture RÉUSSIE existe pour exactement la
+    # même demande (image envoyée + prompt + modèle + paramètres + max_tokens),
+    # on la réutilise sans appel ni coût. Permet de relancer un document (test
+    # d'un correctif, reprise après coupure) sans relire ni repayer les pages
+    # déjà lues. N'affecte jamais le résultat des pages. Seules les réponses
+    # réussies (y compris « non-listing ») sont gardées — jamais une erreur, un
+    # refus, une réponse coupée, ni la clé API.
+    CLAUDE_CACHE_LECTURES = True
+    # Forcer la relecture : ignore le cache (relance de vrais appels) pour cette
+    # conversion. Piloté par la case « Forcer la relecture Claude » de l'interface.
+    CLAUDE_FORCER_RELECTURE = False
+    CLAUDE_CACHE_DOSSIER = _DOSSIER_UTILISATEUR / 'cache_claude'
+    CLAUDE_CACHE_AGE_MAX_JOURS = 90
+    CLAUDE_CACHE_TAILLE_MAX_MO = 200
+
+    # ---- Reprise après coupure réseau / API indisponible ----
+    # Sur erreur de connexion, 429, 5xx ou 529 (surcharge), l'appel est retenté
+    # après ces délais (secondes) ; épuisés, la conversion s'arrête proprement
+    # (les pages déjà lues restent en cache, la relance les réutilise).
+    CLAUDE_RETRY_DELAIS = (5, 15, 30, 45, 60)
+
     # ========================================
     # 🤖 MODE OCR — Agent Managed Agents
     # ========================================

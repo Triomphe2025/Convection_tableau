@@ -67,10 +67,11 @@ def reglage_en_memoire(modele: str, effort: str, cle: str):
     Effort « aucun » : le champ effort n'est pas envoyé (capacité coupée en mémoire).
     """
     noms = ('OCR_MODE', 'CLAUDE_OCR_MODEL', 'CLAUDE_EFFORT', 'CLAUDE_API_KEY',
-            'CLAUDE_CAPACITES_MODELES')
+            'CLAUDE_CAPACITES_MODELES', 'CLAUDE_CACHE_LECTURES')
     sauvegarde = {n: getattr(Config, n) for n in noms}
     try:
         Config.OCR_MODE = 'claude'
+        Config.CLAUDE_CACHE_LECTURES = False   # mesures jamais faussées par le cache
         Config.CLAUDE_OCR_MODEL = modele
         Config.CLAUDE_API_KEY = cle
         if effort == EFFORT_AUCUN:
