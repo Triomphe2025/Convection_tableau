@@ -252,6 +252,13 @@ class Config:
     # texte vectoriel (en dessous : titre isolé, tampon — pipeline actuel).
     PDF_MIN_CARS_VECTORIEL = 20
 
+    # Police intégrée sans table Unicode (en-têtes et pieds en Comic Sans de 223111PE052) :
+    # True, chaque lettre illisible est reconnue par son dessin, d'abord dans le texte
+    # lisible du même document, sinon par Tesseract en local (polices_illisibles.py).
+    # Aucun appel API : la page reste lue en couche texte. False : comportement v1.8
+    # (page écartée faute d'en-tête lisible).
+    PDF_DECODER_POLICES_ILLISIBLES = True
+
     # Écart vertical (points PDF) en dessous duquel deux spans sont sur la
     # même ligne de la grille ; l'interligne des listings est d'environ 11 pt.
     PDF_GRILLE_TOLERANCE_Y = 2.0

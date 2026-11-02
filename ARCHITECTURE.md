@@ -62,6 +62,7 @@ Tous retournent le même format de résultat (§4).
 |---------|-------------|-------------------|
 | `ocr_processor.py` | `BornierTableExtractor` : prétraitement → OCR → colonnes → cellules → métadonnées | `tesseract` |
 | `pdf_extractor.py` | `PdfTableExtractor` : extraction d'un PDF par couche texte (PyMuPDF), repli OCR Tesseract sur les pages raster ; classement des pages et lecture exacte en grille (routage §3) | *(chemin PDF, voir §3)* |
+| `polices_illisibles.py` | Lettres des polices intégrées sans table Unicode (en-têtes et pieds de 223111PE052) : reconnues par le dessin du glyphe, dans le texte lisible du document sinon par Tesseract en local — aucun appel API | *(lecture en grille)* |
 | `claude_ocr.py` | `ClaudeVisionExtractor` (API Anthropic) + `LogReplayer` (replay d'un journal `*_claude.jsonl` sans appel API) + parseur pipe partagé par les moteurs vision | `claude` |
 | `ollama_ocr.py` | `OllamaVisionExtractor` : modèle vision local Ollama, sans API externe | `ollama` |
 | `hybrid_ocr.py` | `HybridVisionExtractor` : Ollama classe les colonnes, Claude corrige les caractères (2 passes) | `hybrid` |
@@ -111,7 +112,7 @@ est journalisé (`Converter._journaliser_routage`) :
 
 | Nature | Critère (dans l'ordre) | Traitement |
 |--------|------------------------|-----------|
-| Vectoriel | texte visible ≥ `PDF_MIN_CARS_VECTORIEL`, police intégrée, aucune couche invisible, pas d'image pleine page | `extract_page_grille` : grille de caractères, cellules aux « \| » ou aux gouttières sous l'en-tête (pages sans cadre), lignes de section reconnues, espaces intérieurs conservés — aucun OCR, aucun appel API |
+| Vectoriel | texte visible ≥ `PDF_MIN_CARS_VECTORIEL`, police intégrée, aucune couche invisible, pas d'image pleine page | `extract_page_grille` : grille de caractères, cellules aux « \| » ou aux gouttières sous l'en-tête (pages sans cadre), lignes de section reconnues, espaces intérieurs conservés ; caractères d'une police sans table Unicode décodés par `polices_illisibles` (`PDF_DECODER_POLICES_ILLISIBLES`) — aucun appel API |
 | OCR invisible | images cumulées ≥ `PDF_SEUIL_IMAGE` et couche texte présente (ex. Adobe Paper Capture) | couche ignorée : repli image `_extract_page_ocr` (tesseract/docling) ou rastérisation + vision |
 | Scan | images cumulées ≥ `PDF_SEUIL_IMAGE` sans texte, ou texte visible non garanti (police non intégrée) | pipeline OCR du mode choisi (inchangé) |
 | Vide | ni texte exploitable ni images ≥ `PDF_SEUIL_IMAGE` | ignorée ; journal : « page N ignorée : <raison>, images = X % de la page » |
@@ -270,7 +271,8 @@ dans les fonctions inclus) :
 | `interface` | `converter`, `generer_classeur`, `data_dictionary`, `template`, `config`, `audit_claude`, `ollama_ocr`, `cad` |
 | `converter` | `recuperer_image`, `ocr_processor`, `pdf_extractor`, `claude_ocr`, `ollama_ocr`, `hybrid_ocr`, `agent_ocr`, `docling_ocr`, `word_table_importer`, `generer_classeur`, `verificateur`, `data_dictionary`, `template`, `config` |
 | `generer_classeur` | `ocr_processor`, `pdf_extractor`, `data_dictionary`, `template`, `config` |
-| `pdf_extractor` | `ocr_processor`, `template`, `config` |
+| `pdf_extractor` | `ocr_processor`, `polices_illisibles`, `template`, `config` |
+| `polices_illisibles` | `config` |
 | `ocr_processor` | `claude_ocr`, `docling_ocr`, `data_dictionary`, `template`, `config` |
 | `recuperer_image` | `ocr_processor` (chargé à la demande) |
 | `hybrid_ocr` | `claude_ocr`, `ollama_ocr` |

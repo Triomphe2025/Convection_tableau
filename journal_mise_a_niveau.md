@@ -1533,3 +1533,30 @@ Aucun avertissement sur les 3 extraits ; logo inconnu seul sur sa ligne signalé
 - Piste v1.9 gratuite à essayer : **construire sur Python 3.12**, où Nuitka accepte encore son
   MinGW64 (refusé à partir de 3.13) ; rejouer toute la suite de tests et la batterie d'essais
   sur 3.12 avant de livrer.
+
+
+## Pages vectorielles en police sans table Unicode : lues sans OCR ni API (2026-10-23)
+
+Constat de l'utilisateur sur 223111PE052 : pages vectorielles absentes du livrable. Reproduit :
+17 pages sur 35 écartées avec « pas d'en-tête du modèle (page de garde, modifications…) ».
+Cause : en-tête et pied en Comic Sans intégrée en sous-ensemble sans table ToUnicode ; la
+couche texte rend des numéros de glyphes (\x01…), la grille ne trouve pas « BORNE COULEUR
+SIGNAL JARRETIERES », et depuis le routage v1.8 rien ne reprend la page. Le corps (CourierStd)
+était lisible. Régression de la v1.8 (la v1.7 passait tout en OCR).
+
+Correction (`polices_illisibles.py`, branchée dans `pdf_extractor.grille_page`) : chaque glyphe
+illisible est reconnu par son dessin (points des contours TrueType, identiques d'un
+sous-ensemble à l'autre) — d'abord dans le texte lisible du même document (PE052 p. 12 et 25),
+sinon par Tesseract en local sur le morceau de ligne, aligné glyphe par glyphe, lettre la plus
+lue sur tout le document, une 2e lecture autrement réglée pour une lettre lue une seule fois.
+Lettre introuvable → « ? » et ligne d'information dans A VERIFIER ; jamais de lettre inventée.
+Aucun appel API, la page reste lue en couche texte. `PDF_DECODER_POLICES_ILLISIBLES = False`
+rend le comportement v1.8. Journal : « N caractères en police sans table Unicode (décodés en
+local, sans appel API) » sur chaque page concernée.
+
+Vérifié sur PE052 : 17 pages récupérées, 562 lignes identiques à la relecture de la couche
+texte, 17 pieds justes (bornier, indice, P.E.T., N° PLAN) ; 11 morceaux relus par Tesseract,
+~3 s ; Tesseract seul (sans la référence interne) : mêmes résultats, 50 morceaux, ~10 s ; pages
+de garde 1 et 3 toujours écartées ; pages 12 et 25 identiques à avant. Pages sans police
+illisible : chemin inchangé. Banc : `tests/test_polices_illisibles.py` (extrait de 4 pages
+`tests/fixtures/223111PE052_extrait_polices_sans_unicode.pdf`). `.spec` : module ajouté.

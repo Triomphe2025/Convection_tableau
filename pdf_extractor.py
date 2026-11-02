@@ -76,13 +76,16 @@ def diagnostiquer_page(page) -> Dict:
     4. sinon → VIDE, page ignorée (le motif est journalisé).
     """
     from config import Config
-    visibles = invisibles = 0
+    from polices_illisibles import illisible
+    visibles = invisibles = illisibles = 0
     for trace in page.get_texttrace():
-        n = len(trace.get('chars', ()))
+        caracteres = trace.get('chars', ())
+        n = len(caracteres)
         if trace.get('type') == _RENDU_INVISIBLE:
             invisibles += n
         else:
             visibles += n
+            illisibles += sum(1 for c in caracteres if illisible(c[0]))
     couverture = couverture_image(page)
     polices_integrees = any(police[1] != 'n/a' for police in page.get_fonts())
     assez_de_texte = visibles >= Config.PDF_MIN_CARS_VECTORIEL
@@ -98,7 +101,7 @@ def diagnostiquer_page(page) -> Dict:
         nature = VIDE
     return {
         'nature': nature, 'visibles': visibles, 'invisibles': invisibles,
-        'couverture': couverture,
+        'couverture': couverture, 'illisibles': illisibles,
     }
 
 
@@ -233,6 +236,41 @@ def mots_visibles(page, ecartes: Optional[Dict] = None
     return visibles
 
 
+def _a_illisibles(caracteres) -> bool:
+    from polices_illisibles import illisible
+    return any(c['c'] and illisible(ord(c['c'][0])) for c in caracteres)
+
+
+def _table_illisibles(page, ecartes: Optional[Dict]) -> Dict:
+    """Lettres des caractères sans équivalent Unicode de la page (polices_illisibles)."""
+    from config import Config
+    if not getattr(Config, 'PDF_DECODER_POLICES_ILLISIBLES', False):
+        return {}
+    from polices_illisibles import decodage_document
+    decodage = decodage_document(page.parent)
+    if ecartes is not None and decodage.tesseract_absent:
+        ecartes['tesseract_absent'] = True
+    return decodage.table_page(page)
+
+
+def _decoder(caracteres, police: str, table: Dict, ecartes: Optional[Dict]):
+    """Caractères du span, les illisibles remplacés par la lettre de leur dessin."""
+    from polices_illisibles import code_brut, position_caractere
+    sortie = []
+    for c in caracteres:
+        if c['c'] and code_brut(ord(c['c'][0])):
+            lettre, sure = table.get(position_caractere(police, c['origin']), ('?', False))
+            if ecartes is not None:
+                ecartes['illisibles'] = ecartes.get('illisibles', 0) + 1
+                if lettre == '?':
+                    ecartes['inconnues'] = ecartes.get('inconnues', 0) + 1
+                elif not sure and not lettre.isspace():
+                    ecartes.setdefault('incertaines', set()).add(lettre)
+            c = dict(c, c=lettre)
+        sortie.append(c)
+    return sortie
+
+
 def grille_page(page, ecartes: Optional[Dict] = None) -> List[str]:
     """Reconstruit une page de texte vectoriel en lignes à positions exactes.
 
@@ -259,7 +297,9 @@ def grille_page(page, ecartes: Optional[Dict] = None) -> List[str]:
     from collections import Counter
     from config import Config
     if ecartes is not None:
-        ecartes.update(doublons=0, caches=[])
+        ecartes.update(doublons=0, caches=[], illisibles=0, incertaines=set(), inconnues=0,
+                       tesseract_absent=False)
+    table_illisibles = None
 
     # Un mot : (y du span, x du 1er caractère, x du dernier, texte, n° de span,
     # x de début du span, boîte du mot).
@@ -273,6 +313,10 @@ def grille_page(page, ecartes: Optional[Dict] = None) -> List[str]:
                 caracteres = span['chars']
                 if not caracteres:
                     continue
+                if _a_illisibles(caracteres):
+                    if table_illisibles is None:
+                        table_illisibles = _table_illisibles(page, ecartes)
+                    caracteres = _decoder(caracteres, span['font'], table_illisibles, ecartes)
                 if page.rotation:
                     span, caracteres = _sens_de_lecture(span, page.rotation_matrix)
                 num_span += 1
@@ -743,6 +787,9 @@ class PdfTableExtractor:
             result = self._fail(page_num)
             result['detection_method'] = 'pdf-grille'
             result['error'] = "pas d'en-tête du modèle (page de garde, modifications…)"
+            if ecartes.get('illisibles') and ecartes.get('tesseract_absent'):
+                result['error'] = ("en-tête en police sans table Unicode, non décodé : "
+                                   "Tesseract introuvable")
             revisions = indices_revisions(lignes)
             if revisions:
                 result['metadata'] = {'REVISIONS': revisions}
@@ -805,6 +852,22 @@ class PdfTableExtractor:
                 rows.append({'type': 'data', 'cells': cellules, 'confidence': [100] * n})
         if len(cellules_par_ligne) in sections:
             rows.append({'type': 'section', 'text': sections[len(cellules_par_ligne)]})
+        if ecartes.get('inconnues'):
+            pourquoi = (", Tesseract introuvable" if ecartes.get('tesseract_absent') else "")
+            a_verifier.append({
+                'ligne': None, 'colonne': None, 'type': 'information',
+                'message': f"en-tête ou pied en police sans table Unicode : "
+                           f"{ecartes['inconnues']} caractère(s) non reconnu(s) (« ? »)"
+                           f"{pourquoi}, recopier depuis l'original",
+                'lecture': None})
+        if ecartes.get('incertaines'):
+            lettres = ', '.join(sorted(ecartes['incertaines']))
+            a_verifier.append({
+                'ligne': None, 'colonne': None, 'type': 'information',
+                'message': f"en-tête ou pied en police sans table Unicode : lettre(s) "
+                           f"{lettres} reconnue(s) sur une seule lecture Tesseract, "
+                           f"vérifier le pied",
+                'lecture': None})
         if ecartes.get('caches'):
             a_verifier.append({
                 'ligne': None, 'colonne': None, 'type': 'information',
