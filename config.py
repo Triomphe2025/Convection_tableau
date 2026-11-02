@@ -700,6 +700,9 @@ class Config:
     #   "claude-sonnet-5"           — précis, coût intermédiaire
     #   "claude-opus-5"             — 5 $ / 25 $ par million de tokens
     #   "claude-opus-5-5"           — recommandé (défaut), 4 $ / 20 $ ; réflexion toujours active
+    #   "claude-opus-5-5"           — recommandé (défaut), 4 $ / 20 $ ; réflexion toujours active
+    #   "claude-sonnet-5-5"         — rapide, 2 $ / 10 $ ; réflexion adaptative (non désactivable)
+    #   "claude-haiku-5-5"          — le moins cher, 0,10 $ / 0,50 $ ; réflexion adaptative
     #   "claude-fable-5-1"          — le plus capable ; réflexion toujours active
     CLAUDE_OCR_MODEL = "claude-opus-5-5"
 
@@ -714,6 +717,10 @@ class Config:
         "claude-sonnet-5":           {"thinking": True,  "effort": True},
         "claude-opus-5":             {"thinking": True,  "effort": True},
         "claude-opus-5-5":           {"thinking": False, "effort": True},
+        # Sonnet 5.5 / Haiku 5.5 (réflexion adaptative) refusent thinking:disabled (400) :
+        # champ omis comme Opus 5.5 ; les deux acceptent effort (défaut doc : high / medium).
+        "claude-sonnet-5-5":         {"thinking": False, "effort": True},
+        "claude-haiku-5-5":          {"thinking": False, "effort": True},
         "claude-fable-5-1":          {"thinking": False, "effort": True},
     }
 
@@ -743,6 +750,8 @@ class Config:
         "claude-sonnet-5":           (2.0, 10.0),
         "claude-opus-5":             (5.0, 25.0),
         "claude-opus-5-5":           (4.0, 20.0),
+        "claude-sonnet-5-5":         (2.0, 10.0),
+        "claude-haiku-5-5":          (0.10, 0.50),
         "claude-fable-5-1":          (10.0, 50.0),
     }
 

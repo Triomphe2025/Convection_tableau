@@ -356,5 +356,29 @@ class TestExtractOpus5(_ConfigClaude):
         self.assertNotIn('output_config', appel)
 
 
+class TestConfigModeles(unittest.TestCase):
+    """Chaque modèle déclaré a des capacités ET un prix : un modèle sans prix ferait
+    échouer l'estimation de coût de campagne_mesure.py."""
+
+    def test_chaque_modele_a_un_prix(self):
+        sans_prix = set(Config.CLAUDE_CAPACITES_MODELES) - set(Config.CLAUDE_PRIX_MODELES)
+        self.assertEqual(sans_prix, set(), f"modèles sans prix : {sans_prix}")
+
+    def test_prix_bien_formes(self):
+        for modele, prix in Config.CLAUDE_PRIX_MODELES.items():
+            self.assertEqual(len(prix), 2, modele)
+            entree, sortie = prix
+            self.assertGreater(entree, 0, modele)
+            self.assertGreater(sortie, 0, modele)
+
+    def test_nouveaux_modeles_5_5_presents(self):
+        for modele in ("claude-sonnet-5-5", "claude-haiku-5-5"):
+            self.assertIn(modele, Config.CLAUDE_CAPACITES_MODELES, modele)
+            self.assertIn(modele, Config.CLAUDE_PRIX_MODELES, modele)
+            # réflexion adaptative non désactivable → champ thinking omis
+            self.assertFalse(Config.CLAUDE_CAPACITES_MODELES[modele]["thinking"], modele)
+            self.assertTrue(Config.CLAUDE_CAPACITES_MODELES[modele]["effort"], modele)
+
+
 if __name__ == '__main__':
     unittest.main()
