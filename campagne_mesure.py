@@ -87,10 +87,21 @@ def reglage_en_memoire(modele: str, effort: str, cle: str):
             setattr(Config, nom, valeur)
 
 
-def cout_usd(modele: str, tokens_entree: int, tokens_sortie: int) -> float:
-    """Coût estimé ; KeyError si le modèle n'a pas de prix dans config.py."""
+def cout_usd(modele: str, tokens_entree: int, tokens_sortie: int,
+             cache_read: int = 0, cache_creation: int = 0, lot: bool = False) -> float:
+    """Coût estimé ; KeyError si le modèle n'a pas de prix dans config.py.
+
+    tokens_entree = entrée NON mise en cache. Les tokens lus en cache coûtent
+    `CLAUDE_CACHE_READ_MULT` × le prix d'entrée (0,05× Opus 5.5 / Sonnet 5.5, 0,1× sinon),
+    les tokens écrits en cache `CLAUDE_CACHE_WRITE_MULT` × (1,25×). Mode lot : −50 %.
+    """
     prix_entree, prix_sortie = Config.CLAUDE_PRIX_MODELES[modele]
-    return (tokens_entree * prix_entree + tokens_sortie * prix_sortie) / 1_000_000
+    mult_read = Config.CLAUDE_CACHE_READ_MULT.get(modele, Config.CLAUDE_CACHE_READ_MULT_DEFAUT)
+    cout = (tokens_entree * prix_entree
+            + cache_read * prix_entree * mult_read
+            + cache_creation * prix_entree * Config.CLAUDE_CACHE_WRITE_MULT
+            + tokens_sortie * prix_sortie) / 1_000_000
+    return cout * 0.5 if lot else cout
 
 
 def lire_journal(chemin: Path) -> Dict:
@@ -99,8 +110,8 @@ def lire_journal(chemin: Path) -> Dict:
     Les tokens de cache (lus / écrits) sont comptés en entrée au plein tarif :
     l'estimation est un majorant (aucun cache n'est demandé par claude_ocr).
     """
-    bilan = {'pages_envoyees': 0, 'tokens_entree': 0, 'tokens_sortie': 0, 'erreurs': [],
-             'ids': []}
+    bilan = {'pages_envoyees': 0, 'tokens_entree': 0, 'tokens_sortie': 0,
+             'cache_read': 0, 'cache_creation': 0, 'erreurs': [], 'ids': []}
     if not chemin.exists():
         return bilan
     for ligne in chemin.read_text(encoding='utf-8').splitlines():
@@ -113,6 +124,10 @@ def lire_journal(chemin: Path) -> Dict:
         if entree.get('id'):
             bilan['ids'].append(entree['id'])
         usage = entree.get('usage') or {}
+        # tokens_entree garde le total (entrée + cache) ; cache_read / cache_creation à part
+        # pour l'estimation au vrai prix (cout_usd).
+        bilan['cache_read'] += usage.get('cache_read_input_tokens', 0)
+        bilan['cache_creation'] += usage.get('cache_creation_input_tokens', 0)
         bilan['tokens_entree'] += (
             usage.get('input_tokens', 0) + usage.get('cache_read_input_tokens', 0)
             + usage.get('cache_creation_input_tokens', 0)
@@ -228,7 +243,7 @@ def _dossier_passage(racine: Path, document: str, modele: str, effort: str) -> P
 
 
 def executer_passage(pdf: Path, verite: Path, gabarit: str, modele: str, effort: str,
-                     racine: Path, cle: str) -> Dict:
+                     racine: Path, cle: str, lot: bool = False) -> Dict:
     """Convertit, mesure et retourne la ligne CSV d'un passage."""
     from converter import Converter
     from mesurer_precision import _version_git
@@ -265,7 +280,12 @@ def executer_passage(pdf: Path, verite: Path, gabarit: str, modele: str, effort:
         **mesures,
         'tokens_entree': journal['tokens_entree'],
         'tokens_sortie': journal['tokens_sortie'],
-        'cout_usd': round(cout_usd(modele, journal['tokens_entree'], journal['tokens_sortie']), 4),
+        'cout_usd': round(cout_usd(
+            modele,
+            journal['tokens_entree'] - journal['cache_read'] - journal['cache_creation'],
+            journal['tokens_sortie'],
+            cache_read=journal['cache_read'], cache_creation=journal['cache_creation'],
+            lot=lot), 4),
         'duree_s': round(duree, 1),
         'lignes_tableau_brutes': colonnes['lignes_tableau_brutes'],
         'lignes_hors_colonnes': colonnes['lignes_hors_colonnes'],
@@ -328,7 +348,7 @@ def controle_appels_reels(ligne: Dict, vus: set) -> List[str]:
 def lancer_campagne(modele: str, effort: str, passages: int, pdf: Path, verite: Path,
                     gabarit: str, racine: Path, cle: str,
                     budget: Optional[float] = None, afficher=print,
-                    rejouer: bool = False) -> List[Dict]:
+                    rejouer: bool = False, lot: bool = False) -> List[Dict]:
     """Enchaîne les passages ; s'arrête avant un passage si le budget est atteint.
 
     Chaque passage fait de vrais appels : une source .jsonl (rejeu d'un journal,
@@ -350,7 +370,7 @@ def lancer_campagne(modele: str, effort: str, passages: int, pdf: Path, verite: 
                      f"≥ budget {budget:.2f} $ (CAMPAGNE_BUDGET_MAX_USD).")
             break
         afficher(f"Passage {i}/{passages} — {modele}, effort {effort}…")
-        ligne = executer_passage(pdf, verite, gabarit, modele, effort, racine, cle)
+        ligne = executer_passage(pdf, verite, gabarit, modele, effort, racine, cle, lot=lot)
         if not rejouer:
             problemes = controle_appels_reels(ligne, vus)
             if problemes:

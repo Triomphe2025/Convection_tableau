@@ -1576,3 +1576,19 @@ illisible : chemin inchangé. Banc : `tests/test_polices_illisibles.py` (extrait
   incomplet écrit). À la relance : « reprise : N page(s) servie(s) par le cache » dès le début,
   seules les pages non lues rappellent l'API. `CLAUDE_CACHE_LECTURES`, case « Forcer la
   relecture » dans l'interface ; `campagne_mesure.py` coupe toujours le cache. 13 tests.
+
+## Mise en cache de la consigne Claude (étape 1, 2026-11-03)
+
+- La consigne commune (`_build_prompt`, ~1 000–1 500 tokens) est désormais envoyée EN TÊTE,
+  en bloc `system` stable avec `cache_control: {"type": "ephemeral"}` ; l'image suit dans le
+  message `user`. Les pages d'un même document partagent ce préfixe : lecture en cache ≈
+  0,05× le prix d'entrée (Opus 5.5 / Sonnet 5.5), 0,1× sinon ; écriture 1,25× (TTL 5 min).
+  Le texte de la consigne est inchangé, seule sa place change. Feedback et mode hybride
+  (prompt variable) gardent la structure d'avant (non mis en cache).
+- Clé de `cache_claude` strictement inchangée (toujours le hash de la consigne complète) :
+  les lectures déjà payées restent réutilisables (test dédié).
+- `campagne_mesure.cout_usd` facture les tokens de cache à leur vrai prix (lecture
+  `CLAUDE_CACHE_READ_MULT`, écriture `CLAUDE_CACHE_WRITE_MULT`), `lire_journal` sépare
+  `cache_read` / `cache_creation` ; option `lot` (−50 %) prête pour l'étape 6.
+- Tests sans réseau : clé identique, consigne en `system` + `cache_control`, feedback
+  inchangé, coût cache lu/écrit, `lire_journal` sépare les tokens. Suite complète verte.

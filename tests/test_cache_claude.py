@@ -45,6 +45,7 @@ class FauxClient:
 
     scenario = []     # liste d'actions : 'ok' | 'refus' | 'tronque' | '529'
     appels = 0
+    requetes = []     # kwargs de chaque appel (pour inspecter system / cache_control)
 
     def __init__(self, api_key=None, **kw):
         self.messages = SimpleNamespace(create=self._create, stream=self._stream)
@@ -56,6 +57,7 @@ class FauxClient:
         return cls.scenario[i] if i < len(cls.scenario) else 'ok'
 
     def _create(self, **kw):
+        FauxClient.requetes.append(kw)
         action = self._action()
         if action == '529':
             raise _Erreur529("surcharge simulée")
@@ -94,6 +96,7 @@ class _Base(unittest.TestCase):
         Config.CLAUDE_RETRY_DELAIS = ()
         FauxClient.scenario = []
         FauxClient.appels = 0
+        FauxClient.requetes = []
         self.ex = co.ClaudeVisionExtractor(TemplateManager().get('REPARTITEUR'))
 
     def tearDown(self):
@@ -249,6 +252,77 @@ class TestRepriseApresCoupure(_Base):
         FauxClient.appels = 0
         neuf, _ = self._extraire_toutes(images_dir)
         self.assertEqual([r['rows'] for r in repris], [r['rows'] for r in neuf])
+
+
+class TestConsigneEnCache(_Base):
+    """Étape 1 : consigne commune mise en cache (bloc system + cache_control), clé inchangée."""
+
+    def test_cle_cache_identique_a_la_formule_d_origine(self):
+        # Exigence : même hash qu'avant pour une même page → les lectures déjà payées
+        # restent réutilisables. La clé hache toujours la consigne complète (_build_prompt),
+        # indépendamment de la place (system) dans la requête.
+        import cache_claude
+        img = _image(self.tmp)
+        model = Config.CLAUDE_OCR_MODEL
+        parametres = co._parametres_modele(model)
+        image_data, media_type = co._preparer_image_claude(img, Config.CLAUDE_IMAGE_MAX_PX)
+        prompt = co._build_prompt(self.ex._tpl)
+        attendue = cache_claude.cle(image_data, media_type, prompt, model,
+                                    parametres, co._limite_tokens(parametres))
+        self.assertEqual(self.ex.cle_cache(img), attendue)
+        self.assertEqual(self.ex.cle_cache(img), self.ex.cle_cache(img))   # stable
+
+    def test_consigne_en_bloc_system_avec_cache_control(self):
+        self._extraire(_image(self.tmp))
+        req = FauxClient.requetes[0]
+        self.assertIn('system', req)
+        self.assertEqual(req['system'][0]['cache_control'], {'type': 'ephemeral'})
+        self.assertIn('Tu analyses', req['system'][0]['text'])          # la consigne
+        # L'image est seule dans le message user (la consigne la précède, en system).
+        contenu = req['messages'][0]['content']
+        self.assertEqual([b['type'] for b in contenu], ['image'])
+
+    def test_feedback_garde_la_structure_d_avant(self):
+        with patch('anthropic.Anthropic', FauxClient):
+            self.ex.extract(_image(self.tmp), feedback='corrige la colonne 2')
+        req = FauxClient.requetes[0]
+        self.assertNotIn('system', req)
+        self.assertEqual([b['type'] for b in req['messages'][0]['content']],
+                         ['image', 'text'])
+
+
+class TestCoutCache(unittest.TestCase):
+    """campagne_mesure : tokens de cache lus/écrits comptés à leur vrai prix."""
+
+    def test_cout_usd_cache_lu_moins_cher(self):
+        import campagne_mesure as cm
+        # Sonnet 5.5 (2/10) : lecture cache 0,05× → 1 000 tokens lus = 1 000×2×0.05/1e6
+        plein = cm.cout_usd('claude-sonnet-5-5', 1000, 0)
+        cache = cm.cout_usd('claude-sonnet-5-5', 0, 0, cache_read=1000)
+        self.assertAlmostEqual(plein, 1000 * 2 / 1e6)
+        self.assertAlmostEqual(cache, 1000 * 2 * 0.05 / 1e6)
+        self.assertLess(cache, plein)
+
+    def test_cout_usd_cache_ecrit_et_lot(self):
+        import campagne_mesure as cm
+        ecrit = cm.cout_usd('claude-sonnet-5-5', 0, 0, cache_creation=1000)
+        self.assertAlmostEqual(ecrit, 1000 * 2 * 1.25 / 1e6)
+        self.assertAlmostEqual(cm.cout_usd('claude-sonnet-5-5', 1000, 1000, lot=True),
+                               cm.cout_usd('claude-sonnet-5-5', 1000, 1000) * 0.5)
+
+    def test_lire_journal_separe_les_tokens_de_cache(self):
+        import json
+        import tempfile as tf
+        import campagne_mesure as cm
+        lignes = [json.dumps({'image': 'p1.png', 'success': True, 'usage': {
+            'input_tokens': 10, 'output_tokens': 3,
+            'cache_read_input_tokens': 7, 'cache_creation_input_tokens': 5}})]
+        f = Path(tf.mkdtemp()) / 'j.jsonl'
+        f.write_text('\n'.join(lignes), encoding='utf-8')
+        bilan = cm.lire_journal(f)
+        self.assertEqual(bilan['cache_read'], 7)
+        self.assertEqual(bilan['cache_creation'], 5)
+        self.assertEqual(bilan['tokens_entree'], 22)   # total inchangé (10+7+5)
 
 
 if __name__ == '__main__':

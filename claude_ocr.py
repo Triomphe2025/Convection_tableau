@@ -606,25 +606,25 @@ class ClaudeVisionExtractor:
             )
 
         max_tokens = _limite_tokens(parametres)
-        requete = dict(
-            model=model,
-            max_tokens=max_tokens,
-            **parametres,
-            messages=[{
+        bloc_image = {
+            'type': 'image',
+            'source': {'type': 'base64', 'media_type': media_type, 'data': image_data},
+        }
+        requete = dict(model=model, max_tokens=max_tokens, **parametres)
+        # Consigne commune mise en cache : la page standard (ni feedback, ni données Ollama)
+        # envoie la consigne EN TÊTE, en bloc `system` stable avec cache_control ; l'image suit.
+        # Lecture en cache ≈ 0,05× (Opus 5.5 / Sonnet 5.5) : les pages d'un même document la
+        # partagent. Feedback et mode hybride (prompt variable) gardent la structure d'avant.
+        if not feedback and not context_data:
+            requete['system'] = [{
+                'type': 'text', 'text': prompt, 'cache_control': {'type': 'ephemeral'},
+            }]
+            requete['messages'] = [{'role': 'user', 'content': [bloc_image]}]
+        else:
+            requete['messages'] = [{
                 'role': 'user',
-                'content': [
-                    {
-                        'type': 'image',
-                        'source': {
-                            'type':       'base64',
-                            'media_type': media_type,
-                            'data':       image_data,
-                        },
-                    },
-                    {'type': 'text', 'text': prompt},
-                ],
-            }],
-        )
+                'content': [bloc_image, {'type': 'text', 'text': prompt}],
+            }]
         # Cache : si la même demande exacte a déjà une lecture réussie, on la réutilise
         # sans appel ni coût (relance d'un document, reprise après coupure).
         cache_actif = (getattr(Config, 'CLAUDE_CACHE_LECTURES', False)

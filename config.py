@@ -764,6 +764,19 @@ class Config:
         "claude-fable-5-1":          (10.0, 50.0),
     }
 
+    # Multiplicateurs du prompt caching (page « Prompt caching ») appliqués au prix d'entrée :
+    # lecture d'un bloc en cache = 0,05× (Opus 5.5, Sonnet 5.5) ou 0,1× (autres) ; écriture
+    # = 1,25× (TTL 5 min) ou 2× (TTL 1 h, utilisé en mode lot). Sert à estimer le coût réel.
+    CLAUDE_CACHE_READ_MULT = {
+        "claude-opus-5-5": 0.05,
+        "claude-sonnet-5-5": 0.05,
+        "claude-opus-5": 0.05,
+        "claude-sonnet-5": 0.05,
+        "claude-fable-5-1": 0.05,
+    }
+    CLAUDE_CACHE_READ_MULT_DEFAUT = 0.10
+    CLAUDE_CACHE_WRITE_MULT = 1.25
+
     # Plafond de dépense d'une campagne de mesure : la campagne s'arrête avant
     # un passage si le coût cumulé l'a atteint.
     CAMPAGNE_BUDGET_MAX_USD = 10.0
