@@ -639,6 +639,7 @@ class ClaudeVisionExtractor:
 
         source = 'api'
         id_origine = ''
+        response = None             # défini pour les deux origines (cache : pas de réponse)
         if entree_cache is not None:
             raw = entree_cache['raw']
             usage = {'input_tokens': 0, 'output_tokens': 0,
@@ -702,6 +703,20 @@ class ClaudeVisionExtractor:
             # (deux passages ne peuvent pas partager un même identifiant).
             id_reponse = getattr(response, 'id', '') or ''
             stop_reason = response.stop_reason
+        return self._traiter_reponse(
+            image_path, raw, usage, modele_servi, id_reponse, stop_reason,
+            source, id_origine, cache_actif, cle_cache, max_tokens, response,
+        )
+
+    def _traiter_reponse(self, image_path, raw, usage, modele_servi, id_reponse,
+                         stop_reason, source, id_origine, cache_actif, cle_cache,
+                         max_tokens, response=None):
+        """Traite une réponse Claude (appel direct, cache ou futur lot) et rend le résultat.
+
+        Chemin unique : journal, cache et format de retour identiques quelle que soit
+        l'origine de la réponse. `response` ne sert qu'aux refus / troncatures (absent
+        pour une lecture en cache, dont stop_reason vaut 'end_turn').
+        """
         logger.info(
             f"Claude {modele_servi} — {image_path.name} : "
             f"{usage['input_tokens']} tokens en entrée, {usage['output_tokens']} en sortie"
