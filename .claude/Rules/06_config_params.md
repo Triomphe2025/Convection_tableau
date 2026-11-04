@@ -55,7 +55,7 @@ Config.TESSERACT_PATH   # référencer uniquement
 | `CLAUDE_CACHE_DOSSIER` | `…\cache_claude` | Un JSON par clé (écriture atomique), dans le dossier de l'utilisateur ; les tests le redirigent |
 | `CLAUDE_CACHE_AGE_MAX_JOURS` / `CLAUDE_CACHE_TAILLE_MAX_MO` | `90` / `200` | Purge du cache (âge puis taille) |
 | `CLAUDE_RETRY_DELAIS` | `(5, 15, 30, 45, 60)` | Délais (s) entre tentatives sur coupure réseau / 429 / 5xx / 529 ; épuisés → arrêt propre `ConnexionPerdue` |
-| `CLAUDE_MODE_LOT` | `False` | Mode lot (Message Batches API) en mode OCR `claude` seul : pages standard d'un document lues en un envoi, facturé −50 % ; pages en erreur / expirées / annulées et relectures → appel normal après le lot. Case « Mode lot » de l'interface (visible en mode claude) |
+| `CLAUDE_MODE_LOT` | `False` | Mode lot (Message Batches API) en mode OCR `claude` seul : pages d'un document pas encore en cache lues en un envoi (`Converter._lire_en_lot`, avant la boucle de `_extraire_avec_progres`), facturé −50 % ; pages déjà en cache retirées du lot (aucun lot si toutes y sont) ; pages en erreur / expirées / annulées, arrêt et relectures → appel normal après le lot (même gestion de coupure). Case « Mode lot » de l'interface (visible en mode claude) |
 | `CLAUDE_LOT_POLL_SECONDES` | `30` | Intervalle d'interrogation de l'état d'un lot (un lot aboutit en général en moins d'1 h, 24 h au maximum) |
 
 ## Vérification de conversion (section « VÉRIFICATION DE CONVERSION »)

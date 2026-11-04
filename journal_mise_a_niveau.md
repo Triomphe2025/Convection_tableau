@@ -1616,3 +1616,25 @@ illisible : chemin inchangé. Banc : `tests/test_polices_illisibles.py` (extrait
 - Non branché dans `converter.py` (étape 4). Tests sans réseau : `tests/test_claude_lot.py`
   (8 tests — custom_id conforme/unique + table, chemin unique, cache relu, repli errored/
   expired, arrêt annule le lot, sans clé, création impossible).
+
+## Branchement du mode lot dans le convertisseur (étape 4, 2026-11-04)
+
+- `Converter._lire_en_lot` : en mode OCR `claude` avec `CLAUDE_MODE_LOT`, les pages d'un
+  document partent en un seul lot (−50 %) avant la boucle de lecture, dans
+  `_extraire_avec_progres` (donc pour un PDF scanné, un dossier d'images ou un Word).
+  Les pages déjà en cache local sont retirées du lot (lues ensuite par le cache, 0 token) ;
+  si toutes y sont, aucun lot n'est créé. La boucle réutilise le résultat du lot pour chaque
+  page réussie ; une page rendue en `repli_normal` (erreur / expiration / annulation, arrêt,
+  lot indisponible) est relue en **appel normal après le lot**, avec la même gestion de
+  coupure qu'avant (`connexion_perdue` → `ConnexionPerdue`, aucun Excel incomplet en silence).
+- `lot_<id>.json` est écrit dès la création du lot (avant l'attente) : une fermeture de
+  l'appli pendant l'attente laisse le lot reprenable (étape 5). L'attente se fait sur le fil
+  de travail (l'UI sonde la file, jamais figée) ; le journal affiche « Lot envoyé : N page(s) »
+  puis la progression à chaque sondage ; le bouton d'arrêt (`cancel_event` → `_est_annule`)
+  annule le lot.
+- Test sans réseau `tests/test_lot_converter.py` (4 tests) : un faux client sert à la fois
+  `messages.create` (appel normal) et `messages.batches` (lot). Exigence centrale vérifiée :
+  même document lu en mode normal puis en mode lot, avec les mêmes réponses, donne un classeur
+  Excel **strictement identique** (toutes feuilles, toutes cellules) ; plus page en cache
+  retirée du lot, aucun lot si tout en cache, page errored relue en un appel normal après le
+  lot. Suite complète verte, 1360 tests.

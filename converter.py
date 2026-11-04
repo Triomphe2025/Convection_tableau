@@ -1221,6 +1221,37 @@ class Converter:
             self._log(f"  reprise : {deja} page(s) servie(s) par le cache "
                       "(ni relues ni repayées).")
 
+    def _lire_en_lot(self, vision_extractor, images) -> Dict[str, dict]:
+        """Lit en un seul lot (Message Batches API, −50 %) les pages Claude pas en cache.
+
+        Pages déjà en cache retirées du lot (lues ensuite par le cache, 0 token) ; si
+        toutes y sont, aucun lot n'est créé. Pages en erreur / expirées / annulées ou
+        arrêt rendues en `repli_normal` : la boucle les relit en appel normal. L'attente
+        du lot se fait sur le fil de travail (l'UI sonde la file, jamais figée) ; le
+        bouton d'arrêt (cancel_event → _est_annule) annule le lot.
+        """
+        if not hasattr(vision_extractor, '_construire_requete'):
+            return {}      # garde-fou : moteur sans mode lot (jamais atteint en mode claude)
+        a_lire = list(images)
+        if (getattr(Config, 'CLAUDE_CACHE_LECTURES', False)
+                and not getattr(Config, 'CLAUDE_FORCER_RELECTURE', False)
+                and hasattr(vision_extractor, 'cle_cache')):
+            import cache_claude
+            a_lire = [img for img in images
+                      if not ((c := vision_extractor.cle_cache(img)) and cache_claude.existe(c))]
+        if not a_lire:
+            self._log("  Mode lot : toutes les pages sont déjà en cache — aucun lot créé.")
+            return {}
+        from claude_lot import LecteurLot
+        self._log(f"  Mode lot : {len(a_lire)} page(s) envoyée(s) en un seul lot (−50 %), "
+                  "en attente…")
+        lecteur = LecteurLot(
+            vision_extractor,
+            on_log=lambda m, niveau='info': self._log(m),
+            doit_arreter=self._est_annule,
+        )
+        return lecteur.lire(a_lire, self.output_dir)
+
     def _extraire_avec_progres(
         self, images_dir: Path, total_hint: int
     ) -> Tuple[List[Dict], BornierTableExtractor]:
@@ -1330,8 +1361,12 @@ class Converter:
 
         # Reprise : annoncer dès le début combien de pages sont déjà en cache (relance d'un
         # document, reprise après coupure) — elles ne seront ni relues ni repayées.
+        lot_resultats: Dict[str, dict] = {}
         if vision_extractor is not None:
             self._annoncer_reprise(vision_extractor, images)
+            # Mode lot (Claude seul) : lire d'un bloc les pages pas encore en cache (−50 %).
+            if ocr_mode == 'claude' and getattr(Config, 'CLAUDE_MODE_LOT', False):
+                lot_resultats = self._lire_en_lot(vision_extractor, images)
 
         results = []
         pages_cache = 0
@@ -1344,7 +1379,12 @@ class Converter:
             self._log(f"  OCR {i + 1}/{total} : {img.name}")
 
             if vision_extractor is not None:
-                result = vision_extractor.extract(img)
+                # Page déjà lue par le lot ; sinon (cache, repli du lot, hors lot) appel normal.
+                pre = lot_resultats.get(str(img))
+                if pre is not None and not pre.get('repli_normal'):
+                    result = pre
+                else:
+                    result = vision_extractor.extract(img)
             else:
                 result = extractor.extract(img)
 
