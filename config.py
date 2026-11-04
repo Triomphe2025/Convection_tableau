@@ -819,6 +819,20 @@ class Config:
     # Intervalle d'interrogation de l'état d'un lot (secondes) : un lot aboutit le plus
     # souvent en moins d'une heure (24 h au maximum, au-delà les pages sont « expirées »).
     CLAUDE_LOT_POLL_SECONDES = 30
+    # Taille maximale d'un lot (Mo) : un document est découpé en plusieurs lots sous ce
+    # plafond, un fichier lot_<id>.json par lot. La limite serveur Anthropic est de 256 Mo
+    # par lot (erreur 413 au-delà) ; la taille est mesurée sur les requêtes déjà préparées
+    # (image + consigne encodées), l'encodage des images reste inchangé (clés de cache).
+    CLAUDE_LOT_TAILLE_MAX_MO = 50
+    # Délai (secondes) de la requête d'ENVOI d'un lot : proportionnel à la taille envoyée
+    # (base + par_mo × Mo). Le client du lot n'a aucune relance interne (max_retries=0) ;
+    # nos propres relances passent par CLAUDE_RETRY_DELAIS et respectent le bouton Arrêter.
+    CLAUDE_LOT_TIMEOUT_BASE_S = 60
+    CLAUDE_LOT_TIMEOUT_PAR_MO_S = 6
+    # Avant de recréer un lot après un délai dépassé ou une coupure (l'envoi a pu aboutir
+    # côté serveur), les lots créés dans cette fenêtre (minutes) sont examinés : un lot du
+    # même nombre de requêtes est repris au lieu d'en créer un doublon (facturé deux fois).
+    CLAUDE_LOT_FENETRE_DOUBLON_MIN = 10
 
     # ========================================
     # 🤖 MODE OCR — Agent Managed Agents

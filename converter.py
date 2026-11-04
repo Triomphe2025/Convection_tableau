@@ -1222,7 +1222,7 @@ class Converter:
                       "(ni relues ni repayées).")
 
     def _lire_en_lot(self, vision_extractor, images) -> Dict[str, dict]:
-        """Lit en un seul lot (Message Batches API, −50 %) les pages Claude pas en cache.
+        """Lit en lot(s) (Message Batches API, −50 %) les pages Claude pas en cache.
 
         Pages déjà en cache retirées du lot (lues ensuite par le cache, 0 token) ; si
         toutes y sont, aucun lot n'est créé. Pages en erreur / expirées / annulées ou
@@ -1243,8 +1243,7 @@ class Converter:
             self._log("  Mode lot : toutes les pages sont déjà en cache — aucun lot créé.")
             return {}
         from claude_lot import LecteurLot
-        self._log(f"  Mode lot : {len(a_lire)} page(s) envoyée(s) en un seul lot (−50 %), "
-                  "en attente…")
+        self._log(f"  Mode lot : {len(a_lire)} page(s) à lire par lot (−50 %), en attente…")
         lecteur = LecteurLot(
             vision_extractor,
             on_log=lambda m, niveau='info': self._log(m),

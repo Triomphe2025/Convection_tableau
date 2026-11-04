@@ -57,6 +57,9 @@ Config.TESSERACT_PATH   # référencer uniquement
 | `CLAUDE_RETRY_DELAIS` | `(5, 15, 30, 45, 60)` | Délais (s) entre tentatives sur coupure réseau / 429 / 5xx / 529 ; épuisés → arrêt propre `ConnexionPerdue` |
 | `CLAUDE_MODE_LOT` | `False` | Mode lot (Message Batches API) en mode OCR `claude` seul : pages d'un document pas encore en cache lues en un envoi (`Converter._lire_en_lot`, avant la boucle de `_extraire_avec_progres`), facturé −50 % ; pages déjà en cache retirées du lot (aucun lot si toutes y sont) ; pages en erreur / expirées / annulées, arrêt et relectures → appel normal après le lot (même gestion de coupure). Case « Mode lot » de l'interface (visible en mode claude) |
 | `CLAUDE_LOT_POLL_SECONDES` | `30` | Intervalle d'interrogation de l'état d'un lot (un lot aboutit en général en moins d'1 h, 24 h au maximum) |
+| `CLAUDE_LOT_TAILLE_MAX_MO` | `50` | Plafond de taille d'un lot : un document est découpé en plusieurs lots sous ce seuil (un fichier `lot_<id>.json` par lot), mesuré sur les requêtes préparées (image + consigne encodées). Limite serveur Anthropic : 256 Mo / lot (erreur 413 au-delà). Encodage des images inchangé (clés de cache) |
+| `CLAUDE_LOT_TIMEOUT_BASE_S` / `CLAUDE_LOT_TIMEOUT_PAR_MO_S` | `60` / `6` | Délai d'envoi d'un lot = base + par_mo × Mo. Client du lot sans relance interne (`max_retries=0`) : nos relances (`CLAUDE_RETRY_DELAIS`) ne s'ajoutent pas à celles du SDK et respectent Arrêter (pauses via `_dormir`) |
+| `CLAUDE_LOT_FENETRE_DOUBLON_MIN` | `10` | Avant de recréer un lot après un délai dépassé / une coupure (l'envoi a pu aboutir côté serveur), les lots créés dans cette fenêtre (min) sont listés : un lot du même nombre de requêtes est repris au lieu d'un doublon (facturé deux fois) |
 
 ## Vérification de conversion (section « VÉRIFICATION DE CONVERSION »)
 

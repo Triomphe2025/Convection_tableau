@@ -1638,3 +1638,74 @@ illisible : chemin inchangé. Banc : `tests/test_polices_illisibles.py` (extrait
   Excel **strictement identique** (toutes feuilles, toutes cellules) ; plus page en cache
   retirée du lot, aucun lot si tout en cache, page errored relue en un appel normal après le
   lot. Suite complète verte, 1360 tests.
+
+## Reprendre un lot déjà envoyé (étape 5, 2026-11-04)
+
+- `LecteurLot.reprendre(lot_fichier)` rejoue un lot depuis son `lot_<id>.json` (écrit dès la
+  création à l'étape 4), pour reprendre après une fermeture de l'appli pendant l'attente. La
+  table de correspondance (clé de cache, modèle, `max_tokens`) se reconstruit à l'identique :
+  `_preparer` est déterministe et le `custom_id` enregistré est conservé — aucun nouveau lot
+  n'est jamais créé.
+- Trois cas, selon l'état lu par `retrieve` :
+  - **terminé** (`ended`) → les pages réussies passent par le chemin de lecture unique
+    (`_traiter_reponse` : même journal, même cache, même retour qu'une lecture normale) ;
+  - **encore en cours** (`in_progress` / `canceling`) → l'attente reprend (`_attendre`, sur le
+    fil de travail, UI jamais figée, arrêt possible), puis récupération ;
+  - **expiré / annulé** → les pages expirées / annulées (et toute page absente des résultats)
+    repartent en `repli_normal` : converter les relit en **appel normal**. Même mécanisme si le
+    lot est introuvable côté serveur (`retrieve` en échec persistant : lot purgé / supprimé).
+- Ne lève jamais : fichier absent, illisible, sans identifiant ni pages → rien à reprendre
+  (dict vide) ; clé API absente → tout en `repli_normal`.
+- Test sans réseau `tests/test_lot_reprise.py` (8 tests) : faux client dont `results()` est
+  piloté par les `custom_id` du fichier (jamais de `create`). Couvre les trois cas demandés +
+  lot introuvable + fichier absent / sans pages / sans clé. Suite complète verte, 1368 tests.
+- Non encore branché dans `converter.py` ni l'interface (bouton « Reprendre un lot ») : étape
+  suivante, après revue.
+
+## Correctif du mode lot : découpage, délai, arrêt, anti-doublon (2026-11-04)
+
+Symptôme : conversion bloquée sur « Lot indisponible — nouvelle tentative dans 45 s ».
+Quatre causes traitées dans `claude_lot.py` (plus 4 paramètres dans `config.py`) :
+
+1. **Un seul `create` pour tout le document** (une page = PNG base64 de 0,3 à 3,4 Mo, donc
+   des centaines de Mo ; limite serveur 256 Mo, erreur 413). → Découpage en plusieurs lots
+   sous `CLAUDE_LOT_TAILLE_MAX_MO` (50 Mo), taille mesurée sur les requêtes déjà préparées
+   (`_decouper`) ; **un `lot_<id>.json` par lot** ; une page seule plus grosse que le plafond
+   part quand même dans son propre lot. L'encodage des images est inchangé (clés de cache).
+2. **Client avec délai par défaut (10 min) et ses 2 relances internes** qui s'ajoutaient à nos
+   5 relances. → Client du lot `max_retries=0` et **délai explicite proportionnel à la taille**
+   (`CLAUDE_LOT_TIMEOUT_BASE_S` + `CLAUDE_LOT_TIMEOUT_PAR_MO_S` × Mo).
+3. **`_creer()` ne consultait jamais l'arrêt.** → Les pauses de relance passent par `_dormir()`
+   (le bouton Arrêter coupe net, aucune boucle qui tourne dans le vide), y compris les pauses
+   de `_etat()` (interrogation de l'état d'un lot).
+4. **Doublon facturé** : après un délai dépassé, l'envoi a pu aboutir côté serveur. → Avant de
+   recréer, `batches.list` cherche le lot que **notre** envoi a créé malgré l'erreur et le
+   reprend au lieu d'en créer un autre.
+
+Corrections de revue (avant commit) :
+
+- **Tous les lots sont créés d'abord**, puis attendus dans une seule boucle de sondage, puis
+  récupérés (`_creer_lot` / `_attendre_et_recuperer`) : un lot n'attend plus la fin du précédent
+  pour partir (le document avançait auparavant lot par lot, séquentiellement).
+- **Anti-doublon resserré** : le lot repris doit avoir le même nombre de requêtes, avoir été créé
+  **après le début de nos tentatives** (`heure_debut`, marge d'une minute) et porter un id
+  **encore inconnu** — ni un lot déjà créé cette exécution, ni un `lot_<id>.json` d'une exécution
+  passée (`_ids_lots_dossier`). Sans ces gardes, deux lots du même document (même nombre de pages)
+  se confondaient : le lot 1 aurait pu être repris comme lot 2, ses pages reparties en repli payant
+  et son `lot_<id>.json` écrasé.
+- **`batches.list`** : lecture de la **première page seule** (`.data`), sans paginer tout
+  l'historique.
+
+Journal plus parlant : « Lot 1/3 : 84 page(s), 92 Mo — envoi… » et « Lot indisponible
+(APITimeoutError) — nouvelle tentative dans 45 s » (vraie classe d'erreur affichée).
+`reprendre` accepte désormais un **dossier** : il rejoue chaque `lot_*.json` qu'il contient
+(document découpé en plusieurs lots). `converter.py` : message d'amorce ajusté (plusieurs lots
+possibles), aucune autre logique touchée.
+
+Test sans réseau `tests/test_lot_decoupage.py` (10 tests) : découpage unitaire par taille,
+un lot par page / un seul lot selon le plafond (fichiers `lot_*.json` comptés), tous les lots
+créés avant la première récupération (3 `create` avant tout `results`), arrêt pendant les
+relances (une seule tentative, pas de boucle), pas de doublon après un délai dépassé (lot du
+serveur repris via `batches.list`, aucun second `create` ; nombre différent → repli ; un AUTRE
+lot du même document, du même nombre de pages, n'est pas repris à sa place), reprise d'un dossier
+à deux lots. Suite complète verte, **1378 tests** (1368 + 10).
