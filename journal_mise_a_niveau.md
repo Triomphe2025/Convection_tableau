@@ -1592,3 +1592,27 @@ illisible : chemin inchangé. Banc : `tests/test_polices_illisibles.py` (extrait
   `cache_read` / `cache_creation` ; option `lot` (−50 %) prête pour l'étape 6.
 - Tests sans réseau : clé identique, consigne en `system` + `cache_control`, feedback
   inchangé, coût cache lu/écrit, `lire_journal` sépare les tokens. Suite complète verte.
+
+## Refonte du traitement de réponse + module de lecture par lot (étapes 2-3, 2026-11-03)
+
+- Étape 2 (sans changement de comportement) : le traitement d'une réponse Claude (journal,
+  cache, refus, troncature, parsing pipe, page « non-listing », retour) passe dans une méthode
+  unique `ClaudeVisionExtractor._traiter_reponse`. `extract()` se termine par
+  `return self._traiter_reponse(...)`, appelée aussi bien pour un appel d'API que pour une
+  lecture en cache. Déplacement pur (15 insertions, 0 suppression). Suite verte, 1348 tests.
+- Étape 3, mode lot (`claude_lot.py`, `LecteurLot`) : lecture d'un document entier par la
+  Message Batches API d'Anthropic (anthropic 1.8 : `messages.batches.create/retrieve/results/
+  cancel`), facturée à moitié prix. Un `custom_id` par page (`p00000`…, conforme et unique :
+  le rang de la page), table de correspondance `lot_<id>.json` enregistrée dans le dossier de
+  sortie (reprise). Chaque page réussie passe par `_traiter_reponse` : même journal, même cache
+  (écrit comme un appel normal, source `api`), même retour. Pages en erreur / expirées /
+  annulées et arrêt demandé → `repli_normal=True` (relecture en appel normal après le lot).
+  Ne lève jamais. La requête est construite par la source unique `_construire_requete`
+  (consigne en cache, partagée avec `extract()`).
+- Règles actées : mode lot réservé au mode OCR `claude` (jamais hybrid ni agent) ; toute
+  relecture déclenchée par un contrôle part en appel normal APRÈS le lot. `config.py` :
+  `CLAUDE_MODE_LOT` (False), `CLAUDE_LOT_POLL_SECONDES` (30). Interface : case « Mode lot »
+  sur la page Mode OCR (réglages développeur), visible en mode claude seul.
+- Non branché dans `converter.py` (étape 4). Tests sans réseau : `tests/test_claude_lot.py`
+  (8 tests — custom_id conforme/unique + table, chemin unique, cache relu, repli errored/
+  expired, arrêt annule le lot, sans clé, création impossible).

@@ -807,6 +807,19 @@ class Config:
     # (les pages déjà lues restent en cache, la relance les réutilise).
     CLAUDE_RETRY_DELAIS = (5, 15, 30, 45, 60)
 
+    # ---- Mode lot (Message Batches API) — 50 % moins cher, lecture différée ----
+    # True : en mode OCR « claude » seul, les pages standard d'un document partent en
+    # un seul lot (un custom_id par page) au lieu d'un appel par page ; l'entrée et la
+    # sortie sont facturées à moitié prix. Chaque page lue passe par le chemin unique de
+    # lecture (journal, cache, retour identiques à un appel normal). Les pages en erreur /
+    # expirées / annulées, et toute relecture déclenchée par un contrôle, partent en appel
+    # normal APRÈS le lot (jamais dans le lot). Piloté par la case « Mode lot » de
+    # l'interface, visible en mode claude ; jamais en hybrid ni agent.
+    CLAUDE_MODE_LOT = False
+    # Intervalle d'interrogation de l'état d'un lot (secondes) : un lot aboutit le plus
+    # souvent en moins d'une heure (24 h au maximum, au-delà les pages sont « expirées »).
+    CLAUDE_LOT_POLL_SECONDES = 30
+
     # ========================================
     # 🤖 MODE OCR — Agent Managed Agents
     # ========================================

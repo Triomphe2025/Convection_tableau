@@ -79,6 +79,7 @@ tests/
   test_texte_imprime.py              → Lecture vectorielle telle qu'imprimée : 223111PE022 p. 14 (31 lignes, lignes surimprimées lues une fois avec leur borne, jarretières entières, texte caché non lu), p. 9 (« NOM DE CABLE », page lue) ; surimpression, masque blanc, point seul gardé (pages fabriquées) ; pied reconnu à ses libellés (ligne inconnue gardée et signalée, « NOM DE CABLE » sans équivalent : page gardée), information « mots cachés » avec les mots en commentaire, zone du tableau par le texte (pages sans cadre)
   test_ligne_de_commande.py          → ligne_de_commande.py : infos, conversion d'un PDF vectoriel, reformatage, erreur au journal avec le code 2
   test_cache_claude.py               → cache_claude.py + ClaudeVisionExtractor + Converter (faux client, sans réseau) : même demande = 1 appel ; modèle / effort / prompt / image différents = nouvel appel ; refus, réponse coupée jamais gardés ; clé API absente du cache ; campagne (reglage_en_memoire) coupe le cache ; retry puis succès ; coupure page 3/5 = arrêt propre ConnexionPerdue, relance = pages 3-5 seules rappelées, résultat identique
+  test_claude_lot.py                 → claude_lot.py (LecteurLot, Message Batches API simulée, sans réseau) : custom_id conforme (^[a-zA-Z0-9_-]{1,64}$) et unique + table lot_<id>.json enregistrée, chaque page réussie par le chemin unique _traiter_reponse (même retour, cache relu sans appel), errored / expired → repli_normal, arrêt = lot annulé + repli, sans clé = repli, création impossible = repli, liste vide
   test_ed25519_verif.py              → ed25519_verif.py : vecteurs officiels RFC 8032, altérations et entrées mal formées rejetées
   test_licence.py                    → licence.py (signature simulée) : licence du poste valable, signature invalide, autre poste, expirée, forme fausse ; identifiant stable ; garde d'horloge (recul refusé, avance ok) ; préavis 15 j ; exiger hors exe / sans licence / valable / expirée
   test_prompt_claude.py              → consigne Claude externalisée (ressources/prompt_claude.txt) + encodée (textes_proteges) : sortie identique au golden des 4 modèles, aucun jeton restant, .dat sans texte en clair, aller-retour d'encodage
@@ -108,7 +109,7 @@ tests/
   test_claude_opus5.py               → claude_ocr sur Opus 5 / 5.5 : table de capacités, paramètres envoyés, refus avec catégorie, bloc de réflexion, effort refusé, images PNG ≤ 2576 px
 ```
 
-**1342 tests passent** (`pytest tests\`, relevé le 2026-11-02), aucun échec attendu, plus 1 test lent
+**1356 tests passent** (`pytest tests\`, relevé le 2026-11-03), aucun échec attendu, plus 1 test lent
 facultatif (`VERIF_TEST_LENT=1`, relecture du scan de 15 pages, ~30 s). Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.
 

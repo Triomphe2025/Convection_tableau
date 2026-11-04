@@ -771,6 +771,8 @@ class TriosSeconverterApp(tk.Tk):
         self._claude_model = tk.StringVar(value=getattr(Config, 'CLAUDE_OCR_MODEL', ''))
         self._claude_forcer = tk.BooleanVar(
             value=bool(getattr(Config, 'CLAUDE_FORCER_RELECTURE', False)))
+        self._claude_mode_lot = tk.BooleanVar(
+            value=bool(getattr(Config, 'CLAUDE_MODE_LOT', False)))
         self._agent_session_id = tk.StringVar(
             value=getattr(Config, 'CLAUDE_AGENT_SESSION_ID', '')
         )
@@ -2832,6 +2834,18 @@ class TriosSeconverterApp(tk.Tk):
             highlightthickness=0, bd=0,
         ).pack(side='left', padx=(16, 0))
 
+        # Mode lot : visible en mode claude seul (pas hybrid/agent). 50 % moins cher,
+        # lecture différée du document entier en un seul envoi.
+        self._claude_lot_frame = tk.Frame(engine_frame, bg=BG_PANEL)
+        tk.Checkbutton(
+            self._claude_lot_frame,
+            text="Mode lot (50 % moins cher, lecture différée du document)",
+            variable=self._claude_mode_lot, font=("Segoe UI", 8),
+            fg=FG_MUTED, bg=BG_PANEL, selectcolor=BG_CARD,
+            activebackground=BG_PANEL, activeforeground=FG_TEXT,
+            highlightthickness=0, bd=0,
+        ).pack(side='left', padx=(12, 0))
+
         # Ligne ID de session agent (conditionnelle — visible uniquement en mode "agent")
         self._agent_session_frame = tk.Frame(engine_frame, bg=BG_PANEL)
 
@@ -3727,6 +3741,12 @@ class TriosSeconverterApp(tk.Tk):
                 self._claude_model_frame.pack(fill='x', padx=0, pady=(0, 4))
             else:
                 self._claude_model_frame.pack_forget()
+        # Mode lot : réservé au mode claude (jamais hybrid ni agent).
+        if hasattr(self, '_claude_lot_frame'):
+            if mode == 'claude':
+                self._claude_lot_frame.pack(fill='x', padx=0, pady=(0, 4))
+            else:
+                self._claude_lot_frame.pack_forget()
         if hasattr(self, '_agent_session_frame'):
             if needs_agent:
                 self._agent_session_frame.pack(fill='x', padx=0, pady=(0, 8))
@@ -3910,6 +3930,8 @@ class TriosSeconverterApp(tk.Tk):
             if modele:
                 Config.CLAUDE_OCR_MODEL = modele
             Config.CLAUDE_FORCER_RELECTURE = bool(self._claude_forcer.get())
+        # Mode lot réservé au mode claude : décoché d'office dans les autres modes.
+        Config.CLAUDE_MODE_LOT = (ocr_mode == 'claude') and bool(self._claude_mode_lot.get())
         if ocr_mode == 'agent':
             session_id = self._agent_session_id.get().strip()
             if not session_id:

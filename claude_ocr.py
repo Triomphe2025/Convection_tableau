@@ -539,6 +539,33 @@ class ClaudeVisionExtractor:
         except Exception:
             return None
 
+    def _construire_requete(self, model, parametres, image_data, media_type, prompt,
+                            feedback=None, context_data=None):
+        """Assemble la requête Claude d'une page (image + consigne) et rend (requete, max_tokens).
+
+        Une seule façon de poser la consigne, partagée par extract() (appel direct) et le mode
+        lot : page standard (ni feedback ni données Ollama) → consigne EN TÊTE, bloc `system`
+        stable avec cache_control (lecture en cache ≈ 0,05× Opus/Sonnet 5.5, partagée entre les
+        pages d'un document) ; feedback / mode hybride (prompt variable) → consigne après l'image.
+        """
+        max_tokens = _limite_tokens(parametres)
+        bloc_image = {
+            'type': 'image',
+            'source': {'type': 'base64', 'media_type': media_type, 'data': image_data},
+        }
+        requete = dict(model=model, max_tokens=max_tokens, **parametres)
+        if not feedback and not context_data:
+            requete['system'] = [{
+                'type': 'text', 'text': prompt, 'cache_control': {'type': 'ephemeral'},
+            }]
+            requete['messages'] = [{'role': 'user', 'content': [bloc_image]}]
+        else:
+            requete['messages'] = [{
+                'role': 'user',
+                'content': [bloc_image, {'type': 'text', 'text': prompt}],
+            }]
+        return requete, max_tokens
+
     def extract(
         self,
         image_path: Path,
@@ -605,26 +632,8 @@ class ClaudeVisionExtractor:
                 f"({len(feedback)} car.) : {image_path.name}"
             )
 
-        max_tokens = _limite_tokens(parametres)
-        bloc_image = {
-            'type': 'image',
-            'source': {'type': 'base64', 'media_type': media_type, 'data': image_data},
-        }
-        requete = dict(model=model, max_tokens=max_tokens, **parametres)
-        # Consigne commune mise en cache : la page standard (ni feedback, ni données Ollama)
-        # envoie la consigne EN TÊTE, en bloc `system` stable avec cache_control ; l'image suit.
-        # Lecture en cache ≈ 0,05× (Opus 5.5 / Sonnet 5.5) : les pages d'un même document la
-        # partagent. Feedback et mode hybride (prompt variable) gardent la structure d'avant.
-        if not feedback and not context_data:
-            requete['system'] = [{
-                'type': 'text', 'text': prompt, 'cache_control': {'type': 'ephemeral'},
-            }]
-            requete['messages'] = [{'role': 'user', 'content': [bloc_image]}]
-        else:
-            requete['messages'] = [{
-                'role': 'user',
-                'content': [bloc_image, {'type': 'text', 'text': prompt}],
-            }]
+        requete, max_tokens = self._construire_requete(
+            model, parametres, image_data, media_type, prompt, feedback, context_data)
         # Cache : si la même demande exacte a déjà une lecture réussie, on la réutilise
         # sans appel ni coût (relance d'un document, reprise après coupure).
         cache_actif = (getattr(Config, 'CLAUDE_CACHE_LECTURES', False)
