@@ -330,6 +330,30 @@ Pour ajouter une correction → `/corriger-ocr`.
 
 ---
 
+## Tests d'abord (obligatoire)
+Pour toute nouvelle fonction, toute correction de bug et tout changement de comportement :
+1. Écris d'abord le ou les tests qui décrivent le comportement attendu, avant de toucher au code.
+2. Lance-les et montre qu'ils échouent pour la bonne raison : le message d'échec porte sur le
+   comportement visé, pas sur une erreur d'import, de nom ou de syntaxe.
+3. Écris ensuite le code minimal qui les fait passer, puis relance toute la suite.
+4. Preuve qu'un test vérifie vraiment : casse volontairement la ligne de code qu'il protège (ou
+   inverse la condition), montre que le test devient rouge, puis remets le code.
+5. Dans le rapport, pour chaque test : ce qu'il vérifie, sa sortie en échec avant le code, sa
+   sortie en échec quand le code est cassé, sa sortie verte à la fin.
+
+Un test ne doit jamais :
+- vérifier seulement qu'une fonction a été appelée (simulacre) sans vérifier le résultat réel ;
+- recopier dans le test le calcul du code testé, ou comparer une valeur à elle-même ;
+- passer quel que soit le code : assert True, aucun assert, exception avalée, skip ou xfail
+  sans mon accord ;
+- être modifié, affaibli ou supprimé pour faire passer le code : si un test existant échoue,
+  arrête-toi et explique-moi pourquoi avant d'y toucher.
+
+Seule exception : un réglage purement visuel (couleur, marge, position) peut être vérifié par
+capture d'écran plutôt que par test ; le rapport le signale.
+
+---
+
 ## Dépendances (`requirements.txt`)
 
 ```
