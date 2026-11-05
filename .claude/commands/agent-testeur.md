@@ -11,6 +11,12 @@ env\Scripts\python.exe -m pytest tests\ -v --tb=short
 ```
 - Tous les tests existants doivent toujours passer (205+)
 - Les nouveaux tests écrits par le backend doivent passer
+- Pour chaque nouveau test, vérifier les trois preuves de « Tests d'abord (obligatoire) »
+  (`.claude/CLAUDE.md`) : rouge avant le code, rouge quand la ligne protégée est cassée (ou la
+  condition inversée), vert à la fin ; refuser les faux tests listés dans cette section
+  (simulacre sans vérification du résultat réel, valeur comparée à elle-même, `assert True`,
+  aucun assert, exception avalée, `skip`/`xfail` non autorisé — les simulacres restent permis
+  pour les appels API à condition de vérifier le résultat réel)
 - Signaler tout test qui échoue avec la cause exacte
 
 ### 2. Test de syntaxe de tous les fichiers modifiés
@@ -57,6 +63,7 @@ TESTS AUTOMATISÉS
   Passants : [N] ✓
   Échoués  : [N] ✗
   Nouveaux : [N]
+  Preuves (rouge avant / rouge code cassé / vert) : [N]/[N] complètes
 
 TESTS FONCTIONNELS
   Interface démarrage  : ✓/✗
@@ -69,6 +76,7 @@ COUVERTURE
   Cas non testés          : [liste — pour le backlog]
 
 VERDICT FINAL : ✓ PRÊT / ✗ BLOQUÉ
+  ✗ BLOQUÉ si une preuve manque ou si un faux test est trouvé
   [Raison si bloqué]
 
 TRANSMIS À : Agent Apprentissage + Auditeur

@@ -86,6 +86,12 @@ le traitement global. Logger l'erreur et continuer.
 
 ## Étape 5 — Implémentation fichier par fichier
 
+**Tests d'abord (obligatoire)** — voir la section « Tests d'abord (obligatoire) » de
+`.claude/CLAUDE.md`. Avant toute édition de code : écrire le ou les tests qui décrivent le
+comportement attendu, les lancer et les voir **rouges pour la bonne raison** (le message
+d'échec porte sur le comportement visé, pas sur un import, un nom ou une syntaxe). Seulement
+ensuite, écrire le code minimal ci-dessous qui les fait passer.
+
 Pour chaque fichier :
 1. Lire la section exacte à modifier
 2. Effectuer l'edit minimal (pas de réécriture complète)
@@ -93,6 +99,11 @@ Pour chaque fichier :
 4. Ne pas ajouter de commentaires sur le QUOI — seulement le POURQUOI si non évident
 
 ## Étape 6 — Test immédiat
+
+Relancer toute la suite, puis prouver que chaque nouveau test protège vraiment le code : casser
+volontairement la ligne qu'il protège (ou inverser la condition), le voir rouge, puis remettre
+le code. Le rapport donne, pour chaque test, sa sortie rouge d'avant le code, sa sortie rouge
+quand le code est cassé, et sa sortie verte à la fin.
 
 ```powershell
 # Test rapide en ligne de commande

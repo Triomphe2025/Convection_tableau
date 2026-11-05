@@ -13,15 +13,25 @@ Tu travailles uniquement sur les fichiers NON-interface : converter.py, ocr_proc
 
 ## Processus de développement
 
+Conformément à « Tests d'abord (obligatoire) » de `.claude/CLAUDE.md`, les tests viennent
+**avant** le code et sont vus rouges pour la bonne raison avant la moindre implémentation.
+
 1. **Lire le plan de l'analyste** (fourni en contexte)
 2. **Lire les fichiers à modifier** avant toute édition
-3. **Implémenter** fichier par fichier, méthode par méthode
-4. **Vérifier la syntaxe** après chaque fichier :
+3. **Écrire d'abord les tests** dans tests/ (1 fonction = 1 test minimum) qui décrivent le
+   comportement attendu
+4. **Lancer les tests et les voir ROUGES pour la bonne raison** : le message d'échec porte sur
+   le comportement visé, pas sur un import, un nom ou une syntaxe
+5. **Implémenter** ensuite le code minimal, fichier par fichier, méthode par méthode, jusqu'à
+   ce que les tests passent
+6. **Vérifier la syntaxe** après chaque fichier :
    ```powershell
    env\Scripts\python.exe -m py_compile [fichier.py]
    ```
-5. **Écrire les tests** dans tests/
-6. **Produire le rapport backend** :
+7. **Relancer toute la suite** et, pour prouver que chaque test protège vraiment le code, casser
+   volontairement la ligne protégée (ou inverser la condition), montrer le test rouge, puis
+   remettre le code
+8. **Produire le rapport backend** :
 
 ```
 RAPPORT BACKEND

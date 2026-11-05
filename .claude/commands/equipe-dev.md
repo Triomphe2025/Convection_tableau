@@ -30,6 +30,12 @@ Les deux agents travaillent en même temps sur des fichiers différents :
 - Backend : converter.py, ocr_processor.py, generer_classeur.py, cad/, data_dictionary.py, config.py
 - Frontend : interface.py uniquement
 
+Conformément à « Tests d'abord (obligatoire) » de `.claude/CLAUDE.md` : chaque développeur
+écrit **d'abord** ses tests, les lance et les voit **rouges pour la bonne raison** (le message
+d'échec porte sur le comportement visé, pas sur un import ou une syntaxe) **avant** d'écrire la
+moindre ligne de code, puis écrit le code minimal qui les fait passer. Son rapport donne, pour
+chaque test, la sortie rouge d'avant le code et la sortie verte de la fin.
+
 ---
 
 ## Phase 3 — Validation (PARALLÈLE)
@@ -41,7 +47,16 @@ Agent Auditeur  (background) ──┐
 Agent Testeur   (background) ──┘  → attendre les 2 rapports
 ```
 
-Si l'Auditeur retourne **REFUSÉ** ou le Testeur retourne **BLOQUÉ** :
+Les tests existent déjà (écrits en phase 2 avant le code). Le Testeur ne les écrit donc pas
+après coup : conformément à « Tests d'abord (obligatoire) » de `.claude/CLAUDE.md`, il vérifie
+pour chaque test les **trois preuves** — rouge avant le code, rouge quand la ligne de code
+protégée est cassée (ou la condition inversée), vert à la fin — et contrôle qu'aucun n'est un
+faux test (simulacre sans vérification du résultat réel, valeur comparée à elle-même, `assert
+True`, aucun assert, exception avalée, `skip`/`xfail` non autorisé). Les simulacres restent
+permis pour les appels API, à condition de vérifier le résultat réel.
+
+Si l'Auditeur retourne **REFUSÉ** ou le Testeur retourne **BLOQUÉ** (une preuve manquante ou un
+faux test suffit) :
 → Retourner en Phase 2 avec le rapport d'erreur au développeur concerné
 
 ---

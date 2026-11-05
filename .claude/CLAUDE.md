@@ -26,6 +26,12 @@ L'équipe de 6 agents travaille en parallèle sur toute tâche de développement
 
 **Ordre :** Analyste → Backend + Frontend (parallèle) → Auditeur + Testeur (parallèle) → Apprentissage
 
+Conformément à « Tests d'abord (obligatoire) » : en phase Backend + Frontend, chaque
+développeur écrit d'abord ses tests et les voit rouges avant d'écrire le code. Le Testeur
+(phase Auditeur + Testeur) ne découvre donc pas les tests après coup : il vérifie les trois
+preuves de chaque test (rouge avant le code, rouge quand la ligne protégée est cassée, vert à
+la fin) et répond **BLOQUÉ** s'il en manque une.
+
 **Mémoire de l'équipe :** `memory/equipe_lecons.md` — leçons cumulées de toutes les sessions.
 
 ---

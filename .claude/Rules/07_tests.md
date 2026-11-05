@@ -2,16 +2,21 @@
 
 ## Règle fondamentale : 1 fonction = 1 test minimum
 
-**Toute fonction ou méthode écrite doit avoir au moins un test unitaire.**
+**Toute fonction ou méthode écrite doit avoir au moins un test unitaire, écrit AVANT le code.**
 C'est non négociable. Le code sans test ne passe pas l'audit.
 
+Conformément à « Tests d'abord (obligatoire) » de `.claude/CLAUDE.md`, le développeur écrit
+d'abord les tests et les voit rouges pour la bonne raison, puis écrit le code minimal qui les
+fait passer. Le Testeur ne découvre pas les tests après coup : il vérifie les trois preuves de
+chaque test (rouge avant le code, rouge quand la ligne protégée est cassée, vert à la fin).
+
 ```python
-# Exemple : si le backend écrit cette méthode...
+# Exemple : pour cette méthode à écrire...
 def _clean_cell(value: str) -> str:
     """Nettoie une valeur de cellule OCR."""
     ...
 
-# ...le testeur DOIT écrire ces tests :
+# ...on écrit D'ABORD ces tests (vus rouges), puis le code qui les fait passer :
 class TestCleanCell:
     def test_valeur_normale_inchangee(self):
         assert _clean_cell("ROUGE") == "ROUGE"
