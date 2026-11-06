@@ -1,0 +1,21 @@
+{
+  "couleurs": {
+    "fond": "#0E1322", "surface": "#151B2E", "sureleve": "#1D2540", "trait": "#2A3352", "barre_laterale": "#0B1020",
+    "texte": "#E9EBF3", "texte_secondaire": "#AEB4CC", "texte_discret": "#8E95B3",
+    "rose_trios": "#FF5C7A", "action_principale": "#D63555", "action_principale_survol": "#E04364",
+    "succes": "#4CC38A", "a_relire": "#F5B041", "erreur": "#FF7A59", "texte_natif": "#6CA8FF", "page_scannee": "#9B87F5",
+    "lot_en_cours": "#5B4FA8", "tuile_attente": "#232B45", "tuile_lue": "#3BAA78"
+  },
+  "polices": { "interface": "Inter", "codes": "JetBrains Mono", "repli_windows": "Segoe UI" },
+  "tailles_texte_px": { "titre_ecran": 26, "titre_bloc": 15, "courant": 14, "aide": 12.5 },
+  "rayons_px": { "carte": 16, "bouton": 10, "puce": 999 },
+  "espacement_base_px": 4,
+  "cible_tactile_min_px": 44,
+  "contraste_min": 4.5,
+  "mouvement_ms": {
+    "survol": 150, "changement_etat": 250, "ligne_extraite": 220, "passage_ecran": 300,
+    "coche_fin": 600, "pulsation_page": 900, "balayage_scan": 1400, "message_etape_affiche": 3000,
+    "astuce_rotation": 7000, "animation_accueil": 3600, "maximum_hors_boucles": 350
+  },
+  "courbe_standard": "cubic-bezier(0.2, 0.8, 0.2, 1)"
+}

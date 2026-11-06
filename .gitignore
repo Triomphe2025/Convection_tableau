@@ -59,6 +59,9 @@ LOT12-P-2025_717-6324-MI01/
 TriosSeconverter_Rapport_Evolution.pdf
 analyse_projet.pdf
 acad.err
+# Captures des maquettes : contiennent un extrait de scan client (PE203)
+docs/maquettes/*.png
+maquettes_pour_claude_code.zip
 
 # Fichiers générés/scratch à la racine
 analysis_summary.json
