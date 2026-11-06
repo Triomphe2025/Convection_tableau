@@ -38,11 +38,18 @@ def nom_modele_lisible(identifiant):
     return _NOMS_MODELES.get(cle, cle)
 
 
-def moteurs_visibles(dev_actif):
-    """Moteurs OCR affichés : socle seul, + expérimentaux si le mode Dev est actif."""
+def moteurs_visibles(dev_actif, moteur_choisi=None):
+    """Moteurs OCR affichés : socle (+ expérimentaux si Dev) ; le moteur choisi reste visible.
+
+    Hors Dev, un moteur expérimental déjà sélectionné (ex. « hybrid ») reste à l'écran : il ne
+    doit pas disparaître en restant pourtant actif.
+    """
     if dev_actif:
         return _MOTEURS_SOCLE + _MOTEURS_EXPERIMENTAUX
-    return _MOTEURS_SOCLE
+    visibles = list(_MOTEURS_SOCLE)
+    if moteur_choisi in _MOTEURS_EXPERIMENTAUX and moteur_choisi not in visibles:
+        visibles.append(moteur_choisi)
+    return tuple(visibles)
 
 
 def page_apres_bascule_dev(page_affichee, dev_actif):
@@ -87,13 +94,34 @@ def analyser_progres_page(message):
     return (done, total)
 
 
-def estimer_temps_restant(ecoule_s, done, total):
-    """Secondes restantes estimées ; None tant que done = 0 (début, attente du lot)."""
+def estimer_temps_restant(ecoule_depuis_1re_page_s, done, total, mode_lot=False):
+    """Secondes restantes mesurées depuis la 1re page ; None si done = 0 ou en mode lot.
+
+    En mode lot, les pages reviennent toutes d'un coup après l'attente : une estimation serait
+    absurde (des heures), donc jamais d'estimation. L'horloge part de la 1re page, pas du
+    lancement : le temps d'analyse ne gonfle pas le temps par page (le jalon vient de
+    `jalon_premiere_page`).
+    """
+    if mode_lot:
+        return None
     if done <= 0 or total <= 0 or done > total:
         return None
     if done == total:
         return 0.0
-    return ecoule_s / done * (total - done)
+    return ecoule_depuis_1re_page_s / done * (total - done)
+
+
+def jalon_premiere_page(evenements):
+    """Horodatage du 1er message « Page n/total » réel (l'analyse ne compte pas) ; None sinon.
+
+    `evenements` : suite de (horodatage, message). Les lignes d'analyse, pour lesquelles
+    `analyser_progres_page` rend None, ne déclenchent pas le jalon — le temps d'analyse est
+    exclu de l'estimation.
+    """
+    for horodatage, message in evenements:
+        if analyser_progres_page(message) is not None:
+            return horodatage
+    return None
 
 
 def format_duree(secondes):

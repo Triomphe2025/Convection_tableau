@@ -27,6 +27,14 @@ class TestNomModeleLisible(unittest.TestCase):
     def test_espaces_autour_ignores(self):
         self.assertEqual(h.nom_modele_lisible("  claude-sonnet-5-5  "), "Sonnet 5.5 — recommandé")
 
+    def test_tous_les_modeles_de_config_ont_un_nom(self):
+        # Devient rouge le jour où un modèle est ajouté à config.py sans nom lisible.
+        from config import Config
+        for identifiant in Config.CLAUDE_CAPACITES_MODELES:
+            lisible = h.nom_modele_lisible(identifiant)
+            self.assertTrue(lisible, f"nom vide pour {identifiant}")
+            self.assertNotEqual(lisible, identifiant, f"nom manquant pour {identifiant}")
+
 
 class TestMoteursVisibles(unittest.TestCase):
 
@@ -42,6 +50,13 @@ class TestMoteursVisibles(unittest.TestCase):
     def test_experimentaux_absents_hors_dev(self):
         for moteur in ("docling", "ollama", "hybrid", "agent"):
             self.assertNotIn(moteur, h.moteurs_visibles(False))
+
+    def test_moteur_experimental_choisi_reste_visible(self):
+        # Hors Dev, un moteur expérimental déjà sélectionné ne doit pas disparaître de l'écran.
+        self.assertIn("hybrid", h.moteurs_visibles(False, "hybrid"))
+        self.assertEqual(h.moteurs_visibles(False, "tesseract"), ("tesseract", "claude"))
+        self.assertEqual(h.moteurs_visibles(True, "hybrid"),
+                         ("tesseract", "claude", "docling", "ollama", "hybrid", "agent"))
 
 
 class TestPageApresBasculeDev(unittest.TestCase):
@@ -112,7 +127,10 @@ class TestDpiAActiver(unittest.TestCase):
 class TestAnalyserProgresPage(unittest.TestCase):
 
     def test_message_on_progress_page(self):
-        self.assertEqual(h.analyser_progres_page("Page 3/48 [claude] — ✓"), (3, 48))
+        # Formes exactes de converter.py:1026 : f"Page {done}/{total} [{engine}] — {ok_flag}".
+        self.assertEqual(h.analyser_progres_page("Page 3/48 [Claude] — 12 lignes"), (3, 48))
+        self.assertEqual(h.analyser_progres_page("Page 4/48 [OCR] — vide"), (4, 48))
+        self.assertEqual(h.analyser_progres_page("Page 5/48 [PDF] — 3 lignes"), (5, 48))
 
     def test_ligne_analyse_scan_donne_none(self):
         # Ligne de _log (converter.py:161), pas on_progress : deux-points, pas de crochet.
@@ -142,6 +160,34 @@ class TestEstimerTempsRestant(unittest.TestCase):
 
     def test_total_nul_rend_none(self):
         self.assertIsNone(h.estimer_temps_restant(10.0, 0, 0))
+
+    def test_depuis_premiere_page_exclut_analyse(self):
+        # 60 s d'analyse exclues : 12 pages en 60 s depuis la 1re page = 5 s/page → 36 × 5 = 180.
+        # Le même temps compté depuis le lancement (120 s) donnerait 10 s/page = 360 : à éviter.
+        self.assertAlmostEqual(h.estimer_temps_restant(60.0, 12, 48), 180.0)
+
+    def test_mode_lot_jamais_estimation(self):
+        self.assertIsNone(h.estimer_temps_restant(60.0, 12, 48, mode_lot=True))
+
+
+class TestJalonPremierePage(unittest.TestCase):
+
+    def test_ignore_analyse_et_lancement(self):
+        # Le jalon est la 1re VRAIE page (on_progress) ; lancement et lignes d'analyse exclus.
+        evenements = [
+            (0.0, "Démarrage de la conversion"),
+            (10.0, "Page 1/48 : scannée, images = 80 %"),     # analyse → ne compte pas
+            (60.0, "Page 1/48 [Claude] — 12 lignes"),
+            (65.0, "Page 2/48 [Claude] — vide"),
+        ]
+        self.assertEqual(h.jalon_premiere_page(evenements), 60.0)
+
+    def test_aucune_vraie_page_rend_none(self):
+        self.assertIsNone(h.jalon_premiere_page(
+            [(0.0, "Démarrage"), (5.0, "OCR 1/3 : a.png")]))
+
+    def test_liste_vide_rend_none(self):
+        self.assertIsNone(h.jalon_premiere_page([]))
 
 
 class TestFormatDuree(unittest.TestCase):
