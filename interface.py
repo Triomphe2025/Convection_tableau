@@ -49,7 +49,7 @@ BG_PANEL = "#16213e"
 BG_CARD = "#0f3460"
 BG_LOG = "#0a0a14"
 FG_TEXT = "#e0e0f0"
-FG_MUTED = "#7878a0"
+FG_MUTED = "#9797c9"   # 4,5:1 (WCAG AA) sur tous ses fonds — cf. test_contraste_interface
 FG_OK = "#56c596"
 FG_ERR = "#e05c5c"
 FG_WARN = "#e0a050"
@@ -843,6 +843,19 @@ class TriosSeconverterApp(tk.Tk):
         style.configure("TCombobox",
                         fieldbackground=BG_LOG, background=BG_LOG,
                         foreground=FG_TEXT, selectbackground=COL_ACC)
+        # L'état readonly (nos listes modèle/OCR) a ses propres couleurs sous clam : sans ça,
+        # le champ ressortait en gris illisible et le texte sélectionné disparaissait.
+        style.map("TCombobox",
+                  fieldbackground=[("readonly", BG_LOG)],
+                  background=[("readonly", BG_LOG)],
+                  foreground=[("readonly", FG_TEXT)],
+                  selectbackground=[("readonly", BG_CARD)],
+                  selectforeground=[("readonly", FG_TEXT)])
+        # La liste déroulante est une Listbox Tk (popup), stylée par la base d'options (pas ttk).
+        self.option_add('*TCombobox*Listbox.background', BG_LOG)
+        self.option_add('*TCombobox*Listbox.foreground', FG_TEXT)
+        self.option_add('*TCombobox*Listbox.selectBackground', COL_ACC)
+        self.option_add('*TCombobox*Listbox.selectForeground', FG_TEXT)
         style.configure("TNotebook", background=BG_PANEL, tabmargins=[2, 5, 2, 0])
         style.configure("TNotebook.Tab", background=BG_CARD, foreground=FG_MUTED,
                         padding=[14, 6], font=FONT_BOLD)
@@ -1208,9 +1221,11 @@ class TriosSeconverterApp(tk.Tk):
                             fg=FG_MUTED, bg=BG_CARD, anchor='w')
         lbl_desc.pack(fill='x', pady=(4, 8))
 
+        # Détail en FG_MUTED (lisible sur BG_CARD et BG_PANEL) : la couleur de carte COL_ACC2
+        # (violet) sur bleu foncé rendait la ligne « Outils » de la carte Dessins illisible.
         lbl_detail = tk.Label(frame, text=card["detail"],
                               font=("Segoe UI", 8),
-                              fg=card["couleur"], bg=BG_CARD, anchor='w')
+                              fg=FG_MUTED, bg=BG_CARD, anchor='w')
         lbl_detail.pack(fill='x')
 
         # Indicateur de sélection (barre colorée en bas de la carte)
@@ -1230,8 +1245,7 @@ class TriosSeconverterApp(tk.Tk):
                 except Exception:
                     pass
 
-        def _on_leave(e, widgets=all_widgets, mode=card["mode"],
-                      orig_col=card["couleur"]):
+        def _on_leave(e, widgets=all_widgets, mode=card["mode"]):
             if self._workflow_mode.get() == mode:
                 return
             for w in widgets:
@@ -1239,11 +1253,6 @@ class TriosSeconverterApp(tk.Tk):
                     w.configure(bg=BG_CARD)
                 except Exception:
                     pass
-            # Le label couleur garde sa couleur d'origine
-            try:
-                lbl_detail.configure(fg=orig_col)
-            except Exception:
-                pass
 
         for w in all_widgets:
             w.bind('<Button-1>', lambda e, fn=_on_click: fn())
