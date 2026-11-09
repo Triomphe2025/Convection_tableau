@@ -56,6 +56,10 @@ FG_WARN = "#e0a050"
 COL_ACC = "#e94560"   # rouge-rose accent
 COL_ACC2 = "#533483"   # violet secondaire
 BTN_HVR = "#c73652"
+# FG_MUTED sert aussi de FOND (pastille d'étape) ou de texte sur fond sombre (bouton désactivé) :
+# ces deux couples gardent 4,5:1 — cf. test_contraste_interface.
+BG_BTN_OFF = BG_CARD              # fond d'un bouton désactivé (texte/contour FG_MUTED)
+FG_PASTILLE_FOND_MUTED = BG_MAIN  # texte d'une pastille dont le fond est FG_MUTED
 FONT_MAIN = ("Segoe UI", 9)
 FONT_BOLD = ("Segoe UI", 9, "bold")
 FONT_H1 = ("Segoe UI", 18, "bold")
@@ -706,11 +710,15 @@ class RoundedButton(tk.Canvas):
 
     def _draw(self, bg):
         self.delete("all")
-        fill = bg if self._state == 'normal' else FG_MUTED
+        if self._state == 'normal':
+            fill, outline, fg = bg, bg, self._fg
+        else:
+            # Bouton inactif : fond sombre, texte et contour atténués mais lisibles (4,5:1)
+            fill, outline, fg = BG_BTN_OFF, FG_MUTED, FG_MUTED
         self._rounded_rect(1, 1, self._btn_w - 1, self._btn_h - 1,
-                           self._radius, fill=fill, outline=fill)
+                           self._radius, fill=fill, outline=outline)
         self.create_text(self._btn_w // 2, self._btn_h // 2,
-                         text=self._text, fill=self._fg,
+                         text=self._text, fill=fg,
                          font=self._font)
 
     def _on_enter(self, _):
@@ -731,7 +739,7 @@ class RoundedButton(tk.Canvas):
 
     def set_text(self, text):
         self._text = text
-        self._draw(self._bg if self._state == 'normal' else FG_MUTED)
+        self._draw(self._bg)
 
 
 # ── Application principale ────────────────────────────────────────────
@@ -842,13 +850,15 @@ class TriosSeconverterApp(tk.Tk):
         style.theme_use('clam')
         style.configure("TCombobox",
                         fieldbackground=BG_LOG, background=BG_LOG,
-                        foreground=FG_TEXT, selectbackground=COL_ACC)
+                        foreground=FG_TEXT, selectbackground=COL_ACC,
+                        arrowcolor=FG_TEXT)
         # L'état readonly (nos listes modèle/OCR) a ses propres couleurs sous clam : sans ça,
-        # le champ ressortait en gris illisible et le texte sélectionné disparaissait.
+        # le champ ressortait en gris illisible, le texte sélectionné et la flèche disparaissaient.
         style.map("TCombobox",
                   fieldbackground=[("readonly", BG_LOG)],
                   background=[("readonly", BG_LOG)],
                   foreground=[("readonly", FG_TEXT)],
+                  arrowcolor=[("readonly", FG_TEXT)],
                   selectbackground=[("readonly", BG_CARD)],
                   selectforeground=[("readonly", FG_TEXT)])
         # La liste déroulante est une Listbox Tk (popup), stylée par la base d'options (pas ttk).
@@ -1442,7 +1452,7 @@ class TriosSeconverterApp(tk.Tk):
         for i, (num, label) in enumerate(steps_info):
             circ = tk.Label(indicator, text=f" {num} ",
                             font=("Segoe UI", 9, "bold"),
-                            fg="white", bg=FG_MUTED, padx=4, pady=2)
+                            fg=FG_PASTILLE_FOND_MUTED, bg=FG_MUTED, padx=4, pady=2)
             circ.pack(side='left')
             self._stepper_circle_lbls.append(circ)
 
@@ -1808,7 +1818,7 @@ class TriosSeconverterApp(tk.Tk):
                 circ.configure(bg=COL_ACC, fg="white")
                 lbl.configure(fg=COL_ACC)
             else:
-                circ.configure(bg=FG_MUTED, fg=BG_MAIN)
+                circ.configure(bg=FG_MUTED, fg=FG_PASTILLE_FOND_MUTED)
                 lbl.configure(fg=FG_MUTED)
 
         # Update nav buttons
@@ -1965,7 +1975,7 @@ class TriosSeconverterApp(tk.Tk):
         params_frame = tk.LabelFrame(
             form,
             text=" Paramètres avancés ",
-            bg="#0f3460", fg="#7878a0", font=("Segoe UI", 8),
+            bg="#0f3460", fg=FG_MUTED, font=("Segoe UI", 8),
             relief='flat', bd=1, padx=8, pady=6,
         )
         params_frame.grid(row=4, column=0, columnspan=2, sticky='ew', pady=(4, 0))
@@ -1982,7 +1992,7 @@ class TriosSeconverterApp(tk.Tk):
             relief='flat', font=("Segoe UI", 9),
         ).pack(side='left', padx=4)
         tk.Label(r1, text="20=rapide · 500=standard · 2000=précis",
-                 bg="#0f3460", fg="#7878a0", font=("Segoe UI", 8)).pack(side='left')
+                 bg="#0f3460", fg=FG_MUTED, font=("Segoe UI", 8)).pack(side='left')
 
         # Ligne 2 — Seuil texte/géométrie
         r2 = tk.Frame(params_frame, bg="#0f3460")
@@ -1996,7 +2006,7 @@ class TriosSeconverterApp(tk.Tk):
             relief='flat', font=("Segoe UI", 9),
         ).pack(side='left', padx=4)
         tk.Label(r2, text="60 px pour ~200 DPI — augmenter si texte confondu avec géométrie",
-                 bg="#0f3460", fg="#7878a0", font=("Segoe UI", 8)).pack(side='left')
+                 bg="#0f3460", fg=FG_MUTED, font=("Segoe UI", 8)).pack(side='left')
 
         # Bouton + barre de progression + statut
         action_row = tk.Frame(form, bg=BG_MAIN)
@@ -2053,10 +2063,10 @@ class TriosSeconverterApp(tk.Tk):
         for name, label in ETAPES_DEF:
             step_row = tk.Frame(steps_outer, bg="#0f3460")
             step_row.pack(fill='x', padx=12, pady=1)
-            icon_lbl = tk.Label(step_row, text="○", bg="#0f3460", fg="#7878a0",
+            icon_lbl = tk.Label(step_row, text="○", bg="#0f3460", fg=FG_MUTED,
                                 font=("Segoe UI", 9, "bold"), width=2)
             icon_lbl.pack(side='left')
-            text_lbl = tk.Label(step_row, text=label, bg="#0f3460", fg="#7878a0",
+            text_lbl = tk.Label(step_row, text=label, bg="#0f3460", fg=FG_MUTED,
                                 font=("Segoe UI", 9), anchor='w')
             text_lbl.pack(side='left', fill='x', expand=True)
             self._cad_step_widgets[name] = (icon_lbl, text_lbl)
@@ -2109,8 +2119,8 @@ class TriosSeconverterApp(tk.Tk):
         """Remet toutes les pastilles d'étape en état initial (○ gris)."""
         for name, (icon_lbl, text_lbl) in getattr(self, '_cad_step_widgets', {}).items():
             self.after(0, lambda il=icon_lbl, tl=text_lbl: (
-                il.config(text="○", fg="#7878a0"),
-                tl.config(fg="#7878a0"),
+                il.config(text="○", fg=FG_MUTED),
+                tl.config(fg=FG_MUTED),
             ))
 
     def _cad_step_start(self, name: str):
