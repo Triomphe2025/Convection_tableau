@@ -81,6 +81,11 @@ def etat_cle_api(cle):
     return "configurée" if (cle or "").strip() else "absente"
 
 
+def doit_signaler_fin(plateforme, a_le_focus):
+    """Signaler la fin (clignotement + son) seulement sous Windows et fenêtre sans focus."""
+    return str(plateforme).startswith("win") and not a_le_focus
+
+
 def dpi_a_activer(plateforme, reglage):
     """Vrai seulement si le réglage est actif ET la plateforme est Windows."""
     return bool(reglage) and str(plateforme).startswith("win")

@@ -2510,6 +2510,18 @@ class TriosSeconverterApp(tk.Tk):
         )
         self._dash_eta_lbl.pack(pady=(4, 0))
 
+        # Actions de fin (affichées à la fin de la conversion par _dashboard_done).
+        self._dash_actions = tk.Frame(mid_col, bg=BG_LOG)
+        for _txt, _cmd in (("📊  Ouvrir l'Excel", self._open_excel),
+                           ("📁  Dossier", self._open_folder),
+                           ("🔍  Audit", self._lancer_audit)):
+            tk.Button(
+                self._dash_actions, text=_txt, font=("Segoe UI", 9),
+                bg=BG_CARD, fg=FG_TEXT, activebackground=COL_ACC2,
+                activeforeground="white", relief='flat', padx=10, pady=5,
+                cursor='hand2', command=_cmd,
+            ).pack(side='left', padx=6)
+
         # Colonne droite — MODÈLE ATTENDU
         right_col = tk.Frame(cols_outer, bg=BG_PANEL, width=220)
         right_col.pack(side='left', fill='both')
@@ -2606,6 +2618,7 @@ class TriosSeconverterApp(tk.Tk):
                     and bool(getattr(_Cfg, 'CLAUDE_MODE_LOT', False)))
         self._dash_eta_lbl.configure(
             text="Mode lot — en attente du lot" if mode_lot else "")
+        self._dash_actions.pack_forget()
 
         # Timer
         self._dash_timer_lbl.configure(text="⏱  00:00", fg=COL_ACC)
@@ -2683,6 +2696,36 @@ class TriosSeconverterApp(tk.Tk):
             text=f"✓ {n_ok} bornier(s) converti(s)", fg=FG_OK,
         )
         self._dash_anim_lbl.configure(text="✓", fg=FG_OK)
+        self._dash_eta_lbl.configure(text="")
+        self._dash_actions.pack(pady=(10, 0))
+        self._signaler_fin()
+
+    def _signaler_fin(self):
+        """Fin de conversion : si la fenêtre n'a pas le focus, clignotement de l'icône
+        (FlashWindowEx) + son système. Windows seul ; un échec ne bloque jamais la fin."""
+        import sys as _sys
+        if not interface_helpers.doit_signaler_fin(
+                _sys.platform, bool(self.focus_displayof())):
+            return
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class _FlashInfo(ctypes.Structure):
+                _fields_ = [("cbSize", ctypes.c_uint),
+                            ("hwnd", wintypes.HWND),
+                            ("dwFlags", ctypes.c_uint),
+                            ("uCount", ctypes.c_uint),
+                            ("dwTimeout", ctypes.c_uint)]
+
+            racine = ctypes.windll.user32.GetAncestor(int(self.winfo_id()), 2)  # GA_ROOT
+            # FLASHW_ALL | FLASHW_TIMERNOFG = 0x0F : clignote jusqu'au retour au premier plan.
+            info = _FlashInfo(ctypes.sizeof(_FlashInfo), racine, 0x0F, 5, 0)
+            ctypes.windll.user32.FlashWindowEx(ctypes.byref(info))
+            import winsound
+            winsound.MessageBeep(-1)
+        except Exception as exc:
+            self._log(f"  (signal de fin indisponible : {exc})", 'muted')
 
     # ── Pages ─────────────────────────────────────────────────────────
 

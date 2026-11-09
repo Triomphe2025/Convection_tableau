@@ -220,6 +220,18 @@ class TestRatioContraste(unittest.TestCase):
             h.ratio_contraste("#fff", "#000000")
 
 
+class TestDoitSignalerFin(unittest.TestCase):
+
+    def test_windows_sans_focus_signale(self):
+        self.assertTrue(h.doit_signaler_fin("win32", a_le_focus=False))
+
+    def test_windows_avec_focus_ne_signale_pas(self):
+        self.assertFalse(h.doit_signaler_fin("win32", a_le_focus=True))
+
+    def test_autre_plateforme_jamais(self):
+        self.assertFalse(h.doit_signaler_fin("linux", a_le_focus=False))
+
+
 class TestEtatCleApi(unittest.TestCase):
 
     def test_cle_presente_configuree(self):
