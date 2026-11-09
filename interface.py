@@ -2503,6 +2503,13 @@ class TriosSeconverterApp(tk.Tk):
         )
         self._dash_borniers_lbl.pack()
 
+        # Temps écoulé / restant estimé (depuis la 1re page lue), ou phase du mode lot.
+        self._dash_eta_lbl = tk.Label(
+            mid_col, text="",
+            font=("Segoe UI", 9), fg=FG_MUTED, bg=BG_LOG,
+        )
+        self._dash_eta_lbl.pack(pady=(4, 0))
+
         # Colonne droite — MODÈLE ATTENDU
         right_col = tk.Frame(cols_outer, bg=BG_PANEL, width=220)
         right_col.pack(side='left', fill='both')
@@ -2550,14 +2557,6 @@ class TriosSeconverterApp(tk.Tk):
                  font=FONT_BOLD, fg=FG_MUTED, bg=BG_MAIN,
                  anchor='w').pack(side='left')
 
-        tk.Button(
-            log_hdr, text="Voir onglet Mode OCR →",
-            font=("Segoe UI", 8), bg=BG_CARD, fg=FG_MUTED,
-            activebackground=COL_ACC2, activeforeground="white",
-            relief='flat', padx=8, pady=2, cursor='hand2',
-            command=lambda: self._show_page('ocr'),
-        ).pack(side='right')
-
         self._dash_log_box = scrolledtext.ScrolledText(
             log_zone, font=FONT_MONO, bg=BG_LOG, fg=FG_TEXT,
             insertbackground=FG_TEXT, relief='flat',
@@ -2600,6 +2599,13 @@ class TriosSeconverterApp(tk.Tk):
         self._dash_pbar['value'] = 0
         self._dash_page_lbl.configure(text="En attente…", fg=FG_TEXT)
         self._dash_borniers_lbl.configure(text="")
+        # Jalon : heure de la 1re page lue (pour l'estimation du temps restant).
+        self._dash_premiere_page_t = None
+        from config import Config as _Cfg
+        mode_lot = (self._ocr_mode.get() == 'claude'
+                    and bool(getattr(_Cfg, 'CLAUDE_MODE_LOT', False)))
+        self._dash_eta_lbl.configure(
+            text="Mode lot — en attente du lot" if mode_lot else "")
 
         # Timer
         self._dash_timer_lbl.configure(text="⏱  00:00", fg=COL_ACC)
@@ -4361,6 +4367,34 @@ class TriosSeconverterApp(tk.Tk):
             self._dash_pbar['value'] = pct * 100
             self._dash_page_lbl.configure(text=msg if msg else "…")
             self._dash_status_lbl.configure(text=msg)
+            self._dash_maj_progres(msg)
+
+    def _dash_maj_progres(self, msg: str):
+        """« page n / total », temps écoulé et restant estimé à partir des messages
+        « Page n/total » (interface_helpers, fonctions pures testées)."""
+        if not hasattr(self, '_dash_eta_lbl'):
+            return
+        paire = interface_helpers.analyser_progres_page(msg)
+        if paire is None:
+            return
+        import time
+        from config import Config as _Cfg
+        done, total = paire
+        if self._dash_premiere_page_t is None:
+            self._dash_premiere_page_t = time.time()
+        self._dash_page_lbl.configure(text=f"page {done} / {total}")
+        ecoule = time.time() - self._dash_premiere_page_t
+        mode_lot = (self._ocr_mode.get() == 'claude'
+                    and bool(getattr(_Cfg, 'CLAUDE_MODE_LOT', False)))
+        restant = interface_helpers.estimer_temps_restant(ecoule, done, total, mode_lot)
+        if mode_lot:
+            self._dash_eta_lbl.configure(text="Mode lot — récupération des pages")
+        elif restant is None:
+            self._dash_eta_lbl.configure(text="")
+        else:
+            self._dash_eta_lbl.configure(
+                text=f"écoulé {interface_helpers.format_duree(int(ecoule))}"
+                     f"  •  restant ~ {interface_helpers.format_duree(int(restant))}")
 
     def _log(self, msg: str, tag: str = 'info'):
         self._log_box.configure(state='normal')
