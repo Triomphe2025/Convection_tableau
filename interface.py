@@ -2973,7 +2973,23 @@ class TriosSeconverterApp(tk.Tk):
 
     def _build_page_format(self, parent) -> tk.Frame:
         """Page Formater Excel : reformate un Excel existant sans relancer l'OCR."""
-        page = tk.Frame(parent, bg=BG_MAIN)
+        # Page défilable : à 1060x760, les boutons et le journal passaient sous le bord.
+        conteneur = tk.Frame(parent, bg=BG_MAIN)
+        canvas = tk.Canvas(conteneur, bg=BG_MAIN, highlightthickness=0)
+        vbar = ttk.Scrollbar(conteneur, orient='vertical', command=canvas.yview)
+        canvas.configure(yscrollcommand=vbar.set)
+        vbar.pack(side='right', fill='y')
+        canvas.pack(side='left', fill='both', expand=True)
+
+        page = tk.Frame(canvas, bg=BG_MAIN)
+        fenetre = canvas.create_window((0, 0), window=page, anchor='nw')
+        canvas.bind('<Configure>', lambda e: canvas.itemconfigure(fenetre, width=e.width))
+        page.bind('<Configure>',
+                  lambda e: canvas.configure(scrollregion=canvas.bbox('all')))
+        # Molette active seulement quand le pointeur est sur cette page.
+        canvas.bind('<Enter>', lambda e: canvas.bind_all(
+            '<MouseWheel>', lambda ev: canvas.yview_scroll(int(-ev.delta / 120), 'units')))
+        canvas.bind('<Leave>', lambda e: canvas.unbind_all('<MouseWheel>'))
 
         tk.Label(page, text="Formater Excel", font=FONT_H2,
                  fg=FG_TEXT, bg=BG_MAIN).pack(anchor='w', padx=24, pady=(16, 4))
@@ -3115,13 +3131,14 @@ class TriosSeconverterApp(tk.Tk):
             ).grid(row=ri, column=2, sticky='w', pady=2)
 
         # ── Marges (en cm, comme Excel français) ──────────────────
+        # Après les 5 paramètres (sinon « Marges » recouvrait « Nombre de colonnes »).
         tk.Label(
             inner_p, text="Marges (cm) :", font=FONT_BOLD,
             fg=FG_MUTED, bg=BG_PANEL,
-        ).grid(row=3, column=0, columnspan=3, sticky='w', pady=(10, 4))
+        ).grid(row=len(_params), column=0, columnspan=3, sticky='w', pady=(10, 4))
 
         margins_row = tk.Frame(inner_p, bg=BG_PANEL)
-        margins_row.grid(row=4, column=0, columnspan=3, sticky='w')
+        margins_row.grid(row=len(_params) + 1, column=0, columnspan=3, sticky='w')
 
         _margins = [
             ("Haut :",     self._format_margin_top),
@@ -3202,7 +3219,7 @@ class TriosSeconverterApp(tk.Tk):
         self._format_log_box.tag_config('muted', foreground=FG_MUTED)
         self._format_log_box.tag_config('info',  foreground=FG_TEXT)
 
-        return page
+        return conteneur
 
     # ── Actions de la page Formater ───────────────────────────────────
 
