@@ -112,6 +112,12 @@ class WelcomeAnimation:
     def stop(self):
         self._running = False
 
+    def resume(self):
+        """Relance l'animation après un stop() (quand l'Accueil redevient visible)."""
+        if not self._running:
+            self._running = True
+            self._c.after(100, self._tick)
+
     def _tick(self):
         if not self._running:
             return
@@ -132,19 +138,19 @@ class WelcomeAnimation:
         self._c.delete('anim')
         f = self._frame
         bx, by, gy = self._BX, self._BY, self._GY
-        glowing = 75 <= f < 108
+        glowing = 70 <= f < 104
 
-        # Ouverture de porte : 0=fermée → 1=ouverte → referme après l'envol
-        if f < 56:
+        # Porte : fermée → ouverte (dépôt) → reste ouverte (sortie) → referme.
+        if f < 50:
             door_open = 0.0
-        elif f < 72:
-            door_open = min(1.0, (f - 56) / 16.0)   # s'ouvre
-        elif f < 144:
-            door_open = 1.0                           # reste ouverte
-        elif f < 158:
-            door_open = max(0.0, 1.0 - (f - 144) / 14.0)  # se referme
+        elif f < 66:
+            door_open = min(1.0, (f - 50) / 16.0)
+        elif f < 140:
+            door_open = 1.0
+        elif f < 156:
+            door_open = max(0.0, 1.0 - (f - 140) / 16.0)
         else:
-            door_open = 0.0                           # fermée pour la pause
+            door_open = 0.0
 
         # Sol — bord à bord, jusqu'au bas du canvas
         cw = max(self._c.winfo_width(), 2000)
@@ -155,35 +161,19 @@ class WelcomeAnimation:
         self._c.create_line(0, gy + 3, cw, gy + 3,
                             fill="#0d1a30", width=1, tags='anim')
 
-        # Boite 3D avec porte (toujours présente)
+        # Boite 3D « trios » (toujours présente)
         gcol = (COL_ACC if (f // 4) % 2 == 0 else COL_ACC2) if glowing else None
         self._draw_box3d(bx, by, gcol, door_open)
 
-        if f < 56:
-            # Minion marche depuis la gauche en portant la statue
-            mx = int(-55 + (bx - 35) * f / 55)
-            wk = (f % 14) / 14
-            self._shadow(mx, gy)
-            self._minion(mx, gy, walk=wk, carrying=True)
-            self._bird(mx + 22, gy - 48, statue=True)
-
-        elif f < 75:
-            # Dépôt dans la boite (porte ouverte depuis f=72)
-            p = (f - 56) / 18
-            mx = bx - 90
-            self._shadow(mx, gy)
-            self._minion(mx, gy, lean=int(p * 11))
-            if p < 0.88:
-                self._bird(mx + 22 + int(p * 20),
-                           gy - 48 + int(p * 36), statue=True)
-
-        elif f < 108:
-            # Boite brille — Minion recule et observe
-            p = (f - 75) / 32
-            mx = bx - 90 - int(p * 16)
-            self._shadow(mx, gy)
-            self._minion(mx, gy, watching=True)
-            # Particules orbitales autour de la boite
+        if f < 66:
+            # Une feuille glisse depuis la gauche et entre dans la boite.
+            p = f / 66.0
+            fx = int(-40 + (bx + 40) * p)
+            sc = max(0.5, 1.0 - p * 0.4)
+            if p < 0.9:
+                self._feuille(fx, by - 8, scale=sc)
+        elif f < 104:
+            # La boite brille — particules orbitales (transformation).
             for i in range(7):
                 angle = i * math.pi * 2 / 7 + f * 0.22
                 r = 40 + 9 * math.sin(f * 0.28 + i)
@@ -193,24 +183,13 @@ class WelcomeAnimation:
                 col = COL_ACC if i % 2 == 0 else COL_ACC2
                 self._c.create_oval(px - sz, py - sz, px + sz, py + sz,
                                     fill=col, outline='', tags='anim')
-
-        elif f < 152:
-            # Oiseau sort par la porte et traverse l'écran
-            p = (f - 108) / 43
-            mx = bx - 106
-            self._shadow(mx, gy)
-            self._minion(mx, gy, watching=True)
-            bird_x = int(bx + 20 + p * 295)
-            bird_y = int(by - 5 - p * 77)
-            wt = (f % 10) / 10
-            sc = max(0.28, 1.0 - p * 0.72)
-            self._bird(bird_x, bird_y, statue=False, wing_t=wt, scale=sc)
-
-        else:
-            # Pause (porte se referme)
-            mx = bx - 106
-            self._shadow(mx, gy)
-            self._minion(mx, gy, watching=True)
+        elif f < 150:
+            # Un petit tableau sort par la porte et part vers la droite.
+            p = (f - 104) / 46.0
+            tx = int(bx + 10 + p * 300)
+            sc = min(1.0, 0.5 + p * 0.5)
+            self._tableau(tx, by - 6, scale=sc)
+        # sinon : courte pause avant la boucle
 
     # ── Coffre magique isométrique avec porte ────────────────────────────
 
@@ -344,362 +323,38 @@ class WelcomeAnimation:
                             fill="white" if glow else COL_ACC,
                             font=("Segoe UI", 9, "bold"), tags='anim')
 
-    # ── Personnage 3D miniature ────────────────────────────────────────
+    # ── Feuille (entrée) et petit tableau (sortie) ──────────────────────
 
-    def _shadow(self, cx, gy):
-        self._c.create_oval(cx - 17, gy - 3, cx + 17, gy + 3,
-                            fill="#0c1828", outline='', tags='anim')
+    def _feuille(self, cx, cy, scale=1.0):
+        """Feuille de papier : rectangle clair, coin plié, quelques lignes de texte."""
+        w, h = int(26 * scale), int(34 * scale)
+        x1, y1, x2, y2 = cx - w // 2, cy - h // 2, cx + w // 2, cy + h // 2
+        pli = max(3, int(8 * scale))
+        self._c.create_rectangle(x1, y1, x2, y2,
+                                 fill="#f4f4f8", outline="#9a9ab0", tags='anim')
+        self._c.create_polygon(x2 - pli, y1, x2, y1 + pli, x2 - pli, y1 + pli,
+                               fill="#d0d0da", outline='', tags='anim')
+        for i in range(1, 5):
+            yy = y1 + int(h * i / 5)
+            self._c.create_line(x1 + pli // 2, yy, x2 - pli, yy,
+                                fill="#b8b8c8", tags='anim')
 
-    def _minion(self, x, gy, walk=0.0, carrying=False,
-                lean=0, watching=False):
-        """Minion 2D isométrique dessiné sur Canvas — du fond vers l'avant."""
-        import math
-        # Palette Minion
-        YL = "#f5d028"   # jaune clair
-        YM = "#d4aa00"   # jaune moyen
-        YD = "#b08800"   # jaune sombre (ombres)
-        BL = "#5b8ed6"   # bleu salopette
-        BD = "#3a6ab0"   # bleu salopette ombre
-        BS = "#1e408a"   # bleu salopette contour
-        GR = "#909098"   # gris lunettes
-        GRD = "#5a5a62"   # gris sombre
-        EW = "#ffffff"   # blanc œil
-        EBR = "#7a3800"   # brun iris
-        EPU = "#080400"   # noir pupille
-        BK = "#101012"   # noir chaussures/cheveux
-        BKS = "#282830"   # noir reflet
+    def _tableau(self, cx, cy, scale=1.0):
+        """Petit tableau : grille avec en-tête coloré (le résultat produit)."""
+        w, h = int(42 * scale), int(30 * scale)
+        x1, y1, x2, y2 = cx - w // 2, cy - h // 2, cx + w // 2, cy + h // 2
+        tete = max(4, int(7 * scale))
+        self._c.create_rectangle(x1, y1, x2, y2,
+                                 fill="#153a5e", outline=COL_ACC, tags='anim')
+        self._c.create_rectangle(x1, y1, x2, y1 + tete,
+                                 fill=COL_ACC, outline='', tags='anim')
+        for cc in (1, 2):
+            xx = x1 + int(w * cc / 3)
+            self._c.create_line(xx, y1, xx, y2, fill="#2a5a8a", tags='anim')
+        for rr in (1, 2):
+            yy = y1 + tete + int((h - tete) * rr / 3)
+            self._c.create_line(x1, yy, x2, yy, fill="#2a5a8a", tags='anim')
 
-        bx = x + lean // 2
-        sw = math.sin(walk * 2 * math.pi)
-        ls = int(sw * 8)   # swing jambes
-
-        fy = gy         # sol
-        shY = fy - 6     # dessus chaussure
-        lgT = fy - 22    # haut jambes
-        ovB = fy - 24    # bas salopette
-        ovM = fy - 37    # milieu salopette (logo)
-        ovT = fy - 52    # haut salopette
-        bckT = fy - 67    # sommet du corps
-        hCY = fy - 58    # centre tête
-        hRX = 16         # rayon horizontal tête
-        hRY = 14         # rayon vertical tête
-        bHW = 15         # demi-largeur corps (total 30px)
-        armY = ovT + 6    # position verticale des bras
-
-        # ── 1. Chaussure arrière ──────────────────────────────────────
-        self._c.create_oval(bx - 13 - ls, shY - 3,
-                            bx + 1 - ls, fy + 3,
-                            fill=BK, outline='', tags='anim')
-
-        # ── 2. Jambe arrière ──────────────────────────────────────────
-        self._c.create_rectangle(bx - 10 - ls, lgT,
-                                 bx - 2 - ls, shY,
-                                 fill=YM, outline='', tags='anim')
-
-        # ── 3. Bras arrière ───────────────────────────────────────────
-        aW = 6                               # epaisseur des bras
-        sbX, sbY = bx - bHW + 1, armY + 3   # epaule gauche
-        if carrying:
-            ebX, ebY = sbX - 7, armY - 7
-            hbX, hbY = sbX - 5, armY - 18
-        elif lean > 0:
-            prog = lean / 11.0
-            ebX, ebY = sbX + int(8 * prog),  sbY - int(4 * prog)
-            hbX, hbY = sbX + int(16 * prog), sbY - int(10 * prog)
-        elif watching:
-            ebX, ebY = sbX - 6, armY - 3
-            hbX, hbY = sbX - 4, armY - 12
-        else:
-            aof = int(-sw * 8)
-            ebX, ebY = sbX - 5, sbY + 5 + aof // 2
-            hbX, hbY = sbX - 3, sbY + 13 + aof
-        self._c.create_line(sbX, sbY, ebX, ebY,
-                            fill=YM, width=aW, capstyle='round', tags='anim')
-        self._c.create_line(ebX, ebY, hbX, hbY,
-                            fill=YD, width=aW - 1, capstyle='round', tags='anim')
-        self._c.create_oval(hbX - 4, hbY - 4, hbX + 4, hbY + 4,
-                            fill=YM, outline=YD, width=1, tags='anim')
-
-        # ── 4. Corps jaune principal ───────────────────────────────────
-        # Arc bas (demi-sphère basse)
-        self._c.create_oval(bx - bHW - 1, ovB - 10,
-                            bx + bHW + 1, ovB + 10,
-                            fill=YL, outline=YD, width=1, tags='anim')
-        # Rectangle central
-        self._c.create_rectangle(bx - bHW, bckT,
-                                 bx + bHW, ovB,
-                                 fill=YL, outline='', tags='anim')
-        # Tête (ovale haut)
-        self._c.create_oval(bx - hRX, hCY - hRY,
-                            bx + hRX, hCY + hRY,
-                            fill=YL, outline=YD, width=1, tags='anim')
-        # Face droite corps (ombre 3D)
-        self._c.create_rectangle(bx + bHW, bckT,
-                                 bx + bHW + 5, ovB,
-                                 fill=YM, outline='', tags='anim')
-        # Face droite tête (ombre 3D)
-        self._c.create_polygon(
-            bx + hRX - 2, hCY - 5,
-            bx + hRX + 4, hCY - 3,
-            bx + hRX + 4, hCY + 7,
-            bx + hRX - 2, hCY + 9,
-            fill=YM, outline='', tags='anim')
-        # Reflet (lumière haut gauche)
-        self._c.create_oval(bx - 8, hCY - hRY + 2,
-                            bx - 2, hCY - hRY + 8,
-                            fill="#ffe060", outline='', tags='anim')
-
-        # ── 5. Salopette bleue ────────────────────────────────────────
-        # Corps salopette
-        self._c.create_polygon(
-            bx - bHW + 2, ovT,
-            bx - bHW,     ovB,
-            bx + bHW,     ovB,
-            bx + bHW - 2, ovT,
-            fill=BL, outline=BS, width=1, tags='anim')
-        # Ombre côté droit
-        self._c.create_polygon(
-            bx + bHW - 2, ovT,
-            bx + bHW,     ovB,
-            bx + bHW + 5, ovB,
-            bx + bHW + 3, ovT,
-            fill=BD, outline='', tags='anim')
-        # Bavette (bib) devant
-        self._c.create_polygon(
-            bx - 9, ovT,
-            bx - 10, ovT + 14,
-            bx + 10, ovT + 14,
-            bx + 9,  ovT,
-            fill=BL, outline=BS, width=1, tags='anim')
-        # Logo G (petit carré centré)
-        self._c.create_rectangle(bx - 5, ovM - 5, bx + 5, ovM + 5,
-                                 fill=BD, outline=BS, tags='anim')
-        self._c.create_text(bx, ovM, text="G", fill="#90c8ff",
-                            font=("Segoe UI", 6, "bold"), tags='anim')
-        # Boutons épaulettes (gauche/droit)
-        for bxb in (bx - bHW + 4, bx + bHW - 4):
-            self._c.create_oval(bxb - 3, ovT + 2, bxb + 3, ovT + 8,
-                                fill=GR, outline=GRD, tags='anim')
-
-        # ── 6. Jambe avant ────────────────────────────────────────────
-        self._c.create_rectangle(bx - 1 + ls, lgT,
-                                 bx + 7 + ls, shY,
-                                 fill=YL, outline='', tags='anim')
-        self._c.create_rectangle(bx + 7 + ls, lgT,
-                                 bx + 10 + ls, shY,
-                                 fill=YM, outline='', tags='anim')
-
-        # ── 7. Chaussure avant ────────────────────────────────────────
-        self._c.create_oval(bx - 3 + ls, shY - 4,
-                            bx + 14 + ls, fy + 3,
-                            fill=BK, outline='', tags='anim')
-        self._c.create_oval(bx - 1 + ls, shY - 2,
-                            bx + 7 + ls, shY + 1,
-                            fill=BKS, outline='', tags='anim')
-
-        # ── 8. Bras avant ─────────────────────────────────────────────
-        sfX, sfY = bx + bHW - 1, armY + 3   # epaule droite
-        if carrying:
-            efX, efY = sfX + 7, armY - 7
-            hfX, hfY = sfX + 5, armY - 18
-        elif lean > 0:
-            prog = lean / 11.0
-            efX, efY = sfX + int(8 * prog),  sfY - int(4 * prog)
-            hfX, hfY = sfX + int(18 * prog), sfY - int(12 * prog)
-        elif watching:
-            efX, efY = sfX + 10, armY - 6
-            hfX, hfY = sfX + 8,  armY - 18
-        else:
-            aof2 = int(sw * 8)
-            efX, efY = sfX + 5, sfY + 5 - aof2 // 2
-            hfX, hfY = sfX + 3, sfY + 13 - aof2
-        self._c.create_line(sfX, sfY, efX, efY,
-                            fill=YL, width=aW, capstyle='round', tags='anim')
-        self._c.create_line(efX, efY, hfX, hfY,
-                            fill=YM, width=aW - 1, capstyle='round', tags='anim')
-        self._c.create_oval(hfX - 4, hfY - 4, hfX + 4, hfY + 4,
-                            fill=YL, outline=YD, width=1, tags='anim')
-
-        # ── 9. Lunettes (sangle + anneaux + yeux) ─────────────────────
-        gogY = hCY - 2   # centre vertical lunettes
-        gR = 9         # rayon anneau
-        gl = bx - 9   # centre lunette gauche
-        gr = bx + 9   # centre lunette droite
-
-        # Sangle noire (passe derrière la tête, de bord en bord)
-        self._c.create_rectangle(bx - hRX - 2, gogY - 3,
-                                 bx + hRX + 6, gogY + 3,
-                                 fill="#1a1a1a", outline='', tags='anim')
-        # Anneaux métalliques
-        for gcx in (gl, gr):
-            self._c.create_oval(gcx - gR, gogY - gR,
-                                gcx + gR, gogY + gR,
-                                fill=GRD, outline=GR, width=2, tags='anim')
-        # Pont entre les deux lunettes
-        self._c.create_rectangle(gl + gR - 2, gogY - 2,
-                                 gr - gR + 2, gogY + 2,
-                                 fill=GR, outline='', tags='anim')
-        # Blancs des yeux
-        eR = gR - 2
-        for gcx in (gl, gr):
-            self._c.create_oval(gcx - eR, gogY - eR,
-                                gcx + eR, gogY + eR,
-                                fill=EW, outline='', tags='anim')
-        # Iris + pupilles (légèrement tournés vers la boite si watching)
-        edir = 2 if watching else 1
-        for gcx in (gl + edir, gr + edir):
-            self._c.create_oval(gcx - 4, gogY - 4, gcx + 4, gogY + 4,
-                                fill=EBR, outline='', tags='anim')
-            self._c.create_oval(gcx - 2, gogY - 2, gcx + 2, gogY + 2,
-                                fill=EPU, outline='', tags='anim')
-            # Reflet (point blanc)
-            self._c.create_oval(gcx + 1, gogY - 3, gcx + 3, gogY - 1,
-                                fill=EW, outline='', tags='anim')
-        # Reflets vitrés (arc de cercle clair sur chaque verre)
-        for gcx in (gl, gr):
-            self._c.create_arc(gcx - eR, gogY - eR, gcx + 2, gogY - 2,
-                               start=25, extent=55,
-                               fill="#d4dce8", outline='', tags='anim')
-
-        # ── 10. Cheveux (filaments noirs sur le sommet) ────────────────
-        hairY = hCY - hRY
-        for hxo, dy in ((-6, -9), (-1, -11), (5, -9)):
-            self._c.create_line(bx + hxo, hairY,
-                                bx + hxo + dy // 4, hairY + dy,
-                                fill=BK, width=2, tags='anim')
-
-        # ── 11. Bouche ────────────────────────────────────────────────
-        mY = gogY + gR + 6
-        if watching:
-            # Bouche O (étonné)
-            self._c.create_oval(bx - 5, mY - 4, bx + 5, mY + 4,
-                                fill="#b08070", outline=YD, tags='anim')
-            self._c.create_rectangle(bx - 4, mY - 4, bx + 4, mY - 1,
-                                     fill=EW, outline='', tags='anim')
-        else:
-            # Sourire
-            self._c.create_arc(bx - 7, mY - 5, bx + 7, mY + 5,
-                               start=200, extent=140,
-                               style='arc', outline=YD, width=2, tags='anim')
-
-    # ── Oiseau 3D ──────────────────────────────────────────────────────
-
-    def _bird(self, cx, cy, statue=True, wing_t=0.0, scale=1.0):
-        import math
-        s = scale
-
-        if statue:
-            bw = int(17 * s)
-            bh = int(10 * s)
-            # Corps (pierre grise)
-            self._c.create_oval(cx - bw, cy - bh, cx + bw, cy + bh,
-                                fill="#8898b0", outline="#566070",
-                                width=1, tags='anim')
-            # Reflet 3D corps
-            self._c.create_oval(cx - bw + int(4 * s), cy - bh,
-                                cx + int(4 * s), cy - int(2 * s),
-                                fill="#aabbcc", outline='', tags='anim')
-            # Ailes repliées (deux côtés)
-            for sgn in (-1, 1):
-                self._c.create_polygon(
-                    cx + sgn * 3,             cy - bh // 2,
-                    cx + sgn * int(26 * s),   cy - int(18 * s),
-                    cx + sgn * int(22 * s),   cy + int(4 * s),
-                    fill="#6a7a90", outline="#566070", width=1, tags='anim')
-            # Tête
-            hr = int(7 * s)
-            hx, hy_ = cx + int(14 * s), cy - int(11 * s)
-            self._c.create_oval(hx - hr, hy_ - hr, hx + hr, hy_ + hr,
-                                fill="#9ab0b8", outline="#566070",
-                                width=1, tags='anim')
-            # Bec
-            self._c.create_polygon(
-                hx + hr, hy_,
-                hx + hr + int(8 * s), hy_ - int(2 * s),
-                hx + hr + int(8 * s), hy_ + int(2 * s),
-                fill="#7a6050", outline='', tags='anim')
-            # Plumes queue
-            for i in range(3):
-                self._c.create_line(cx - bw, cy,
-                                    cx - bw - int(10 * s),
-                                    cy + int((i - 1) * 4 * s),
-                                    fill="#566070",
-                                    width=max(1, int(2 * s)), tags='anim')
-
-        else:
-            # Oiseau vivant — coloré, ailes animées
-            bw = int(19 * s)
-            bh = int(9 * s)
-            wu = math.sin(wing_t * 2 * math.pi)
-            BC = "#f5a030"   # corps orange doré
-            WC = "#e07010"   # aile foncée
-            WH = "#ffd060"   # reflet aile
-
-            # Corps
-            self._c.create_oval(cx - bw, cy - bh, cx + bw, cy + bh,
-                                fill=BC, outline="#c07010",
-                                width=1, tags='anim')
-            # Reflet corps
-            self._c.create_oval(cx - bw + int(3 * s), cy - bh,
-                                cx, cy - int(2 * s),
-                                fill="#ffd080", outline='', tags='anim')
-
-            # Ailes (haut/bas animées)
-            wy = cy - bh - int((5 + 15 * abs(wu)) * s)
-            for sgn in (-1, 1):
-                tip_x = cx + sgn * int(30 * s)
-                pts = [
-                    cx,                       cy - bh,
-                    cx + sgn * int(14 * s),  wy,
-                    tip_x,                    wy + int(5 * s),
-                    cx + sgn * int(5 * s),   cy - bh // 2,
-                ]
-                self._c.create_polygon(*pts, fill=WC,
-                                       outline=BC, width=1, tags='anim')
-                # Reflet aile
-                self._c.create_polygon(
-                    cx + sgn * int(2 * s), cy - bh,
-                    cx + sgn * int(10 * s), wy + int(3 * s),
-                    tip_x - sgn * int(6 * s), wy + int(7 * s),
-                    fill=WH, outline='', tags='anim')
-
-            # Tête
-            hr = int(8 * s)
-            hx, hy_ = cx + int(16 * s), cy - int(9 * s)
-            self._c.create_oval(hx - hr, hy_ - hr, hx + hr, hy_ + hr,
-                                fill=BC, outline="#c07010", width=1, tags='anim')
-            # Oeil
-            self._c.create_oval(hx + int(2 * s), hy_ - int(3 * s),
-                                hx + int(6 * s), hy_ + int(1 * s),
-                                fill="white", outline='', tags='anim')
-            self._c.create_oval(hx + int(3 * s), hy_ - int(2 * s),
-                                hx + int(5 * s), hy_,
-                                fill="#1a1a1a", outline='', tags='anim')
-            # Bec
-            self._c.create_polygon(
-                hx + hr, hy_,
-                hx + hr + int(9 * s), hy_ - int(2 * s),
-                hx + hr + int(9 * s), hy_ + int(2 * s),
-                fill="#f0b030", outline='', tags='anim')
-            # Queue animée
-            for i in range(3):
-                ang = (i - 1) * 0.3 + wing_t * 0.5
-                self._c.create_line(
-                    cx - bw, cy,
-                    cx - bw - int(12 * s),
-                    cy + int(math.sin(ang) * 6 * s),
-                    fill="#c07010",
-                    width=max(1, int(2 * s)), tags='anim')
-            # Sillage (petites particules dorées)
-            for i in range(4):
-                px = cx - bw - int((4 + i * 9) * s)
-                py = cy + int(math.sin(wing_t * 6.28 + i * 1.2) * 3)
-                r = max(1, int((3.5 - i * 0.8) * s))
-                self._c.create_oval(px - r, py - r, px + r, py + r,
-                                    fill=WH, outline='', tags='anim')
-
-
-# ── Bouton arrondi ────────────────────────────────────────────────────
 
 class RoundedButton(tk.Canvas):
     """Bouton à coins arrondis dessiné sur un Canvas."""
@@ -1082,6 +737,13 @@ class TriosSeconverterApp(tk.Tk):
 
         if self._current_page and self._current_page in self._pages:
             self._pages[self._current_page].pack_forget()
+
+        # Animation d'accueil : arrêtée quand l'Accueil est caché, relancée au retour.
+        if getattr(self, '_welcome_anim', None) is not None:
+            if page_id == 'accueil':
+                self._welcome_anim.resume()
+            elif self._current_page == 'accueil':
+                self._welcome_anim.stop()
 
         self._current_page = page_id
         self._pages[page_id].pack(fill='both', expand=True)
