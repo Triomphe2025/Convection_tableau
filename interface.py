@@ -16,6 +16,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext
 from tkinter import ttk
 
+import interface_helpers
 from converter import Converter
 from data_dictionary import get_dictionary, get_pending_dictionary
 from template import TableTemplate, TemplateManager
@@ -28,6 +29,19 @@ def _resource(name: str) -> Path:
     if hasattr(sys, '_MEIPASS'):
         return Path(sys._MEIPASS) / name
     return Path(__file__).parent / name
+
+
+def _activer_dpi() -> bool:
+    """Rend la fenêtre nette sur un écran à forte densité (Windows + réglage DPI_NET)."""
+    from config import Config
+    if not interface_helpers.dpi_a_activer(sys.platform, Config.DPI_NET):
+        return False
+    try:
+        import ctypes
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        return True
+    except Exception:
+        return False
 
 
 def _tag_from_msg(msg: str) -> str:
@@ -7252,6 +7266,7 @@ if __name__ == '__main__':
         # Exe lancé avec des arguments : ligne de commande, sans fenêtre (essais, lots).
         from ligne_de_commande import main as ligne_de_commande
         raise SystemExit(ligne_de_commande(sys.argv[1:]))
+    _activer_dpi()   # avant toute fenêtre Tk, sinon la mise à l'échelle n'est pas prise en compte
     _preavis_licence = _controler_licence_graphique()
     app = TriosSeconverterApp()
     if _preavis_licence:
