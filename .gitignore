@@ -63,6 +63,9 @@ acad.err
 docs/maquettes/*.png
 maquettes_pour_claude_code.zip
 
+# Captures de l'interface produites par outils/capture_interface.py (outil de revue visuelle)
+captures/
+
 # Fichiers générés/scratch à la racine
 analysis_summary.json
 generer_classeur_log.txt

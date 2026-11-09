@@ -16,6 +16,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext
 from tkinter import ttk
 
+import interface_helpers
 from converter import Converter
 from data_dictionary import get_dictionary, get_pending_dictionary
 from template import TableTemplate, TemplateManager
@@ -28,6 +29,19 @@ def _resource(name: str) -> Path:
     if hasattr(sys, '_MEIPASS'):
         return Path(sys._MEIPASS) / name
     return Path(__file__).parent / name
+
+
+def _activer_dpi() -> bool:
+    """Rend la fenêtre nette sur un écran à forte densité (Windows + réglage DPI_NET)."""
+    from config import Config
+    if not interface_helpers.dpi_a_activer(sys.platform, Config.DPI_NET):
+        return False
+    try:
+        import ctypes
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        return True
+    except Exception:
+        return False
 
 
 def _tag_from_msg(msg: str) -> str:
@@ -49,18 +63,32 @@ BG_PANEL = "#16213e"
 BG_CARD = "#0f3460"
 BG_LOG = "#0a0a14"
 FG_TEXT = "#e0e0f0"
-FG_MUTED = "#7878a0"
+FG_MUTED = "#9797c9"   # 4,5:1 (WCAG AA) sur tous ses fonds — cf. test_contraste_interface
 FG_OK = "#56c596"
 FG_ERR = "#e05c5c"
 FG_WARN = "#e0a050"
 COL_ACC = "#e94560"   # rouge-rose accent
 COL_ACC2 = "#533483"   # violet secondaire
 BTN_HVR = "#c73652"
+# FG_MUTED sert aussi de FOND (pastille d'étape) ou de texte sur fond sombre (bouton désactivé) :
+# ces deux couples gardent 4,5:1 — cf. test_contraste_interface.
+BG_BTN_OFF = BG_CARD              # fond d'un bouton désactivé (texte/contour FG_MUTED)
+FG_PASTILLE_FOND_MUTED = BG_MAIN  # texte d'une pastille dont le fond est FG_MUTED
 FONT_MAIN = ("Segoe UI", 9)
 FONT_BOLD = ("Segoe UI", 9, "bold")
 FONT_H1 = ("Segoe UI", 18, "bold")
 FONT_H2 = ("Segoe UI", 11, "bold")
 FONT_MONO = ("Consolas", 9)
+
+# Libellés des moteurs OCR (l'ordre d'affichage est donné par interface_helpers.moteurs_visibles).
+_LIBELLES_MOTEURS = {
+    "tesseract": "Tesseract (local)",
+    "claude": "Claude Vision (API)",
+    "docling": "Docling (local IA)",
+    "ollama": "Ollama Vision (local)",
+    "hybrid": "Hybride",
+    "agent": "Agent Claude",
+}
 
 
 # ── Animation d'accueil ───────────────────────────────────────────────
@@ -84,6 +112,12 @@ class WelcomeAnimation:
     def stop(self):
         self._running = False
 
+    def resume(self):
+        """Relance l'animation après un stop() (quand l'Accueil redevient visible)."""
+        if not self._running:
+            self._running = True
+            self._c.after(100, self._tick)
+
     def _tick(self):
         if not self._running:
             return
@@ -104,19 +138,19 @@ class WelcomeAnimation:
         self._c.delete('anim')
         f = self._frame
         bx, by, gy = self._BX, self._BY, self._GY
-        glowing = 75 <= f < 108
+        glowing = 70 <= f < 104
 
-        # Ouverture de porte : 0=fermée → 1=ouverte → referme après l'envol
-        if f < 56:
+        # Porte : fermée → ouverte (dépôt) → reste ouverte (sortie) → referme.
+        if f < 50:
             door_open = 0.0
-        elif f < 72:
-            door_open = min(1.0, (f - 56) / 16.0)   # s'ouvre
-        elif f < 144:
-            door_open = 1.0                           # reste ouverte
-        elif f < 158:
-            door_open = max(0.0, 1.0 - (f - 144) / 14.0)  # se referme
+        elif f < 66:
+            door_open = min(1.0, (f - 50) / 16.0)
+        elif f < 140:
+            door_open = 1.0
+        elif f < 156:
+            door_open = max(0.0, 1.0 - (f - 140) / 16.0)
         else:
-            door_open = 0.0                           # fermée pour la pause
+            door_open = 0.0
 
         # Sol — bord à bord, jusqu'au bas du canvas
         cw = max(self._c.winfo_width(), 2000)
@@ -127,35 +161,19 @@ class WelcomeAnimation:
         self._c.create_line(0, gy + 3, cw, gy + 3,
                             fill="#0d1a30", width=1, tags='anim')
 
-        # Boite 3D avec porte (toujours présente)
+        # Boite 3D « trios » (toujours présente)
         gcol = (COL_ACC if (f // 4) % 2 == 0 else COL_ACC2) if glowing else None
         self._draw_box3d(bx, by, gcol, door_open)
 
-        if f < 56:
-            # Minion marche depuis la gauche en portant la statue
-            mx = int(-55 + (bx - 35) * f / 55)
-            wk = (f % 14) / 14
-            self._shadow(mx, gy)
-            self._minion(mx, gy, walk=wk, carrying=True)
-            self._bird(mx + 22, gy - 48, statue=True)
-
-        elif f < 75:
-            # Dépôt dans la boite (porte ouverte depuis f=72)
-            p = (f - 56) / 18
-            mx = bx - 90
-            self._shadow(mx, gy)
-            self._minion(mx, gy, lean=int(p * 11))
-            if p < 0.88:
-                self._bird(mx + 22 + int(p * 20),
-                           gy - 48 + int(p * 36), statue=True)
-
-        elif f < 108:
-            # Boite brille — Minion recule et observe
-            p = (f - 75) / 32
-            mx = bx - 90 - int(p * 16)
-            self._shadow(mx, gy)
-            self._minion(mx, gy, watching=True)
-            # Particules orbitales autour de la boite
+        if f < 66:
+            # Une feuille glisse depuis la gauche et entre dans la boite.
+            p = f / 66.0
+            fx = int(-40 + (bx + 40) * p)
+            sc = max(0.5, 1.0 - p * 0.4)
+            if p < 0.9:
+                self._feuille(fx, by - 8, scale=sc)
+        elif f < 104:
+            # La boite brille — particules orbitales (transformation).
             for i in range(7):
                 angle = i * math.pi * 2 / 7 + f * 0.22
                 r = 40 + 9 * math.sin(f * 0.28 + i)
@@ -165,24 +183,13 @@ class WelcomeAnimation:
                 col = COL_ACC if i % 2 == 0 else COL_ACC2
                 self._c.create_oval(px - sz, py - sz, px + sz, py + sz,
                                     fill=col, outline='', tags='anim')
-
-        elif f < 152:
-            # Oiseau sort par la porte et traverse l'écran
-            p = (f - 108) / 43
-            mx = bx - 106
-            self._shadow(mx, gy)
-            self._minion(mx, gy, watching=True)
-            bird_x = int(bx + 20 + p * 295)
-            bird_y = int(by - 5 - p * 77)
-            wt = (f % 10) / 10
-            sc = max(0.28, 1.0 - p * 0.72)
-            self._bird(bird_x, bird_y, statue=False, wing_t=wt, scale=sc)
-
-        else:
-            # Pause (porte se referme)
-            mx = bx - 106
-            self._shadow(mx, gy)
-            self._minion(mx, gy, watching=True)
+        elif f < 150:
+            # Un petit tableau sort par la porte et part vers la droite.
+            p = (f - 104) / 46.0
+            tx = int(bx + 10 + p * 300)
+            sc = min(1.0, 0.5 + p * 0.5)
+            self._tableau(tx, by - 6, scale=sc)
+        # sinon : courte pause avant la boucle
 
     # ── Coffre magique isométrique avec porte ────────────────────────────
 
@@ -316,362 +323,38 @@ class WelcomeAnimation:
                             fill="white" if glow else COL_ACC,
                             font=("Segoe UI", 9, "bold"), tags='anim')
 
-    # ── Personnage 3D miniature ────────────────────────────────────────
+    # ── Feuille (entrée) et petit tableau (sortie) ──────────────────────
 
-    def _shadow(self, cx, gy):
-        self._c.create_oval(cx - 17, gy - 3, cx + 17, gy + 3,
-                            fill="#0c1828", outline='', tags='anim')
+    def _feuille(self, cx, cy, scale=1.0):
+        """Feuille de papier : rectangle clair, coin plié, quelques lignes de texte."""
+        w, h = int(26 * scale), int(34 * scale)
+        x1, y1, x2, y2 = cx - w // 2, cy - h // 2, cx + w // 2, cy + h // 2
+        pli = max(3, int(8 * scale))
+        self._c.create_rectangle(x1, y1, x2, y2,
+                                 fill="#f4f4f8", outline="#9a9ab0", tags='anim')
+        self._c.create_polygon(x2 - pli, y1, x2, y1 + pli, x2 - pli, y1 + pli,
+                               fill="#d0d0da", outline='', tags='anim')
+        for i in range(1, 5):
+            yy = y1 + int(h * i / 5)
+            self._c.create_line(x1 + pli // 2, yy, x2 - pli, yy,
+                                fill="#b8b8c8", tags='anim')
 
-    def _minion(self, x, gy, walk=0.0, carrying=False,
-                lean=0, watching=False):
-        """Minion 2D isométrique dessiné sur Canvas — du fond vers l'avant."""
-        import math
-        # Palette Minion
-        YL = "#f5d028"   # jaune clair
-        YM = "#d4aa00"   # jaune moyen
-        YD = "#b08800"   # jaune sombre (ombres)
-        BL = "#5b8ed6"   # bleu salopette
-        BD = "#3a6ab0"   # bleu salopette ombre
-        BS = "#1e408a"   # bleu salopette contour
-        GR = "#909098"   # gris lunettes
-        GRD = "#5a5a62"   # gris sombre
-        EW = "#ffffff"   # blanc œil
-        EBR = "#7a3800"   # brun iris
-        EPU = "#080400"   # noir pupille
-        BK = "#101012"   # noir chaussures/cheveux
-        BKS = "#282830"   # noir reflet
+    def _tableau(self, cx, cy, scale=1.0):
+        """Petit tableau : grille avec en-tête coloré (le résultat produit)."""
+        w, h = int(42 * scale), int(30 * scale)
+        x1, y1, x2, y2 = cx - w // 2, cy - h // 2, cx + w // 2, cy + h // 2
+        tete = max(4, int(7 * scale))
+        self._c.create_rectangle(x1, y1, x2, y2,
+                                 fill="#153a5e", outline=COL_ACC, tags='anim')
+        self._c.create_rectangle(x1, y1, x2, y1 + tete,
+                                 fill=COL_ACC, outline='', tags='anim')
+        for cc in (1, 2):
+            xx = x1 + int(w * cc / 3)
+            self._c.create_line(xx, y1, xx, y2, fill="#2a5a8a", tags='anim')
+        for rr in (1, 2):
+            yy = y1 + tete + int((h - tete) * rr / 3)
+            self._c.create_line(x1, yy, x2, yy, fill="#2a5a8a", tags='anim')
 
-        bx = x + lean // 2
-        sw = math.sin(walk * 2 * math.pi)
-        ls = int(sw * 8)   # swing jambes
-
-        fy = gy         # sol
-        shY = fy - 6     # dessus chaussure
-        lgT = fy - 22    # haut jambes
-        ovB = fy - 24    # bas salopette
-        ovM = fy - 37    # milieu salopette (logo)
-        ovT = fy - 52    # haut salopette
-        bckT = fy - 67    # sommet du corps
-        hCY = fy - 58    # centre tête
-        hRX = 16         # rayon horizontal tête
-        hRY = 14         # rayon vertical tête
-        bHW = 15         # demi-largeur corps (total 30px)
-        armY = ovT + 6    # position verticale des bras
-
-        # ── 1. Chaussure arrière ──────────────────────────────────────
-        self._c.create_oval(bx - 13 - ls, shY - 3,
-                            bx + 1 - ls, fy + 3,
-                            fill=BK, outline='', tags='anim')
-
-        # ── 2. Jambe arrière ──────────────────────────────────────────
-        self._c.create_rectangle(bx - 10 - ls, lgT,
-                                 bx - 2 - ls, shY,
-                                 fill=YM, outline='', tags='anim')
-
-        # ── 3. Bras arrière ───────────────────────────────────────────
-        aW = 6                               # epaisseur des bras
-        sbX, sbY = bx - bHW + 1, armY + 3   # epaule gauche
-        if carrying:
-            ebX, ebY = sbX - 7, armY - 7
-            hbX, hbY = sbX - 5, armY - 18
-        elif lean > 0:
-            prog = lean / 11.0
-            ebX, ebY = sbX + int(8 * prog),  sbY - int(4 * prog)
-            hbX, hbY = sbX + int(16 * prog), sbY - int(10 * prog)
-        elif watching:
-            ebX, ebY = sbX - 6, armY - 3
-            hbX, hbY = sbX - 4, armY - 12
-        else:
-            aof = int(-sw * 8)
-            ebX, ebY = sbX - 5, sbY + 5 + aof // 2
-            hbX, hbY = sbX - 3, sbY + 13 + aof
-        self._c.create_line(sbX, sbY, ebX, ebY,
-                            fill=YM, width=aW, capstyle='round', tags='anim')
-        self._c.create_line(ebX, ebY, hbX, hbY,
-                            fill=YD, width=aW - 1, capstyle='round', tags='anim')
-        self._c.create_oval(hbX - 4, hbY - 4, hbX + 4, hbY + 4,
-                            fill=YM, outline=YD, width=1, tags='anim')
-
-        # ── 4. Corps jaune principal ───────────────────────────────────
-        # Arc bas (demi-sphère basse)
-        self._c.create_oval(bx - bHW - 1, ovB - 10,
-                            bx + bHW + 1, ovB + 10,
-                            fill=YL, outline=YD, width=1, tags='anim')
-        # Rectangle central
-        self._c.create_rectangle(bx - bHW, bckT,
-                                 bx + bHW, ovB,
-                                 fill=YL, outline='', tags='anim')
-        # Tête (ovale haut)
-        self._c.create_oval(bx - hRX, hCY - hRY,
-                            bx + hRX, hCY + hRY,
-                            fill=YL, outline=YD, width=1, tags='anim')
-        # Face droite corps (ombre 3D)
-        self._c.create_rectangle(bx + bHW, bckT,
-                                 bx + bHW + 5, ovB,
-                                 fill=YM, outline='', tags='anim')
-        # Face droite tête (ombre 3D)
-        self._c.create_polygon(
-            bx + hRX - 2, hCY - 5,
-            bx + hRX + 4, hCY - 3,
-            bx + hRX + 4, hCY + 7,
-            bx + hRX - 2, hCY + 9,
-            fill=YM, outline='', tags='anim')
-        # Reflet (lumière haut gauche)
-        self._c.create_oval(bx - 8, hCY - hRY + 2,
-                            bx - 2, hCY - hRY + 8,
-                            fill="#ffe060", outline='', tags='anim')
-
-        # ── 5. Salopette bleue ────────────────────────────────────────
-        # Corps salopette
-        self._c.create_polygon(
-            bx - bHW + 2, ovT,
-            bx - bHW,     ovB,
-            bx + bHW,     ovB,
-            bx + bHW - 2, ovT,
-            fill=BL, outline=BS, width=1, tags='anim')
-        # Ombre côté droit
-        self._c.create_polygon(
-            bx + bHW - 2, ovT,
-            bx + bHW,     ovB,
-            bx + bHW + 5, ovB,
-            bx + bHW + 3, ovT,
-            fill=BD, outline='', tags='anim')
-        # Bavette (bib) devant
-        self._c.create_polygon(
-            bx - 9, ovT,
-            bx - 10, ovT + 14,
-            bx + 10, ovT + 14,
-            bx + 9,  ovT,
-            fill=BL, outline=BS, width=1, tags='anim')
-        # Logo G (petit carré centré)
-        self._c.create_rectangle(bx - 5, ovM - 5, bx + 5, ovM + 5,
-                                 fill=BD, outline=BS, tags='anim')
-        self._c.create_text(bx, ovM, text="G", fill="#90c8ff",
-                            font=("Segoe UI", 6, "bold"), tags='anim')
-        # Boutons épaulettes (gauche/droit)
-        for bxb in (bx - bHW + 4, bx + bHW - 4):
-            self._c.create_oval(bxb - 3, ovT + 2, bxb + 3, ovT + 8,
-                                fill=GR, outline=GRD, tags='anim')
-
-        # ── 6. Jambe avant ────────────────────────────────────────────
-        self._c.create_rectangle(bx - 1 + ls, lgT,
-                                 bx + 7 + ls, shY,
-                                 fill=YL, outline='', tags='anim')
-        self._c.create_rectangle(bx + 7 + ls, lgT,
-                                 bx + 10 + ls, shY,
-                                 fill=YM, outline='', tags='anim')
-
-        # ── 7. Chaussure avant ────────────────────────────────────────
-        self._c.create_oval(bx - 3 + ls, shY - 4,
-                            bx + 14 + ls, fy + 3,
-                            fill=BK, outline='', tags='anim')
-        self._c.create_oval(bx - 1 + ls, shY - 2,
-                            bx + 7 + ls, shY + 1,
-                            fill=BKS, outline='', tags='anim')
-
-        # ── 8. Bras avant ─────────────────────────────────────────────
-        sfX, sfY = bx + bHW - 1, armY + 3   # epaule droite
-        if carrying:
-            efX, efY = sfX + 7, armY - 7
-            hfX, hfY = sfX + 5, armY - 18
-        elif lean > 0:
-            prog = lean / 11.0
-            efX, efY = sfX + int(8 * prog),  sfY - int(4 * prog)
-            hfX, hfY = sfX + int(18 * prog), sfY - int(12 * prog)
-        elif watching:
-            efX, efY = sfX + 10, armY - 6
-            hfX, hfY = sfX + 8,  armY - 18
-        else:
-            aof2 = int(sw * 8)
-            efX, efY = sfX + 5, sfY + 5 - aof2 // 2
-            hfX, hfY = sfX + 3, sfY + 13 - aof2
-        self._c.create_line(sfX, sfY, efX, efY,
-                            fill=YL, width=aW, capstyle='round', tags='anim')
-        self._c.create_line(efX, efY, hfX, hfY,
-                            fill=YM, width=aW - 1, capstyle='round', tags='anim')
-        self._c.create_oval(hfX - 4, hfY - 4, hfX + 4, hfY + 4,
-                            fill=YL, outline=YD, width=1, tags='anim')
-
-        # ── 9. Lunettes (sangle + anneaux + yeux) ─────────────────────
-        gogY = hCY - 2   # centre vertical lunettes
-        gR = 9         # rayon anneau
-        gl = bx - 9   # centre lunette gauche
-        gr = bx + 9   # centre lunette droite
-
-        # Sangle noire (passe derrière la tête, de bord en bord)
-        self._c.create_rectangle(bx - hRX - 2, gogY - 3,
-                                 bx + hRX + 6, gogY + 3,
-                                 fill="#1a1a1a", outline='', tags='anim')
-        # Anneaux métalliques
-        for gcx in (gl, gr):
-            self._c.create_oval(gcx - gR, gogY - gR,
-                                gcx + gR, gogY + gR,
-                                fill=GRD, outline=GR, width=2, tags='anim')
-        # Pont entre les deux lunettes
-        self._c.create_rectangle(gl + gR - 2, gogY - 2,
-                                 gr - gR + 2, gogY + 2,
-                                 fill=GR, outline='', tags='anim')
-        # Blancs des yeux
-        eR = gR - 2
-        for gcx in (gl, gr):
-            self._c.create_oval(gcx - eR, gogY - eR,
-                                gcx + eR, gogY + eR,
-                                fill=EW, outline='', tags='anim')
-        # Iris + pupilles (légèrement tournés vers la boite si watching)
-        edir = 2 if watching else 1
-        for gcx in (gl + edir, gr + edir):
-            self._c.create_oval(gcx - 4, gogY - 4, gcx + 4, gogY + 4,
-                                fill=EBR, outline='', tags='anim')
-            self._c.create_oval(gcx - 2, gogY - 2, gcx + 2, gogY + 2,
-                                fill=EPU, outline='', tags='anim')
-            # Reflet (point blanc)
-            self._c.create_oval(gcx + 1, gogY - 3, gcx + 3, gogY - 1,
-                                fill=EW, outline='', tags='anim')
-        # Reflets vitrés (arc de cercle clair sur chaque verre)
-        for gcx in (gl, gr):
-            self._c.create_arc(gcx - eR, gogY - eR, gcx + 2, gogY - 2,
-                               start=25, extent=55,
-                               fill="#d4dce8", outline='', tags='anim')
-
-        # ── 10. Cheveux (filaments noirs sur le sommet) ────────────────
-        hairY = hCY - hRY
-        for hxo, dy in ((-6, -9), (-1, -11), (5, -9)):
-            self._c.create_line(bx + hxo, hairY,
-                                bx + hxo + dy // 4, hairY + dy,
-                                fill=BK, width=2, tags='anim')
-
-        # ── 11. Bouche ────────────────────────────────────────────────
-        mY = gogY + gR + 6
-        if watching:
-            # Bouche O (étonné)
-            self._c.create_oval(bx - 5, mY - 4, bx + 5, mY + 4,
-                                fill="#b08070", outline=YD, tags='anim')
-            self._c.create_rectangle(bx - 4, mY - 4, bx + 4, mY - 1,
-                                     fill=EW, outline='', tags='anim')
-        else:
-            # Sourire
-            self._c.create_arc(bx - 7, mY - 5, bx + 7, mY + 5,
-                               start=200, extent=140,
-                               style='arc', outline=YD, width=2, tags='anim')
-
-    # ── Oiseau 3D ──────────────────────────────────────────────────────
-
-    def _bird(self, cx, cy, statue=True, wing_t=0.0, scale=1.0):
-        import math
-        s = scale
-
-        if statue:
-            bw = int(17 * s)
-            bh = int(10 * s)
-            # Corps (pierre grise)
-            self._c.create_oval(cx - bw, cy - bh, cx + bw, cy + bh,
-                                fill="#8898b0", outline="#566070",
-                                width=1, tags='anim')
-            # Reflet 3D corps
-            self._c.create_oval(cx - bw + int(4 * s), cy - bh,
-                                cx + int(4 * s), cy - int(2 * s),
-                                fill="#aabbcc", outline='', tags='anim')
-            # Ailes repliées (deux côtés)
-            for sgn in (-1, 1):
-                self._c.create_polygon(
-                    cx + sgn * 3,             cy - bh // 2,
-                    cx + sgn * int(26 * s),   cy - int(18 * s),
-                    cx + sgn * int(22 * s),   cy + int(4 * s),
-                    fill="#6a7a90", outline="#566070", width=1, tags='anim')
-            # Tête
-            hr = int(7 * s)
-            hx, hy_ = cx + int(14 * s), cy - int(11 * s)
-            self._c.create_oval(hx - hr, hy_ - hr, hx + hr, hy_ + hr,
-                                fill="#9ab0b8", outline="#566070",
-                                width=1, tags='anim')
-            # Bec
-            self._c.create_polygon(
-                hx + hr, hy_,
-                hx + hr + int(8 * s), hy_ - int(2 * s),
-                hx + hr + int(8 * s), hy_ + int(2 * s),
-                fill="#7a6050", outline='', tags='anim')
-            # Plumes queue
-            for i in range(3):
-                self._c.create_line(cx - bw, cy,
-                                    cx - bw - int(10 * s),
-                                    cy + int((i - 1) * 4 * s),
-                                    fill="#566070",
-                                    width=max(1, int(2 * s)), tags='anim')
-
-        else:
-            # Oiseau vivant — coloré, ailes animées
-            bw = int(19 * s)
-            bh = int(9 * s)
-            wu = math.sin(wing_t * 2 * math.pi)
-            BC = "#f5a030"   # corps orange doré
-            WC = "#e07010"   # aile foncée
-            WH = "#ffd060"   # reflet aile
-
-            # Corps
-            self._c.create_oval(cx - bw, cy - bh, cx + bw, cy + bh,
-                                fill=BC, outline="#c07010",
-                                width=1, tags='anim')
-            # Reflet corps
-            self._c.create_oval(cx - bw + int(3 * s), cy - bh,
-                                cx, cy - int(2 * s),
-                                fill="#ffd080", outline='', tags='anim')
-
-            # Ailes (haut/bas animées)
-            wy = cy - bh - int((5 + 15 * abs(wu)) * s)
-            for sgn in (-1, 1):
-                tip_x = cx + sgn * int(30 * s)
-                pts = [
-                    cx,                       cy - bh,
-                    cx + sgn * int(14 * s),  wy,
-                    tip_x,                    wy + int(5 * s),
-                    cx + sgn * int(5 * s),   cy - bh // 2,
-                ]
-                self._c.create_polygon(*pts, fill=WC,
-                                       outline=BC, width=1, tags='anim')
-                # Reflet aile
-                self._c.create_polygon(
-                    cx + sgn * int(2 * s), cy - bh,
-                    cx + sgn * int(10 * s), wy + int(3 * s),
-                    tip_x - sgn * int(6 * s), wy + int(7 * s),
-                    fill=WH, outline='', tags='anim')
-
-            # Tête
-            hr = int(8 * s)
-            hx, hy_ = cx + int(16 * s), cy - int(9 * s)
-            self._c.create_oval(hx - hr, hy_ - hr, hx + hr, hy_ + hr,
-                                fill=BC, outline="#c07010", width=1, tags='anim')
-            # Oeil
-            self._c.create_oval(hx + int(2 * s), hy_ - int(3 * s),
-                                hx + int(6 * s), hy_ + int(1 * s),
-                                fill="white", outline='', tags='anim')
-            self._c.create_oval(hx + int(3 * s), hy_ - int(2 * s),
-                                hx + int(5 * s), hy_,
-                                fill="#1a1a1a", outline='', tags='anim')
-            # Bec
-            self._c.create_polygon(
-                hx + hr, hy_,
-                hx + hr + int(9 * s), hy_ - int(2 * s),
-                hx + hr + int(9 * s), hy_ + int(2 * s),
-                fill="#f0b030", outline='', tags='anim')
-            # Queue animée
-            for i in range(3):
-                ang = (i - 1) * 0.3 + wing_t * 0.5
-                self._c.create_line(
-                    cx - bw, cy,
-                    cx - bw - int(12 * s),
-                    cy + int(math.sin(ang) * 6 * s),
-                    fill="#c07010",
-                    width=max(1, int(2 * s)), tags='anim')
-            # Sillage (petites particules dorées)
-            for i in range(4):
-                px = cx - bw - int((4 + i * 9) * s)
-                py = cy + int(math.sin(wing_t * 6.28 + i * 1.2) * 3)
-                r = max(1, int((3.5 - i * 0.8) * s))
-                self._c.create_oval(px - r, py - r, px + r, py + r,
-                                    fill=WH, outline='', tags='anim')
-
-
-# ── Bouton arrondi ────────────────────────────────────────────────────
 
 class RoundedButton(tk.Canvas):
     """Bouton à coins arrondis dessiné sur un Canvas."""
@@ -706,11 +389,15 @@ class RoundedButton(tk.Canvas):
 
     def _draw(self, bg):
         self.delete("all")
-        fill = bg if self._state == 'normal' else FG_MUTED
+        if self._state == 'normal':
+            fill, outline, fg = bg, bg, self._fg
+        else:
+            # Bouton inactif : fond sombre, texte et contour atténués mais lisibles (4,5:1)
+            fill, outline, fg = BG_BTN_OFF, FG_MUTED, FG_MUTED
         self._rounded_rect(1, 1, self._btn_w - 1, self._btn_h - 1,
-                           self._radius, fill=fill, outline=fill)
+                           self._radius, fill=fill, outline=outline)
         self.create_text(self._btn_w // 2, self._btn_h // 2,
-                         text=self._text, fill=self._fg,
+                         text=self._text, fill=fg,
                          font=self._font)
 
     def _on_enter(self, _):
@@ -731,7 +418,7 @@ class RoundedButton(tk.Canvas):
 
     def set_text(self, text):
         self._text = text
-        self._draw(self._bg if self._state == 'normal' else FG_MUTED)
+        self._draw(self._bg)
 
 
 # ── Application principale ────────────────────────────────────────────
@@ -776,6 +463,10 @@ class TriosSeconverterApp(tk.Tk):
         self._agent_session_id = tk.StringVar(
             value=getattr(Config, 'CLAUDE_AGENT_SESSION_ID', '')
         )
+        # Étape 2 : nom lisible du modèle affiché dans la liste (l'identifiant reste
+        # dans _claude_model). Deux traces gardent les deux en phase avec la page Mode OCR.
+        self._stepper_model_display = tk.StringVar(
+            value=interface_helpers.nom_modele_lisible(self._claude_model.get()))
 
         self._validation_interactive = tk.BooleanVar(
             value=getattr(Config, 'VALIDATION_INTERACTIVE', False)
@@ -842,7 +533,22 @@ class TriosSeconverterApp(tk.Tk):
         style.theme_use('clam')
         style.configure("TCombobox",
                         fieldbackground=BG_LOG, background=BG_LOG,
-                        foreground=FG_TEXT, selectbackground=COL_ACC)
+                        foreground=FG_TEXT, selectbackground=COL_ACC,
+                        arrowcolor=FG_TEXT)
+        # L'état readonly (nos listes modèle/OCR) a ses propres couleurs sous clam : sans ça,
+        # le champ ressortait en gris illisible, le texte sélectionné et la flèche disparaissaient.
+        style.map("TCombobox",
+                  fieldbackground=[("readonly", BG_LOG)],
+                  background=[("readonly", BG_LOG)],
+                  foreground=[("readonly", FG_TEXT)],
+                  arrowcolor=[("readonly", FG_TEXT)],
+                  selectbackground=[("readonly", BG_CARD)],
+                  selectforeground=[("readonly", FG_TEXT)])
+        # La liste déroulante est une Listbox Tk (popup), stylée par la base d'options (pas ttk).
+        self.option_add('*TCombobox*Listbox.background', BG_LOG)
+        self.option_add('*TCombobox*Listbox.foreground', FG_TEXT)
+        self.option_add('*TCombobox*Listbox.selectBackground', COL_ACC)
+        self.option_add('*TCombobox*Listbox.selectForeground', FG_TEXT)
         style.configure("TNotebook", background=BG_PANEL, tabmargins=[2, 5, 2, 0])
         style.configure("TNotebook.Tab", background=BG_CARD, foreground=FG_MUTED,
                         padding=[14, 6], font=FONT_BOLD)
@@ -859,6 +565,7 @@ class TriosSeconverterApp(tk.Tk):
 
         # Raccourci clavier
         self.bind('<Control-s>', lambda e: self._start())
+        self.bind('<Control-o>', lambda e: self._browse_word())
 
     # ── Construction de l'interface ───────────────────────────────────
 
@@ -874,6 +581,7 @@ class TriosSeconverterApp(tk.Tk):
         hdr = tk.Frame(self, bg=BG_CARD, height=70)
         hdr.pack(fill='x')
         hdr.pack_propagate(False)
+        self._header_frame = hdr   # repère pour replacer la toolbar sous l'en-tête
 
         tk.Label(hdr, text="Trios", font=("Segoe UI", 22, "bold"),
                  fg=COL_ACC, bg=BG_CARD).pack(side='left', padx=(22, 0), pady=14)
@@ -969,6 +677,11 @@ class TriosSeconverterApp(tk.Tk):
                 self._dev_tabs_container.pack_forget()
                 self._dev_toggle_lbl.configure(fg=FG_MUTED)
                 ind_dev.configure(bg=BG_CARD)
+            self._poser_moteurs_stepper()
+            cible = interface_helpers.page_apres_bascule_dev(
+                self._current_page, self._dev_mode_on)
+            if cible != self._current_page:
+                self._show_page(cible)
 
         dev_btn_frame.bind('<Button-1>', _toggle_dev)
         self._dev_toggle_lbl.bind('<Button-1>', _toggle_dev)
@@ -1027,13 +740,22 @@ class TriosSeconverterApp(tk.Tk):
         if self._current_page and self._current_page in self._pages:
             self._pages[self._current_page].pack_forget()
 
+        # Animation d'accueil : arrêtée quand l'Accueil est caché, relancée au retour.
+        if getattr(self, '_welcome_anim', None) is not None:
+            if page_id == 'accueil':
+                self._welcome_anim.resume()
+            elif self._current_page == 'accueil':
+                self._welcome_anim.stop()
+
         self._current_page = page_id
         self._pages[page_id].pack(fill='both', expand=True)
 
     def _build_toolbar(self):
         """Barre d'actions principale sous le header."""
+        # Cadre non packé au repos : toute la bande reste masquée tant qu'aucune
+        # conversion n'est terminée (sinon une bande vide subsistait sous le titre).
         tb = tk.Frame(self, bg=BG_PANEL, height=54)
-        tb.pack(fill='x')
+        self._toolbar_frame = tb
         tb.pack_propagate(False)
 
         # Trait de séparation haut
@@ -1052,39 +774,40 @@ class TriosSeconverterApp(tk.Tk):
         )
         # NB : pas de .pack() — bouton retiré de la toolbar, accessible via stepper
 
-        # Boutons résultats
+        # Boutons résultats — créés mais non affichés : la barre du haut ne les montre
+        # (avec la barre de progression) qu'une fois une conversion terminée (point 9).
+        self._toolbar_inner = inner
         self._btn_excel = self._mini_btn(inner, "  Excel  ",    self._open_excel)
         self._btn_folder = self._mini_btn(inner, "  Dossier  ",  self._open_folder)
         self._btn_audit = self._mini_btn(inner, "  Audit  ",    self._lancer_audit)
         self._btn_observer = self._mini_btn(inner, " Observer ",   self._ouvrir_observateur)
 
-        for b in (self._btn_excel, self._btn_folder,
-                  self._btn_audit, self._btn_observer):
-            b.pack(side='left', padx=(4, 0))
-
         self._result_btns = [self._btn_excel, self._btn_folder,
                              self._btn_audit, self._btn_observer]
-        for b in self._result_btns:
-            b.configure_state('disabled')
 
-        # Côté droit : dico + progressbar
+        # Côté droit : barre de progression (packée à la fin de la conversion).
         right = tk.Frame(inner, bg=BG_PANEL)
-        right.pack(side='right', fill='y')
-
-        self._btn_dico = RoundedButton(
-            right, text="  Ajouter au lexique  ",
-            command=self._ajouter_au_lexique,
-            bg=BG_CARD, hover_bg=COL_ACC2,
-            width=155, height=36, font=FONT_BOLD,
-        )
-        self._btn_dico.pack(side='right', padx=(6, 0))
+        self._toolbar_right = right
 
         self._pbar = ttk.Progressbar(
             right, style="Trios.Horizontal.TProgressbar",
             orient='horizontal', mode='determinate', maximum=100,
             length=230
         )
+
+    def _afficher_barre_resultats(self):
+        """Fin de conversion : affiche tout le cadre de la barre du haut, boutons
+        résultats et barre de progression compris."""
+        self._toolbar_frame.pack(fill='x', after=self._header_frame)
+        self._toolbar_right.pack(side='right', fill='y')
         self._pbar.pack(side='right', padx=(0, 8))
+        for b in self._result_btns:
+            b.pack(side='left', padx=(4, 0))
+            b.configure_state('normal')
+
+    def _masquer_barre_resultats(self):
+        """Repos / lancement : masque tout le cadre de la barre du haut (pas de bande vide)."""
+        self._toolbar_frame.pack_forget()
 
     def _build_status_bar(self):
         """Barre de statut fine en bas de la fenêtre."""
@@ -1208,9 +931,11 @@ class TriosSeconverterApp(tk.Tk):
                             fg=FG_MUTED, bg=BG_CARD, anchor='w')
         lbl_desc.pack(fill='x', pady=(4, 8))
 
+        # Détail en FG_MUTED (lisible sur BG_CARD et BG_PANEL) : la couleur de carte COL_ACC2
+        # (violet) sur bleu foncé rendait la ligne « Outils » de la carte Dessins illisible.
         lbl_detail = tk.Label(frame, text=card["detail"],
                               font=("Segoe UI", 8),
-                              fg=card["couleur"], bg=BG_CARD, anchor='w')
+                              fg=FG_MUTED, bg=BG_CARD, anchor='w')
         lbl_detail.pack(fill='x')
 
         # Indicateur de sélection (barre colorée en bas de la carte)
@@ -1230,8 +955,7 @@ class TriosSeconverterApp(tk.Tk):
                 except Exception:
                     pass
 
-        def _on_leave(e, widgets=all_widgets, mode=card["mode"],
-                      orig_col=card["couleur"]):
+        def _on_leave(e, widgets=all_widgets, mode=card["mode"]):
             if self._workflow_mode.get() == mode:
                 return
             for w in widgets:
@@ -1239,11 +963,6 @@ class TriosSeconverterApp(tk.Tk):
                     w.configure(bg=BG_CARD)
                 except Exception:
                     pass
-            # Le label couleur garde sa couleur d'origine
-            try:
-                lbl_detail.configure(fg=orig_col)
-            except Exception:
-                pass
 
         for w in all_widgets:
             w.bind('<Button-1>', lambda e, fn=_on_click: fn())
@@ -1433,7 +1152,7 @@ class TriosSeconverterApp(tk.Tk):
         for i, (num, label) in enumerate(steps_info):
             circ = tk.Label(indicator, text=f" {num} ",
                             font=("Segoe UI", 9, "bold"),
-                            fg="white", bg=FG_MUTED, padx=4, pady=2)
+                            fg=FG_PASTILLE_FOND_MUTED, bg=FG_MUTED, padx=4, pady=2)
             circ.pack(side='left')
             self._stepper_circle_lbls.append(circ)
 
@@ -1605,23 +1324,8 @@ class TriosSeconverterApp(tk.Tk):
 
         radio_row = tk.Frame(lf_ocr, bg=BG_PANEL)
         radio_row.pack(fill='x', padx=12, pady=10)
-
-        modes = [
-            ("Tesseract (local)",      "tesseract"),
-            ("Claude Vision (API)",    "claude"),
-            ("Docling (local IA)",     "docling"),
-            ("Ollama Vision (local)",  "ollama"),
-            ("Hybride",                "hybrid"),
-            ("Agent Claude",           "agent"),
-        ]
-        for lbl, val in modes:
-            tk.Radiobutton(
-                radio_row, text=lbl, variable=self._ocr_mode, value=val,
-                font=FONT_MAIN, fg=FG_TEXT, bg=BG_PANEL,
-                selectcolor=BG_CARD, activebackground=BG_PANEL,
-                activeforeground=FG_TEXT,
-                command=self._on_ocr_mode_change,
-            ).pack(side='left', padx=(0, 12))
+        self._stepper_radio_row = radio_row
+        self._poser_moteurs_stepper()
 
         # Clé API — visible uniquement pour Claude/Hybride/Agent
         self._stepper_api_key_frame = tk.Frame(lf_ocr, bg=BG_PANEL)
@@ -1642,6 +1346,51 @@ class TriosSeconverterApp(tk.Tk):
             text="  console.anthropic.com",
             font=("Segoe UI", 8), fg=FG_MUTED, bg=BG_PANEL,
         ).pack(side='left')
+
+        self._stepper_cle_etat = tk.Label(
+            self._stepper_api_key_frame, text="", font=("Segoe UI", 8), bg=BG_PANEL)
+        self._stepper_cle_etat.pack(side='left', padx=(10, 0))
+        self._claude_key.trace_add('write', lambda *_: self._maj_etat_cle())
+
+        # Bloc Claude — modèle lisible, mode lot, relecture forcée (mode « claude »)
+        from config import Config as _Cfg
+        self._stepper_claude_frame = tk.Frame(lf_ocr, bg=BG_PANEL)
+        ids = list(getattr(_Cfg, 'CLAUDE_CAPACITES_MODELES', {}).keys())
+        self._stepper_label_vers_id = {
+            interface_helpers.nom_modele_lisible(mid): mid for mid in ids}
+
+        ligne_modele = tk.Frame(self._stepper_claude_frame, bg=BG_PANEL)
+        ligne_modele.pack(fill='x', padx=12, pady=(2, 2))
+        tk.Label(ligne_modele, text="Modèle Claude :", font=FONT_BOLD,
+                 fg=FG_WARN, bg=BG_PANEL).pack(side='left')
+        combo = ttk.Combobox(
+            ligne_modele, textvariable=self._stepper_model_display,
+            values=[interface_helpers.nom_modele_lisible(mid) for mid in ids],
+            state='readonly', width=30)
+        combo.pack(side='left', padx=(8, 0))
+        combo.bind('<<ComboboxSelected>>', lambda e: self._claude_model.set(
+            self._stepper_label_vers_id.get(self._stepper_model_display.get(),
+                                            self._claude_model.get())))
+        # L'identifiant exact du modèle en infobulle (le nom affiché est lisible).
+        self._infobulle(combo, lambda: self._claude_model.get())
+        # Les deux sens de synchronisation avec la page Mode OCR.
+        self._claude_model.trace_add('write', lambda *_: self._stepper_model_display.set(
+            interface_helpers.nom_modele_lisible(self._claude_model.get())))
+
+        ligne_cases = tk.Frame(self._stepper_claude_frame, bg=BG_PANEL)
+        ligne_cases.pack(fill='x', padx=12, pady=(0, 4))
+        tk.Checkbutton(
+            ligne_cases, text="Mode économique (lot)", variable=self._claude_mode_lot,
+            font=("Segoe UI", 8), fg=FG_MUTED, bg=BG_PANEL, selectcolor=BG_CARD,
+            activebackground=BG_PANEL, activeforeground=FG_TEXT,
+            highlightthickness=0, bd=0,
+        ).pack(side='left')
+        tk.Checkbutton(
+            ligne_cases, text="Relire même les pages en cache", variable=self._claude_forcer,
+            font=("Segoe UI", 8), fg=FG_MUTED, bg=BG_PANEL, selectcolor=BG_CARD,
+            activebackground=BG_PANEL, activeforeground=FG_TEXT,
+            highlightthickness=0, bd=0,
+        ).pack(side='left', padx=(16, 0))
 
         # ID de session agent — visible uniquement en mode "agent"
         self._stepper_agent_frame = tk.Frame(lf_ocr, bg=BG_PANEL)
@@ -1721,19 +1470,24 @@ class TriosSeconverterApp(tk.Tk):
         btn_frame = tk.Frame(parent, bg=BG_MAIN, pady=16)
         btn_frame.pack(fill='x')
 
-        RoundedButton(
+        self._btn_stepper_launch = RoundedButton(
             btn_frame,
             text="▶  Lancer la conversion",
             command=self._start,
             bg=COL_ACC, hover_bg=BTN_HVR,
             width=240, height=42, font=FONT_H2,
-        ).pack(anchor='center')
+        )
+        self._btn_stepper_launch.pack(anchor='center')
 
-        tk.Label(
-            btn_frame,
-            text="Le journal de progression apparaît dans l'onglet Mode OCR.",
-            font=("Segoe UI", 8), fg=FG_MUTED, bg=BG_MAIN,
-        ).pack(anchor='center', pady=(8, 0))
+        # Message affiché quand le lancement est bloqué (source / destination manquante).
+        self._stepper_launch_msg = tk.Label(
+            btn_frame, text="", font=("Segoe UI", 8), fg=FG_WARN, bg=BG_MAIN,
+        )
+        self._stepper_launch_msg.pack(anchor='center', pady=(8, 0))
+
+        # Le bouton suit l'état de la source et de la destination.
+        self._word_file.trace_add('write', lambda *_: self._stepper_maj_lancement())
+        self._output_dir.trace_add('write', lambda *_: self._stepper_maj_lancement())
 
     def _stepper_update_tpl_desc(self, *_):
         """Met à jour la description du modèle sélectionné dans le stepper."""
@@ -1748,6 +1502,17 @@ class TriosSeconverterApp(tk.Tk):
             )
         else:
             self._stepper_tpl_desc.configure(text="")
+
+    def _stepper_maj_lancement(self):
+        """Active le bouton Lancer si source et destination sont là, sinon le désactive
+        avec un message clair (interface_helpers.etat_lancement)."""
+        btn = getattr(self, '_btn_stepper_launch', None)
+        if btn is None:
+            return
+        ok, msg = interface_helpers.etat_lancement(
+            self._word_file.get(), self._output_dir.get())
+        btn.configure_state('normal' if ok else 'disabled')
+        self._stepper_launch_msg.configure(text="" if ok else msg)
 
     def _stepper_refresh_recap(self):
         """Rafraîchit les labels de récapitulatif à l'étape 3."""
@@ -1799,7 +1564,7 @@ class TriosSeconverterApp(tk.Tk):
                 circ.configure(bg=COL_ACC, fg="white")
                 lbl.configure(fg=COL_ACC)
             else:
-                circ.configure(bg=FG_MUTED, fg=BG_MAIN)
+                circ.configure(bg=FG_MUTED, fg=FG_PASTILLE_FOND_MUTED)
                 lbl.configure(fg=FG_MUTED)
 
         # Update nav buttons
@@ -1809,14 +1574,14 @@ class TriosSeconverterApp(tk.Tk):
             fg=FG_TEXT if prev_ok else FG_MUTED,
         )
         if step == n - 1:
-            # Dernière étape : le bouton "Suivant" devient "Lancer"
-            self._btn_stepper_next.configure(
-                text="▶  Lancer",
-                bg=FG_OK,
-                command=self._start,
-            )
+            # Dernière étape : un seul bouton de lancement (le bouton centré). On masque
+            # le « Suivant » de la barre pour ne pas offrir un second bouton.
+            self._btn_stepper_next.pack_forget()
             self._stepper_refresh_recap()
+            self._stepper_maj_lancement()
         else:
+            if not self._btn_stepper_next.winfo_ismapped():
+                self._btn_stepper_next.pack(side='right', padx=(0, 8), pady=8)
             self._btn_stepper_next.configure(
                 text="Suivant →",
                 bg=COL_ACC,
@@ -1956,7 +1721,7 @@ class TriosSeconverterApp(tk.Tk):
         params_frame = tk.LabelFrame(
             form,
             text=" Paramètres avancés ",
-            bg="#0f3460", fg="#7878a0", font=("Segoe UI", 8),
+            bg="#0f3460", fg=FG_MUTED, font=("Segoe UI", 8),
             relief='flat', bd=1, padx=8, pady=6,
         )
         params_frame.grid(row=4, column=0, columnspan=2, sticky='ew', pady=(4, 0))
@@ -1973,7 +1738,7 @@ class TriosSeconverterApp(tk.Tk):
             relief='flat', font=("Segoe UI", 9),
         ).pack(side='left', padx=4)
         tk.Label(r1, text="20=rapide · 500=standard · 2000=précis",
-                 bg="#0f3460", fg="#7878a0", font=("Segoe UI", 8)).pack(side='left')
+                 bg="#0f3460", fg=FG_MUTED, font=("Segoe UI", 8)).pack(side='left')
 
         # Ligne 2 — Seuil texte/géométrie
         r2 = tk.Frame(params_frame, bg="#0f3460")
@@ -1987,7 +1752,7 @@ class TriosSeconverterApp(tk.Tk):
             relief='flat', font=("Segoe UI", 9),
         ).pack(side='left', padx=4)
         tk.Label(r2, text="60 px pour ~200 DPI — augmenter si texte confondu avec géométrie",
-                 bg="#0f3460", fg="#7878a0", font=("Segoe UI", 8)).pack(side='left')
+                 bg="#0f3460", fg=FG_MUTED, font=("Segoe UI", 8)).pack(side='left')
 
         # Bouton + barre de progression + statut
         action_row = tk.Frame(form, bg=BG_MAIN)
@@ -2044,10 +1809,10 @@ class TriosSeconverterApp(tk.Tk):
         for name, label in ETAPES_DEF:
             step_row = tk.Frame(steps_outer, bg="#0f3460")
             step_row.pack(fill='x', padx=12, pady=1)
-            icon_lbl = tk.Label(step_row, text="○", bg="#0f3460", fg="#7878a0",
+            icon_lbl = tk.Label(step_row, text="○", bg="#0f3460", fg=FG_MUTED,
                                 font=("Segoe UI", 9, "bold"), width=2)
             icon_lbl.pack(side='left')
-            text_lbl = tk.Label(step_row, text=label, bg="#0f3460", fg="#7878a0",
+            text_lbl = tk.Label(step_row, text=label, bg="#0f3460", fg=FG_MUTED,
                                 font=("Segoe UI", 9), anchor='w')
             text_lbl.pack(side='left', fill='x', expand=True)
             self._cad_step_widgets[name] = (icon_lbl, text_lbl)
@@ -2100,8 +1865,8 @@ class TriosSeconverterApp(tk.Tk):
         """Remet toutes les pastilles d'étape en état initial (○ gris)."""
         for name, (icon_lbl, text_lbl) in getattr(self, '_cad_step_widgets', {}).items():
             self.after(0, lambda il=icon_lbl, tl=text_lbl: (
-                il.config(text="○", fg="#7878a0"),
-                tl.config(fg="#7878a0"),
+                il.config(text="○", fg=FG_MUTED),
+                tl.config(fg=FG_MUTED),
             ))
 
     def _cad_step_start(self, name: str):
@@ -2405,6 +2170,25 @@ class TriosSeconverterApp(tk.Tk):
         )
         self._dash_borniers_lbl.pack()
 
+        # Temps écoulé / restant estimé (depuis la 1re page lue), ou phase du mode lot.
+        self._dash_eta_lbl = tk.Label(
+            mid_col, text="",
+            font=("Segoe UI", 9), fg=FG_MUTED, bg=BG_LOG,
+        )
+        self._dash_eta_lbl.pack(pady=(4, 0))
+
+        # Actions de fin (affichées à la fin de la conversion par _dashboard_done).
+        self._dash_actions = tk.Frame(mid_col, bg=BG_LOG)
+        for _txt, _cmd in (("📊  Ouvrir l'Excel", self._open_excel),
+                           ("📁  Dossier", self._open_folder),
+                           ("🔍  Audit", self._lancer_audit)):
+            tk.Button(
+                self._dash_actions, text=_txt, font=("Segoe UI", 9),
+                bg=BG_CARD, fg=FG_TEXT, activebackground=COL_ACC2,
+                activeforeground="white", relief='flat', padx=10, pady=5,
+                cursor='hand2', command=_cmd,
+            ).pack(side='left', padx=6)
+
         # Colonne droite — MODÈLE ATTENDU
         right_col = tk.Frame(cols_outer, bg=BG_PANEL, width=220)
         right_col.pack(side='left', fill='both')
@@ -2452,14 +2236,6 @@ class TriosSeconverterApp(tk.Tk):
                  font=FONT_BOLD, fg=FG_MUTED, bg=BG_MAIN,
                  anchor='w').pack(side='left')
 
-        tk.Button(
-            log_hdr, text="Voir onglet Mode OCR →",
-            font=("Segoe UI", 8), bg=BG_CARD, fg=FG_MUTED,
-            activebackground=COL_ACC2, activeforeground="white",
-            relief='flat', padx=8, pady=2, cursor='hand2',
-            command=lambda: self._show_page('ocr'),
-        ).pack(side='right')
-
         self._dash_log_box = scrolledtext.ScrolledText(
             log_zone, font=FONT_MONO, bg=BG_LOG, fg=FG_TEXT,
             insertbackground=FG_TEXT, relief='flat',
@@ -2502,6 +2278,14 @@ class TriosSeconverterApp(tk.Tk):
         self._dash_pbar['value'] = 0
         self._dash_page_lbl.configure(text="En attente…", fg=FG_TEXT)
         self._dash_borniers_lbl.configure(text="")
+        # Jalon : heure de la 1re page lue (pour l'estimation du temps restant).
+        self._dash_premiere_page_t = None
+        from config import Config as _Cfg
+        mode_lot = (self._ocr_mode.get() == 'claude'
+                    and bool(getattr(_Cfg, 'CLAUDE_MODE_LOT', False)))
+        self._dash_eta_lbl.configure(
+            text=interface_helpers.texte_estimation(None, mode_lot, premiere_page_vue=False))
+        self._dash_actions.pack_forget()
 
         # Timer
         self._dash_timer_lbl.configure(text="⏱  00:00", fg=COL_ACC)
@@ -2579,6 +2363,36 @@ class TriosSeconverterApp(tk.Tk):
             text=f"✓ {n_ok} bornier(s) converti(s)", fg=FG_OK,
         )
         self._dash_anim_lbl.configure(text="✓", fg=FG_OK)
+        self._dash_eta_lbl.configure(text="")
+        self._dash_actions.pack(pady=(10, 0))
+        self._signaler_fin()
+
+    def _signaler_fin(self):
+        """Fin de conversion : si la fenêtre n'a pas le focus, clignotement de l'icône
+        (FlashWindowEx) + son système. Windows seul ; un échec ne bloque jamais la fin."""
+        import sys as _sys
+        if not interface_helpers.doit_signaler_fin(
+                _sys.platform, bool(self.focus_displayof())):
+            return
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class _FlashInfo(ctypes.Structure):
+                _fields_ = [("cbSize", ctypes.c_uint),
+                            ("hwnd", wintypes.HWND),
+                            ("dwFlags", ctypes.c_uint),
+                            ("uCount", ctypes.c_uint),
+                            ("dwTimeout", ctypes.c_uint)]
+
+            racine = ctypes.windll.user32.GetAncestor(int(self.winfo_id()), 2)  # GA_ROOT
+            # FLASHW_ALL | FLASHW_TIMERNOFG = 0x0F : clignote jusqu'au retour au premier plan.
+            info = _FlashInfo(ctypes.sizeof(_FlashInfo), racine, 0x0F, 5, 0)
+            ctypes.windll.user32.FlashWindowEx(ctypes.byref(info))
+            import winsound
+            winsound.MessageBeep(-1)
+        except Exception as exc:
+            self._log(f"  (signal de fin indisponible : {exc})", 'muted')
 
     # ── Pages ─────────────────────────────────────────────────────────
 
@@ -2940,7 +2754,23 @@ class TriosSeconverterApp(tk.Tk):
 
     def _build_page_format(self, parent) -> tk.Frame:
         """Page Formater Excel : reformate un Excel existant sans relancer l'OCR."""
-        page = tk.Frame(parent, bg=BG_MAIN)
+        # Page défilable : à 1060x760, les boutons et le journal passaient sous le bord.
+        conteneur = tk.Frame(parent, bg=BG_MAIN)
+        canvas = tk.Canvas(conteneur, bg=BG_MAIN, highlightthickness=0)
+        vbar = ttk.Scrollbar(conteneur, orient='vertical', command=canvas.yview)
+        canvas.configure(yscrollcommand=vbar.set)
+        vbar.pack(side='right', fill='y')
+        canvas.pack(side='left', fill='both', expand=True)
+
+        page = tk.Frame(canvas, bg=BG_MAIN)
+        fenetre = canvas.create_window((0, 0), window=page, anchor='nw')
+        canvas.bind('<Configure>', lambda e: canvas.itemconfigure(fenetre, width=e.width))
+        page.bind('<Configure>',
+                  lambda e: canvas.configure(scrollregion=canvas.bbox('all')))
+        # Molette active seulement quand le pointeur est sur cette page.
+        canvas.bind('<Enter>', lambda e: canvas.bind_all(
+            '<MouseWheel>', lambda ev: canvas.yview_scroll(int(-ev.delta / 120), 'units')))
+        canvas.bind('<Leave>', lambda e: canvas.unbind_all('<MouseWheel>'))
 
         tk.Label(page, text="Formater Excel", font=FONT_H2,
                  fg=FG_TEXT, bg=BG_MAIN).pack(anchor='w', padx=24, pady=(16, 4))
@@ -3082,13 +2912,14 @@ class TriosSeconverterApp(tk.Tk):
             ).grid(row=ri, column=2, sticky='w', pady=2)
 
         # ── Marges (en cm, comme Excel français) ──────────────────
+        # Après les 5 paramètres (sinon « Marges » recouvrait « Nombre de colonnes »).
         tk.Label(
             inner_p, text="Marges (cm) :", font=FONT_BOLD,
             fg=FG_MUTED, bg=BG_PANEL,
-        ).grid(row=3, column=0, columnspan=3, sticky='w', pady=(10, 4))
+        ).grid(row=len(_params), column=0, columnspan=3, sticky='w', pady=(10, 4))
 
         margins_row = tk.Frame(inner_p, bg=BG_PANEL)
-        margins_row.grid(row=4, column=0, columnspan=3, sticky='w')
+        margins_row.grid(row=len(_params) + 1, column=0, columnspan=3, sticky='w')
 
         _margins = [
             ("Haut :",     self._format_margin_top),
@@ -3169,7 +3000,7 @@ class TriosSeconverterApp(tk.Tk):
         self._format_log_box.tag_config('muted', foreground=FG_MUTED)
         self._format_log_box.tag_config('info',  foreground=FG_TEXT)
 
-        return page
+        return conteneur
 
     # ── Actions de la page Formater ───────────────────────────────────
 
@@ -3667,31 +3498,37 @@ class TriosSeconverterApp(tk.Tk):
         contenu = (
             "GUIDE RAPIDE — TriosSeconverter\n"
             "================================\n\n"
-            "1. PRÉPARER VOS FICHIERS\n"
-            "   → Placez votre PDF ou fichier Word dans un dossier accessible.\n"
-            "   → Si vous avez un second fichier Word avec des tableaux"
-            " structurés (Doc.2), préparez-le aussi.\n\n"
-            "2. PARAMÈTRES\n"
-            "   → Onglet \"Documents\" : sélectionnez vos fichiers et le dossier de sortie.\n"
-            "   → Onglet \"Modèles\" : choisissez ou créez un modèle de tableau"
-            " correspondant à vos documents.\n\n"
-            "3. MODE OCR\n"
-            "   → Tesseract : reconnaissance locale, rapide, sans internet.\n"
-            "   → Claude Vision : IA Anthropic, meilleure précision, nécessite une clé API.\n"
-            "   → Docling IBM : IA locale, installation lourde, pas de coût API.\n\n"
-            "4. LANCER LA CONVERSION\n"
-            "   → Cliquez sur \"▶ Lancer la conversion\" en bas de l'écran.\n"
-            "   → Le journal d'exécution s'affiche dans Mode OCR.\n\n"
+            "1. ACCUEIL — CHOISIR LE TRAVAIL\n"
+            "   → \"Transformation tableaux\" : borniers scannés (PDF / Word / images) → Excel.\n"
+            "   → \"Transformation dessins\" et \"Mixte\" : à venir.\n\n"
+            "2. ASSISTANT EN 3 ÉTAPES\n"
+            "   → Étape 1 — Source & destination : le fichier à convertir et le dossier"
+            " de sortie.\n"
+            "   → Étape 2 — Modèle & OCR : le modèle de tableau et le moteur. Avec"
+            " Claude, choisissez le modèle, le mode économique (lot) et, au besoin,"
+            " relire les pages en cache.\n"
+            "   → Étape 3 — Lancer : le bouton reste gris tant que la source ou la"
+            " destination manque.\n\n"
+            "3. MOTEUR OCR\n"
+            "   → Tesseract (local) : reconnaissance hors ligne, rapide, sans clé.\n"
+            "   → Claude Vision (API) : meilleure précision, nécessite une clé API"
+            " Anthropic.\n\n"
+            "4. PENDANT LA CONVERSION\n"
+            "   → Le tableau de bord montre la page en cours (n / total), le temps"
+            " écoulé et le temps restant estimé.\n"
+            "   → À la fin, la fenêtre clignote si elle n'est pas au premier plan.\n\n"
             "5. RÉSULTATS\n"
-            "   → Cliquez sur \"Excel\" pour ouvrir le fichier généré.\n"
-            "   → Cliquez sur \"Dossier\" pour ouvrir le dossier de sortie.\n"
-            "   → Utilisez \"Audit\" pour analyser la qualité de l'extraction.\n\n"
+            "   → \"Ouvrir l'Excel\" ouvre le fichier généré, \"Dossier\" son dossier,"
+            " \"Audit\" analyse la qualité.\n"
+            "   → Ces boutons apparaissent aussi en haut une fois la conversion"
+            " terminée.\n\n"
+            "6. AUTRES PAGES\n"
+            "   → \"Formater Excel\" : remettre en page un Excel déjà converti.\n"
+            "   → \"Options\" : \"Ajouter au lexique\" pour enrichir le contrôle de"
+            " cohérence à partir d'un Excel corrigé.\n\n"
             "RACCOURCIS\n"
+            "   Ctrl+O    Choisir le fichier source\n"
             "   Ctrl+S    Lancer la conversion\n"
-            "   Ctrl+O    Ouvrir le fichier source\n\n"
-            "SUPPORT\n"
-            "   En cas de problème, consultez le fichier CLAUDE.md ou\n"
-            "   contactez l'équipe via le système de tickets.\n"
         )
         aide_box.insert('end', contenu)
         aide_box.configure(state='disabled')
@@ -3721,6 +3558,59 @@ class TriosSeconverterApp(tk.Tk):
         parent.columnconfigure(0, weight=1)
 
     # ── Gestion du mode OCR ───────────────────────────────────────────
+
+    def _poser_moteurs_stepper(self):
+        """(Re)construit les boutons moteur de l'étape 2 : hors Dev, seuls le socle
+        (Tesseract, Claude) et le moteur expérimental déjà choisi sont proposés."""
+        row = getattr(self, '_stepper_radio_row', None)
+        if row is None:
+            return
+        for enfant in row.winfo_children():
+            enfant.destroy()
+        visibles = interface_helpers.moteurs_visibles(self._dev_mode_on, self._ocr_mode.get())
+        for val in visibles:
+            tk.Radiobutton(
+                row, text=_LIBELLES_MOTEURS.get(val, val), variable=self._ocr_mode, value=val,
+                font=FONT_MAIN, fg=FG_TEXT, bg=BG_PANEL,
+                selectcolor=BG_CARD, activebackground=BG_PANEL,
+                activeforeground=FG_TEXT,
+                command=self._on_ocr_mode_change,
+            ).pack(side='left', padx=(0, 12))
+
+    def _infobulle(self, widget, fn_texte):
+        """Infobulle au survol ; fn_texte() rend le texte (contenu dynamique)."""
+        etat = {'top': None}
+
+        def _montrer(_e=None):
+            if etat['top'] is not None:
+                return
+            txt = fn_texte()
+            if not txt:
+                return
+            top = tk.Toplevel(widget)
+            top.wm_overrideredirect(True)
+            top.wm_geometry(f"+{widget.winfo_rootx() + 10}"
+                            f"+{widget.winfo_rooty() + widget.winfo_height() + 2}")
+            tk.Label(top, text=txt, font=("Segoe UI", 8), bg=BG_LOG, fg=FG_TEXT,
+                     relief='solid', bd=1, padx=6, pady=2).pack()
+            etat['top'] = top
+
+        def _cacher(_e=None):
+            if etat['top'] is not None:
+                etat['top'].destroy()
+                etat['top'] = None
+
+        widget.bind('<Enter>', _montrer)
+        widget.bind('<Leave>', _cacher)
+
+    def _maj_etat_cle(self):
+        """Indicateur « Clé API : configurée / absente » de l'étape 2."""
+        lbl = getattr(self, '_stepper_cle_etat', None)
+        if lbl is None:
+            return
+        etat = interface_helpers.etat_cle_api(self._claude_key.get())
+        lbl.configure(text=f"Clé API : {etat}",
+                      fg=FG_OK if etat == "configurée" else FG_WARN)
 
     def _on_ocr_mode_change(self):
         """Affiche/masque clé API et ID session dans la page OCR ET dans le stepper."""
@@ -3758,8 +3648,15 @@ class TriosSeconverterApp(tk.Tk):
             if needs_api:
                 self._stepper_api_key_frame.pack(
                     fill='x', padx=12, pady=(0, 4))
+                self._maj_etat_cle()
             else:
                 self._stepper_api_key_frame.pack_forget()
+        # Bloc Claude (modèle, lot, relecture forcée) : mode « claude » seul.
+        if hasattr(self, '_stepper_claude_frame'):
+            if mode == 'claude':
+                self._stepper_claude_frame.pack(fill='x', padx=0, pady=(0, 4))
+            else:
+                self._stepper_claude_frame.pack_forget()
         if hasattr(self, '_stepper_agent_frame'):
             if needs_agent:
                 self._stepper_agent_frame.pack(
@@ -3900,8 +3797,7 @@ class TriosSeconverterApp(tk.Tk):
         self.configure(cursor="watch")
         self._btn_start.configure_state('disabled')
         self._btn_start.set_text("⏳  Conversion en cours…")
-        for b in self._result_btns:
-            b.configure_state('disabled')
+        self._masquer_barre_resultats()
 
         tpl = self._tpl_manager.get(self._tpl_var.get())
         tables_word = self._tables_word_file.get().strip() or None
@@ -4186,6 +4082,28 @@ class TriosSeconverterApp(tk.Tk):
             self._dash_pbar['value'] = pct * 100
             self._dash_page_lbl.configure(text=msg if msg else "…")
             self._dash_status_lbl.configure(text=msg)
+            self._dash_maj_progres(msg)
+
+    def _dash_maj_progres(self, msg: str):
+        """« page n / total » et temps restant estimé à partir des messages « Page n/total »
+        (le temps écoulé est déjà dans le chrono — pas de doublon)."""
+        if not hasattr(self, '_dash_eta_lbl'):
+            return
+        paire = interface_helpers.analyser_progres_page(msg)
+        if paire is None:
+            return
+        import time
+        from config import Config as _Cfg
+        done, total = paire
+        if self._dash_premiere_page_t is None:
+            self._dash_premiere_page_t = time.time()
+        self._dash_page_lbl.configure(text=f"page {done} / {total}")
+        ecoule = time.time() - self._dash_premiere_page_t
+        mode_lot = (self._ocr_mode.get() == 'claude'
+                    and bool(getattr(_Cfg, 'CLAUDE_MODE_LOT', False)))
+        restant = interface_helpers.estimer_temps_restant(ecoule, done, total, mode_lot)
+        self._dash_eta_lbl.configure(
+            text=interface_helpers.texte_estimation(restant, mode_lot, premiere_page_vue=True))
 
     def _log(self, msg: str, tag: str = 'info'):
         self._log_box.configure(state='normal')
@@ -4284,8 +4202,7 @@ class TriosSeconverterApp(tk.Tk):
         self._set_progress(1.0, f"Terminé — {result['tableaux']} bornier(s) converti(s).")
         self._btn_start.configure_state('normal')
         self._btn_start.set_text("▶  Lancer la conversion")
-        for b in self._result_btns:
-            b.configure_state('normal')
+        self._afficher_barre_resultats()
         self._update_ctx_btn_states()
         self._dashboard_done(result)
 
@@ -4581,15 +4498,18 @@ class ValidationPageDialog(tk.Toplevel):
 
         attempt = result.get('_attempt', 1)
         attempt_txt = f" — Tentative {attempt}" if attempt > 1 else ""
-        self.title(f"Page {page_done}/{page_total}{attempt_txt} — Validation")
+        # Vrai numéro de page : le PAGE lu s'il existe, sinon le rang traité.
+        num = interface_helpers.numero_page_validation(
+            result.get('metadata', {}).get('PAGE'), page_done)
+        self.title(f"Page {num}/{page_total}{attempt_txt} — Validation")
         self.geometry("1160x680")
         self.minsize(900, 520)
         self.resizable(True, True)
         self.configure(bg=BG_MAIN)
         self.grab_set()
 
-        # Fermer via la croix = approuver sans commentaire
-        self.protocol("WM_DELETE_WINDOW", self._valider_accepter)
+        # La croix ne vaut plus « accepter » : elle demande confirmation.
+        self.protocol("WM_DELETE_WINDOW", self._fermer_confirme)
 
         ico = _resource("icon.ico")
         if ico.exists():
@@ -4599,6 +4519,10 @@ class ValidationPageDialog(tk.Toplevel):
                 pass
 
         self._build(page_done, page_total, attempt)
+
+        # Entrée = valider ; Échap = fermer avec confirmation.
+        self.bind('<Return>', lambda e: self._valider_accepter())
+        self.bind('<Escape>', lambda e: self._fermer_confirme())
 
     def _build(self, page_done: int, page_total: int, attempt: int = 1):
         # En-tête
@@ -4657,9 +4581,16 @@ class ValidationPageDialog(tk.Toplevel):
                 img_frame = tk.Frame(left, bg='#000000', height=184)
                 img_frame.pack(fill='x', padx=4, pady=(4, 0))
                 img_frame.pack_propagate(False)
+                apercu = tk.Label(
+                    img_frame, image=self._preview_img, bg='#000000', cursor='hand2',
+                )
+                apercu.pack(expand=True)
+                # Clic sur l'aperçu = scan en grand (vue 100 % défilable, molette = zoom).
+                apercu.bind('<Button-1>', lambda e: self._agrandir_image())
                 tk.Label(
-                    img_frame, image=self._preview_img, bg='#000000',
-                ).pack(expand=True)
+                    left, text="🔍 Cliquez l'aperçu pour l'agrandir",
+                    font=("Segoe UI", 8), fg=FG_MUTED, bg=BG_PANEL,
+                ).pack(fill='x', padx=8)
             except Exception:
                 self._preview_img = None
         else:
@@ -4800,6 +4731,9 @@ class ValidationPageDialog(tk.Toplevel):
         )
         self._comment_entry.pack(fill='both', expand=True, padx=8, pady=(0, 8))
         self._comment_entry.focus_set()
+        # Entrée valide même depuis le commentaire ; Shift+Entrée insère un saut de ligne.
+        self._comment_entry.bind('<Return>', lambda e: (self._valider_accepter(), 'break')[1])
+        self._comment_entry.bind('<Shift-Return>', lambda e: None)
 
         # Barre de boutons
         btn_bar = tk.Frame(self, bg=BG_MAIN)
@@ -4807,8 +4741,8 @@ class ValidationPageDialog(tk.Toplevel):
 
         tk.Button(
             btn_bar, text="Valider et continuer",
-            font=FONT_BOLD, bg=COL_ACC, fg='white',
-            activebackground=BTN_HVR, activeforeground='white',
+            font=FONT_BOLD, bg=COL_ACC2, fg='white',
+            activebackground="#6a4aa5", activeforeground='white',
             relief='flat', padx=24, pady=8, cursor='hand2',
             command=self._valider_accepter,
         ).pack(side='left', padx=(0, 6))
@@ -4858,6 +4792,58 @@ class ValidationPageDialog(tk.Toplevel):
         comment = self._comment_entry.get('1.0', 'end').strip()
         self._on_validated(comment, False, retry=False, auto=True)
         self.destroy()
+
+    def _fermer_confirme(self):
+        """Croix / Échap : demande confirmation, puis valide la page telle quelle
+        (pour débloquer le fil de travail qui attend une décision)."""
+        import tkinter.messagebox as mb
+        if mb.askyesno(
+                "Fermer la validation",
+                "Fermer cette page sans la relire ?\n"
+                "Elle sera validée telle quelle et la conversion continue.",
+                parent=self):
+            self._valider_accepter()
+
+    def _agrandir_image(self):
+        """Ouvre le scan en grand : vue 100 % défilable, molette = zoom."""
+        if not (self._image_path and Path(self._image_path).exists()):
+            return
+        try:
+            from PIL import Image, ImageTk
+        except Exception:
+            return
+        top = tk.Toplevel(self)
+        top.title("Scan — clic molette pour zoomer")
+        top.geometry("1000x760")
+        top.configure(bg='#000000')
+        canvas = tk.Canvas(top, bg='#000000', highlightthickness=0)
+        vbar = ttk.Scrollbar(top, orient='vertical', command=canvas.yview)
+        hbar = ttk.Scrollbar(top, orient='horizontal', command=canvas.xview)
+        canvas.configure(yscrollcommand=vbar.set, xscrollcommand=hbar.set)
+        vbar.pack(side='right', fill='y')
+        hbar.pack(side='bottom', fill='x')
+        canvas.pack(side='left', fill='both', expand=True)
+
+        source = Image.open(self._image_path)
+        etat = {'zoom': 1.0, 'photo': None}
+
+        def _rendre():
+            z = etat['zoom']
+            larg = max(1, int(source.width * z))
+            haut = max(1, int(source.height * z))
+            etat['photo'] = ImageTk.PhotoImage(source.resize((larg, haut), Image.LANCZOS))
+            canvas.delete('all')
+            canvas.create_image(0, 0, anchor='nw', image=etat['photo'])
+            canvas.configure(scrollregion=(0, 0, larg, haut))
+
+        def _molette(ev):
+            etat['zoom'] = min(8.0, max(0.1, etat['zoom'] * (1.1 if ev.delta > 0 else 0.9)))
+            _rendre()
+
+        canvas.bind('<Enter>', lambda e: canvas.bind_all('<MouseWheel>', _molette))
+        canvas.bind('<Leave>', lambda e: canvas.unbind_all('<MouseWheel>'))
+        top.bind('<Escape>', lambda e: top.destroy())
+        _rendre()
 
     def _valider_relancer(self):
         comment = self._comment_entry.get('1.0', 'end').strip()
@@ -7233,6 +7219,7 @@ if __name__ == '__main__':
         # Exe lancé avec des arguments : ligne de commande, sans fenêtre (essais, lots).
         from ligne_de_commande import main as ligne_de_commande
         raise SystemExit(ligne_de_commande(sys.argv[1:]))
+    _activer_dpi()   # avant toute fenêtre Tk, sinon la mise à l'échelle n'est pas prise en compte
     _preavis_licence = _controler_licence_graphique()
     app = TriosSeconverterApp()
     if _preavis_licence:

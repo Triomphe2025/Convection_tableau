@@ -74,6 +74,11 @@ class Config:
     # Afficher les détails lors du traitement
     VERBOSE = True
 
+    # Fenêtre nette sur un écran à forte densité de pixels (Windows seulement).
+    # False = comportement d'avant (la fenêtre peut paraître floue sur certains écrans) ;
+    # True = demande à Windows une mise à l'échelle nette au démarrage de l'interface.
+    DPI_NET = False
+
     # ========================================
     # ⚙️ OPTIONS DE TRAITEMENT
     # ========================================
