@@ -220,6 +220,23 @@ class TestRatioContraste(unittest.TestCase):
             h.ratio_contraste("#fff", "#000000")
 
 
+class TestTexteEstimation(unittest.TestCase):
+
+    def test_restant_seul_sans_ecoule(self):
+        t = h.texte_estimation(40, mode_lot=False, premiere_page_vue=True)
+        self.assertEqual(t, "restant ~ 0:40")
+        self.assertNotIn("écoulé", t)
+
+    def test_restant_none_vide(self):
+        self.assertEqual(h.texte_estimation(None, mode_lot=False, premiere_page_vue=True), "")
+
+    def test_mode_lot_attente_puis_recuperation(self):
+        self.assertEqual(h.texte_estimation(None, mode_lot=True, premiere_page_vue=False),
+                         "Mode lot — en attente du lot")
+        self.assertEqual(h.texte_estimation(None, mode_lot=True, premiere_page_vue=True),
+                         "Mode lot — récupération des pages")
+
+
 class TestDoitSignalerFin(unittest.TestCase):
 
     def test_windows_sans_focus_signale(self):

@@ -581,6 +581,7 @@ class TriosSeconverterApp(tk.Tk):
         hdr = tk.Frame(self, bg=BG_CARD, height=70)
         hdr.pack(fill='x')
         hdr.pack_propagate(False)
+        self._header_frame = hdr   # repère pour replacer la toolbar sous l'en-tête
 
         tk.Label(hdr, text="Trios", font=("Segoe UI", 22, "bold"),
                  fg=COL_ACC, bg=BG_CARD).pack(side='left', padx=(22, 0), pady=14)
@@ -751,8 +752,10 @@ class TriosSeconverterApp(tk.Tk):
 
     def _build_toolbar(self):
         """Barre d'actions principale sous le header."""
+        # Cadre non packé au repos : toute la bande reste masquée tant qu'aucune
+        # conversion n'est terminée (sinon une bande vide subsistait sous le titre).
         tb = tk.Frame(self, bg=BG_PANEL, height=54)
-        tb.pack(fill='x')
+        self._toolbar_frame = tb
         tb.pack_propagate(False)
 
         # Trait de séparation haut
@@ -793,7 +796,9 @@ class TriosSeconverterApp(tk.Tk):
         )
 
     def _afficher_barre_resultats(self):
-        """Montre les boutons résultats et la barre de progression (fin de conversion)."""
+        """Fin de conversion : affiche tout le cadre de la barre du haut, boutons
+        résultats et barre de progression compris."""
+        self._toolbar_frame.pack(fill='x', after=self._header_frame)
         self._toolbar_right.pack(side='right', fill='y')
         self._pbar.pack(side='right', padx=(0, 8))
         for b in self._result_btns:
@@ -801,11 +806,8 @@ class TriosSeconverterApp(tk.Tk):
             b.configure_state('normal')
 
     def _masquer_barre_resultats(self):
-        """Cache les boutons résultats et la barre de progression (barre du haut au repos)."""
-        for b in self._result_btns:
-            b.pack_forget()
-        self._pbar.pack_forget()
-        self._toolbar_right.pack_forget()
+        """Repos / lancement : masque tout le cadre de la barre du haut (pas de bande vide)."""
+        self._toolbar_frame.pack_forget()
 
     def _build_status_bar(self):
         """Barre de statut fine en bas de la fenêtre."""
@@ -2282,7 +2284,7 @@ class TriosSeconverterApp(tk.Tk):
         mode_lot = (self._ocr_mode.get() == 'claude'
                     and bool(getattr(_Cfg, 'CLAUDE_MODE_LOT', False)))
         self._dash_eta_lbl.configure(
-            text="Mode lot — en attente du lot" if mode_lot else "")
+            text=interface_helpers.texte_estimation(None, mode_lot, premiere_page_vue=False))
         self._dash_actions.pack_forget()
 
         # Timer
@@ -4083,8 +4085,8 @@ class TriosSeconverterApp(tk.Tk):
             self._dash_maj_progres(msg)
 
     def _dash_maj_progres(self, msg: str):
-        """« page n / total », temps écoulé et restant estimé à partir des messages
-        « Page n/total » (interface_helpers, fonctions pures testées)."""
+        """« page n / total » et temps restant estimé à partir des messages « Page n/total »
+        (le temps écoulé est déjà dans le chrono — pas de doublon)."""
         if not hasattr(self, '_dash_eta_lbl'):
             return
         paire = interface_helpers.analyser_progres_page(msg)
@@ -4100,14 +4102,8 @@ class TriosSeconverterApp(tk.Tk):
         mode_lot = (self._ocr_mode.get() == 'claude'
                     and bool(getattr(_Cfg, 'CLAUDE_MODE_LOT', False)))
         restant = interface_helpers.estimer_temps_restant(ecoule, done, total, mode_lot)
-        if mode_lot:
-            self._dash_eta_lbl.configure(text="Mode lot — récupération des pages")
-        elif restant is None:
-            self._dash_eta_lbl.configure(text="")
-        else:
-            self._dash_eta_lbl.configure(
-                text=f"écoulé {interface_helpers.format_duree(int(ecoule))}"
-                     f"  •  restant ~ {interface_helpers.format_duree(int(restant))}")
+        self._dash_eta_lbl.configure(
+            text=interface_helpers.texte_estimation(restant, mode_lot, premiere_page_vue=True))
 
     def _log(self, msg: str, tag: str = 'info'):
         self._log_box.configure(state='normal')

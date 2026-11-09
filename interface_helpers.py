@@ -142,6 +142,17 @@ def format_duree(secondes):
     return f"{s // 60}:{s % 60:02d}"
 
 
+def texte_estimation(restant_s, mode_lot=False, premiere_page_vue=False):
+    """Ligne d'estimation du tableau de bord : « restant ~ m:ss » (le temps écoulé est
+    déjà dans le chrono) ; vide tant qu'on ne sait pas ; phases du mode lot."""
+    if mode_lot:
+        return ("Mode lot — récupération des pages" if premiere_page_vue
+                else "Mode lot — en attente du lot")
+    if restant_s is None:
+        return ""
+    return f"restant ~ {format_duree(int(restant_s))}"
+
+
 def ratio_contraste(couleur1, couleur2):
     """Rapport de contraste WCAG entre deux couleurs « #rrggbb » (≥ 1.0)."""
     l1, l2 = _luminance(couleur1), _luminance(couleur2)
