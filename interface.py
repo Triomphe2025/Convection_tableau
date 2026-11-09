@@ -565,6 +565,7 @@ class TriosSeconverterApp(tk.Tk):
 
         # Raccourci clavier
         self.bind('<Control-s>', lambda e: self._start())
+        self.bind('<Control-o>', lambda e: self._browse_word())
 
     # ── Construction de l'interface ───────────────────────────────────
 
@@ -3495,31 +3496,37 @@ class TriosSeconverterApp(tk.Tk):
         contenu = (
             "GUIDE RAPIDE — TriosSeconverter\n"
             "================================\n\n"
-            "1. PRÉPARER VOS FICHIERS\n"
-            "   → Placez votre PDF ou fichier Word dans un dossier accessible.\n"
-            "   → Si vous avez un second fichier Word avec des tableaux"
-            " structurés (Doc.2), préparez-le aussi.\n\n"
-            "2. PARAMÈTRES\n"
-            "   → Onglet \"Documents\" : sélectionnez vos fichiers et le dossier de sortie.\n"
-            "   → Onglet \"Modèles\" : choisissez ou créez un modèle de tableau"
-            " correspondant à vos documents.\n\n"
-            "3. MODE OCR\n"
-            "   → Tesseract : reconnaissance locale, rapide, sans internet.\n"
-            "   → Claude Vision : IA Anthropic, meilleure précision, nécessite une clé API.\n"
-            "   → Docling IBM : IA locale, installation lourde, pas de coût API.\n\n"
-            "4. LANCER LA CONVERSION\n"
-            "   → Cliquez sur \"▶ Lancer la conversion\" en bas de l'écran.\n"
-            "   → Le journal d'exécution s'affiche dans Mode OCR.\n\n"
+            "1. ACCUEIL — CHOISIR LE TRAVAIL\n"
+            "   → \"Transformation tableaux\" : borniers scannés (PDF / Word / images) → Excel.\n"
+            "   → \"Transformation dessins\" et \"Mixte\" : à venir.\n\n"
+            "2. ASSISTANT EN 3 ÉTAPES\n"
+            "   → Étape 1 — Source & destination : le fichier à convertir et le dossier"
+            " de sortie.\n"
+            "   → Étape 2 — Modèle & OCR : le modèle de tableau et le moteur. Avec"
+            " Claude, choisissez le modèle, le mode économique (lot) et, au besoin,"
+            " relire les pages en cache.\n"
+            "   → Étape 3 — Lancer : le bouton reste gris tant que la source ou la"
+            " destination manque.\n\n"
+            "3. MOTEUR OCR\n"
+            "   → Tesseract (local) : reconnaissance hors ligne, rapide, sans clé.\n"
+            "   → Claude Vision (API) : meilleure précision, nécessite une clé API"
+            " Anthropic.\n\n"
+            "4. PENDANT LA CONVERSION\n"
+            "   → Le tableau de bord montre la page en cours (n / total), le temps"
+            " écoulé et le temps restant estimé.\n"
+            "   → À la fin, la fenêtre clignote si elle n'est pas au premier plan.\n\n"
             "5. RÉSULTATS\n"
-            "   → Cliquez sur \"Excel\" pour ouvrir le fichier généré.\n"
-            "   → Cliquez sur \"Dossier\" pour ouvrir le dossier de sortie.\n"
-            "   → Utilisez \"Audit\" pour analyser la qualité de l'extraction.\n\n"
+            "   → \"Ouvrir l'Excel\" ouvre le fichier généré, \"Dossier\" son dossier,"
+            " \"Audit\" analyse la qualité.\n"
+            "   → Ces boutons apparaissent aussi en haut une fois la conversion"
+            " terminée.\n\n"
+            "6. AUTRES PAGES\n"
+            "   → \"Formater Excel\" : remettre en page un Excel déjà converti.\n"
+            "   → \"Options\" : \"Ajouter au lexique\" pour enrichir le contrôle de"
+            " cohérence à partir d'un Excel corrigé.\n\n"
             "RACCOURCIS\n"
+            "   Ctrl+O    Choisir le fichier source\n"
             "   Ctrl+S    Lancer la conversion\n"
-            "   Ctrl+O    Ouvrir le fichier source\n\n"
-            "SUPPORT\n"
-            "   En cas de problème, consultez le fichier CLAUDE.md ou\n"
-            "   contactez l'équipe via le système de tickets.\n"
         )
         aide_box.insert('end', contenu)
         aide_box.configure(state='disabled')
