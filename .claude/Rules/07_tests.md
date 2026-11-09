@@ -70,7 +70,8 @@ tests/
   test_relecture_scan.py             → relecture_scan.py : clés repliées, en-tête et pied écartés, traits du cadre, page réelle du scan 6A 23111PE102
   test_verificateur_golden.py        → Cas réel 6A 23111PE102 (scan contre conversion), lectures figées
   test_converter_verification.py     → Converter.verifier_conversion et ses aides privées
-  test_non_regression_xlsx.py        → Le .xlsx du pipeline reste identique à l'instantané d'avant
+  test_non_regression_xlsx.py        → Le .xlsx du pipeline reste identique à l'instantané d'avant ; dump_classeur capture aussi les commentaires de cellule et l'en-tête/pied d'impression quand ils existent
+  test_memes_cellules.py             → Filet « mêmes cellules » (hors suite rapide, MEMES_CELLULES=1) : rejoue les 3 journaux .jsonl validés (PE011/PE012/6A133, sans API ni Tesseract, lexique neutralisé) et compare cellule par cellule à un instantané figé pris sur main — casse si le code change une cellule, un pied, un commentaire ou la mise en forme
   test_mesure_precision.py           → mesure_precision.py, une classe par fonction publique, dicts fabriqués
   test_mesurer_precision.py          → mesurer_precision.py (lecture xlsx/vérité/PDF, CSV, CLI), fichiers fabriqués
   test_positions_scan.py             → positions_scan.py sur lectures fabriquées : grille (pente, pas, phase, demi-pas), coupe aux traits (« 0815B/|RM »), jumeaux exacts / par rang / sans jumeau, déplacement (bord, débordement), sections, ancrage des lignes (ligne mal lue tenue par sa clé, clé en double, ancres croisées) ; rendu Excel (espaces, Courier New 11, False = avant)
@@ -121,7 +122,8 @@ tests/
 ```
 
 **1435 tests passent** (`pytest tests\`, relevé le 2026-11-09), aucun échec attendu, plus 1 test lent
-facultatif (`VERIF_TEST_LENT=1`, relecture du scan de 15 pages, ~30 s). Barrière de régression à ne jamais abaisser.
+facultatif (`VERIF_TEST_LENT=1`, relecture du scan de 15 pages, ~30 s) et le filet « mêmes
+cellules » (3 tests, `MEMES_CELLULES=1`, ~5 s, skippés par défaut). Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.
 
 ## Lancer les tests

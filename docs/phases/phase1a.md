@@ -50,3 +50,23 @@ Règles (valables à chaque étape) :
 - commence par me montrer ton plan ; avance par petites étapes, un commit par étape ; termine
   par un rapport : fichiers touchés, tests ajoutés, résultat de la suite, vérifications à
   faire à la main.Enregistre d'abord ce prompt mot pour mot dans docs/phases/phase1a.md (committé sur la branche) et relis-le avant chaque commit.
+
+---
+
+## Étape 1 — lancer le filet « mêmes cellules » (une commande)
+
+Le filet est hors de la suite rapide (gate par variable d'environnement, motif du projet).
+Pour le lancer seul :
+
+```powershell
+$env:MEMES_CELLULES = "1"; env\Scripts\python.exe -m pytest tests/test_memes_cellules.py -v
+```
+
+Régénérer l'instantané (seulement sur un changement voulu du moteur) :
+
+```powershell
+env\Scripts\python.exe -m tests.test_memes_cellules --regenerer
+```
+
+Déterminisme vérifié : le rejeu `.jsonl` ne lance ni OCR (pas de Tesseract) ni appel API ; le
+lexique est neutralisé (dossier vide) — l'instantané ne dépend donc que du code.

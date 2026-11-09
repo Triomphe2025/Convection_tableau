@@ -76,7 +76,9 @@ def resultats_synthetiques():
 
 
 def dump_classeur(path):
-    """Instantané JSON d'un classeur : valeurs, fusions, bordures, hauteurs."""
+    """Instantané JSON d'un classeur : valeurs, fusions, bordures, hauteurs ; plus les
+    commentaires de cellule et l'en-tête / pied d'impression QUAND ils existent (ajoutés
+    seulement dans ce cas, pour que les instantanés sans eux restent valides)."""
     wb = openpyxl.load_workbook(path)
     out = {}
     for ws in wb.worksheets:
@@ -94,9 +96,12 @@ def dump_classeur(path):
                            bool(c.alignment.wrap_text)],
                     'bd': [b.left.style, b.right.style, b.top.style, b.bottom.style],
                 }
-                if info['v'] is not None or any(info['bd']) or info['fill']:
+                if c.comment is not None:
+                    info['comment'] = c.comment.text
+                if (info['v'] is not None or any(info['bd']) or info['fill']
+                        or 'comment' in info):
                     cells[c.coordinate] = info
-        out[ws.title] = {
+        feuille = {
             'cells': cells,
             'merged': sorted(str(r) for r in ws.merged_cells.ranges),
             'row_heights': {
@@ -107,6 +112,13 @@ def dump_classeur(path):
             },
             'page_breaks': [brk.id for brk in ws.row_breaks.brk],
         }
+        entete = [ws.oddHeader.left.text, ws.oddHeader.center.text, ws.oddHeader.right.text]
+        pied = [ws.oddFooter.left.text, ws.oddFooter.center.text, ws.oddFooter.right.text]
+        if any(x is not None for x in entete):
+            feuille['print_header'] = entete
+        if any(x is not None for x in pied):
+            feuille['print_footer'] = pied
+        out[ws.title] = feuille
     return json.loads(json.dumps(out, default=str))
 
 
