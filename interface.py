@@ -4833,15 +4833,18 @@ class ValidationPageDialog(tk.Toplevel):
 
         attempt = result.get('_attempt', 1)
         attempt_txt = f" — Tentative {attempt}" if attempt > 1 else ""
-        self.title(f"Page {page_done}/{page_total}{attempt_txt} — Validation")
+        # Vrai numéro de page : le PAGE lu s'il existe, sinon le rang traité.
+        num = interface_helpers.numero_page_validation(
+            result.get('metadata', {}).get('PAGE'), page_done)
+        self.title(f"Page {num}/{page_total}{attempt_txt} — Validation")
         self.geometry("1160x680")
         self.minsize(900, 520)
         self.resizable(True, True)
         self.configure(bg=BG_MAIN)
         self.grab_set()
 
-        # Fermer via la croix = approuver sans commentaire
-        self.protocol("WM_DELETE_WINDOW", self._valider_accepter)
+        # La croix ne vaut plus « accepter » : elle demande confirmation.
+        self.protocol("WM_DELETE_WINDOW", self._fermer_confirme)
 
         ico = _resource("icon.ico")
         if ico.exists():
@@ -4851,6 +4854,10 @@ class ValidationPageDialog(tk.Toplevel):
                 pass
 
         self._build(page_done, page_total, attempt)
+
+        # Entrée = valider ; Échap = fermer avec confirmation.
+        self.bind('<Return>', lambda e: self._valider_accepter())
+        self.bind('<Escape>', lambda e: self._fermer_confirme())
 
     def _build(self, page_done: int, page_total: int, attempt: int = 1):
         # En-tête
@@ -4909,9 +4916,16 @@ class ValidationPageDialog(tk.Toplevel):
                 img_frame = tk.Frame(left, bg='#000000', height=184)
                 img_frame.pack(fill='x', padx=4, pady=(4, 0))
                 img_frame.pack_propagate(False)
+                apercu = tk.Label(
+                    img_frame, image=self._preview_img, bg='#000000', cursor='hand2',
+                )
+                apercu.pack(expand=True)
+                # Clic sur l'aperçu = scan en grand (vue 100 % défilable, molette = zoom).
+                apercu.bind('<Button-1>', lambda e: self._agrandir_image())
                 tk.Label(
-                    img_frame, image=self._preview_img, bg='#000000',
-                ).pack(expand=True)
+                    left, text="🔍 Cliquez l'aperçu pour l'agrandir",
+                    font=("Segoe UI", 8), fg=FG_MUTED, bg=BG_PANEL,
+                ).pack(fill='x', padx=8)
             except Exception:
                 self._preview_img = None
         else:
@@ -5052,6 +5066,9 @@ class ValidationPageDialog(tk.Toplevel):
         )
         self._comment_entry.pack(fill='both', expand=True, padx=8, pady=(0, 8))
         self._comment_entry.focus_set()
+        # Entrée valide même depuis le commentaire ; Shift+Entrée insère un saut de ligne.
+        self._comment_entry.bind('<Return>', lambda e: (self._valider_accepter(), 'break')[1])
+        self._comment_entry.bind('<Shift-Return>', lambda e: None)
 
         # Barre de boutons
         btn_bar = tk.Frame(self, bg=BG_MAIN)
@@ -5059,8 +5076,8 @@ class ValidationPageDialog(tk.Toplevel):
 
         tk.Button(
             btn_bar, text="Valider et continuer",
-            font=FONT_BOLD, bg=COL_ACC, fg='white',
-            activebackground=BTN_HVR, activeforeground='white',
+            font=FONT_BOLD, bg=COL_ACC2, fg='white',
+            activebackground="#6a4aa5", activeforeground='white',
             relief='flat', padx=24, pady=8, cursor='hand2',
             command=self._valider_accepter,
         ).pack(side='left', padx=(0, 6))
@@ -5110,6 +5127,58 @@ class ValidationPageDialog(tk.Toplevel):
         comment = self._comment_entry.get('1.0', 'end').strip()
         self._on_validated(comment, False, retry=False, auto=True)
         self.destroy()
+
+    def _fermer_confirme(self):
+        """Croix / Échap : demande confirmation, puis valide la page telle quelle
+        (pour débloquer le fil de travail qui attend une décision)."""
+        import tkinter.messagebox as mb
+        if mb.askyesno(
+                "Fermer la validation",
+                "Fermer cette page sans la relire ?\n"
+                "Elle sera validée telle quelle et la conversion continue.",
+                parent=self):
+            self._valider_accepter()
+
+    def _agrandir_image(self):
+        """Ouvre le scan en grand : vue 100 % défilable, molette = zoom."""
+        if not (self._image_path and Path(self._image_path).exists()):
+            return
+        try:
+            from PIL import Image, ImageTk
+        except Exception:
+            return
+        top = tk.Toplevel(self)
+        top.title("Scan — clic molette pour zoomer")
+        top.geometry("1000x760")
+        top.configure(bg='#000000')
+        canvas = tk.Canvas(top, bg='#000000', highlightthickness=0)
+        vbar = ttk.Scrollbar(top, orient='vertical', command=canvas.yview)
+        hbar = ttk.Scrollbar(top, orient='horizontal', command=canvas.xview)
+        canvas.configure(yscrollcommand=vbar.set, xscrollcommand=hbar.set)
+        vbar.pack(side='right', fill='y')
+        hbar.pack(side='bottom', fill='x')
+        canvas.pack(side='left', fill='both', expand=True)
+
+        source = Image.open(self._image_path)
+        etat = {'zoom': 1.0, 'photo': None}
+
+        def _rendre():
+            z = etat['zoom']
+            larg = max(1, int(source.width * z))
+            haut = max(1, int(source.height * z))
+            etat['photo'] = ImageTk.PhotoImage(source.resize((larg, haut), Image.LANCZOS))
+            canvas.delete('all')
+            canvas.create_image(0, 0, anchor='nw', image=etat['photo'])
+            canvas.configure(scrollregion=(0, 0, larg, haut))
+
+        def _molette(ev):
+            etat['zoom'] = min(8.0, max(0.1, etat['zoom'] * (1.1 if ev.delta > 0 else 0.9)))
+            _rendre()
+
+        canvas.bind('<Enter>', lambda e: canvas.bind_all('<MouseWheel>', _molette))
+        canvas.bind('<Leave>', lambda e: canvas.unbind_all('<MouseWheel>'))
+        top.bind('<Escape>', lambda e: top.destroy())
+        _rendre()
 
     def _valider_relancer(self):
         comment = self._comment_entry.get('1.0', 'end').strip()
