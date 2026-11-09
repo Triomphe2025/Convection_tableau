@@ -220,5 +220,20 @@ class TestRatioContraste(unittest.TestCase):
             h.ratio_contraste("#fff", "#000000")
 
 
+class TestEtatCleApi(unittest.TestCase):
+
+    def test_cle_presente_configuree(self):
+        self.assertEqual(h.etat_cle_api("sk-ant-xxx"), "configurée")
+
+    def test_cle_vide_absente(self):
+        self.assertEqual(h.etat_cle_api(""), "absente")
+
+    def test_espaces_seuls_absente(self):
+        self.assertEqual(h.etat_cle_api("   "), "absente")
+
+    def test_none_absente(self):
+        self.assertEqual(h.etat_cle_api(None), "absente")
+
+
 if __name__ == '__main__':
     unittest.main()

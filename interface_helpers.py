@@ -76,6 +76,11 @@ def numero_page_validation(meta_page, page_done):
     return str(page_done)
 
 
+def etat_cle_api(cle):
+    """« configurée » si une clé non vide est renseignée, sinon « absente »."""
+    return "configurée" if (cle or "").strip() else "absente"
+
+
 def dpi_a_activer(plateforme, reglage):
     """Vrai seulement si le réglage est actif ET la plateforme est Windows."""
     return bool(reglage) and str(plateforme).startswith("win")

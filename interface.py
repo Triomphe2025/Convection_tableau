@@ -808,6 +808,10 @@ class TriosSeconverterApp(tk.Tk):
         self._agent_session_id = tk.StringVar(
             value=getattr(Config, 'CLAUDE_AGENT_SESSION_ID', '')
         )
+        # Étape 2 : nom lisible du modèle affiché dans la liste (l'identifiant reste
+        # dans _claude_model). Deux traces gardent les deux en phase avec la page Mode OCR.
+        self._stepper_model_display = tk.StringVar(
+            value=interface_helpers.nom_modele_lisible(self._claude_model.get()))
 
         self._validation_interactive = tk.BooleanVar(
             value=getattr(Config, 'VALIDATION_INTERACTIVE', False)
@@ -1676,6 +1680,51 @@ class TriosSeconverterApp(tk.Tk):
             font=("Segoe UI", 8), fg=FG_MUTED, bg=BG_PANEL,
         ).pack(side='left')
 
+        self._stepper_cle_etat = tk.Label(
+            self._stepper_api_key_frame, text="", font=("Segoe UI", 8), bg=BG_PANEL)
+        self._stepper_cle_etat.pack(side='left', padx=(10, 0))
+        self._claude_key.trace_add('write', lambda *_: self._maj_etat_cle())
+
+        # Bloc Claude — modèle lisible, mode lot, relecture forcée (mode « claude »)
+        from config import Config as _Cfg
+        self._stepper_claude_frame = tk.Frame(lf_ocr, bg=BG_PANEL)
+        ids = list(getattr(_Cfg, 'CLAUDE_CAPACITES_MODELES', {}).keys())
+        self._stepper_label_vers_id = {
+            interface_helpers.nom_modele_lisible(mid): mid for mid in ids}
+
+        ligne_modele = tk.Frame(self._stepper_claude_frame, bg=BG_PANEL)
+        ligne_modele.pack(fill='x', padx=12, pady=(2, 2))
+        tk.Label(ligne_modele, text="Modèle Claude :", font=FONT_BOLD,
+                 fg=FG_WARN, bg=BG_PANEL).pack(side='left')
+        combo = ttk.Combobox(
+            ligne_modele, textvariable=self._stepper_model_display,
+            values=[interface_helpers.nom_modele_lisible(mid) for mid in ids],
+            state='readonly', width=30)
+        combo.pack(side='left', padx=(8, 0))
+        combo.bind('<<ComboboxSelected>>', lambda e: self._claude_model.set(
+            self._stepper_label_vers_id.get(self._stepper_model_display.get(),
+                                            self._claude_model.get())))
+        # L'identifiant exact du modèle en infobulle (le nom affiché est lisible).
+        self._infobulle(combo, lambda: self._claude_model.get())
+        # Les deux sens de synchronisation avec la page Mode OCR.
+        self._claude_model.trace_add('write', lambda *_: self._stepper_model_display.set(
+            interface_helpers.nom_modele_lisible(self._claude_model.get())))
+
+        ligne_cases = tk.Frame(self._stepper_claude_frame, bg=BG_PANEL)
+        ligne_cases.pack(fill='x', padx=12, pady=(0, 4))
+        tk.Checkbutton(
+            ligne_cases, text="Mode économique (lot)", variable=self._claude_mode_lot,
+            font=("Segoe UI", 8), fg=FG_MUTED, bg=BG_PANEL, selectcolor=BG_CARD,
+            activebackground=BG_PANEL, activeforeground=FG_TEXT,
+            highlightthickness=0, bd=0,
+        ).pack(side='left')
+        tk.Checkbutton(
+            ligne_cases, text="Relire même les pages en cache", variable=self._claude_forcer,
+            font=("Segoe UI", 8), fg=FG_MUTED, bg=BG_PANEL, selectcolor=BG_CARD,
+            activebackground=BG_PANEL, activeforeground=FG_TEXT,
+            highlightthickness=0, bd=0,
+        ).pack(side='left', padx=(16, 0))
+
         # ID de session agent — visible uniquement en mode "agent"
         self._stepper_agent_frame = tk.Frame(lf_ocr, bg=BG_PANEL)
 
@@ -1754,19 +1803,24 @@ class TriosSeconverterApp(tk.Tk):
         btn_frame = tk.Frame(parent, bg=BG_MAIN, pady=16)
         btn_frame.pack(fill='x')
 
-        RoundedButton(
+        self._btn_stepper_launch = RoundedButton(
             btn_frame,
             text="▶  Lancer la conversion",
             command=self._start,
             bg=COL_ACC, hover_bg=BTN_HVR,
             width=240, height=42, font=FONT_H2,
-        ).pack(anchor='center')
+        )
+        self._btn_stepper_launch.pack(anchor='center')
 
-        tk.Label(
-            btn_frame,
-            text="Le journal de progression apparaît dans l'onglet Mode OCR.",
-            font=("Segoe UI", 8), fg=FG_MUTED, bg=BG_MAIN,
-        ).pack(anchor='center', pady=(8, 0))
+        # Message affiché quand le lancement est bloqué (source / destination manquante).
+        self._stepper_launch_msg = tk.Label(
+            btn_frame, text="", font=("Segoe UI", 8), fg=FG_WARN, bg=BG_MAIN,
+        )
+        self._stepper_launch_msg.pack(anchor='center', pady=(8, 0))
+
+        # Le bouton suit l'état de la source et de la destination.
+        self._word_file.trace_add('write', lambda *_: self._stepper_maj_lancement())
+        self._output_dir.trace_add('write', lambda *_: self._stepper_maj_lancement())
 
     def _stepper_update_tpl_desc(self, *_):
         """Met à jour la description du modèle sélectionné dans le stepper."""
@@ -1781,6 +1835,17 @@ class TriosSeconverterApp(tk.Tk):
             )
         else:
             self._stepper_tpl_desc.configure(text="")
+
+    def _stepper_maj_lancement(self):
+        """Active le bouton Lancer si source et destination sont là, sinon le désactive
+        avec un message clair (interface_helpers.etat_lancement)."""
+        btn = getattr(self, '_btn_stepper_launch', None)
+        if btn is None:
+            return
+        ok, msg = interface_helpers.etat_lancement(
+            self._word_file.get(), self._output_dir.get())
+        btn.configure_state('normal' if ok else 'disabled')
+        self._stepper_launch_msg.configure(text="" if ok else msg)
 
     def _stepper_refresh_recap(self):
         """Rafraîchit les labels de récapitulatif à l'étape 3."""
@@ -1842,14 +1907,14 @@ class TriosSeconverterApp(tk.Tk):
             fg=FG_TEXT if prev_ok else FG_MUTED,
         )
         if step == n - 1:
-            # Dernière étape : le bouton "Suivant" devient "Lancer"
-            self._btn_stepper_next.configure(
-                text="▶  Lancer",
-                bg=FG_OK,
-                command=self._start,
-            )
+            # Dernière étape : un seul bouton de lancement (le bouton centré). On masque
+            # le « Suivant » de la barre pour ne pas offrir un second bouton.
+            self._btn_stepper_next.pack_forget()
             self._stepper_refresh_recap()
+            self._stepper_maj_lancement()
         else:
+            if not self._btn_stepper_next.winfo_ismapped():
+                self._btn_stepper_next.pack(side='right', padx=(0, 8), pady=8)
             self._btn_stepper_next.configure(
                 text="Suivant →",
                 bg=COL_ACC,
@@ -3790,6 +3855,41 @@ class TriosSeconverterApp(tk.Tk):
                 command=self._on_ocr_mode_change,
             ).pack(side='left', padx=(0, 12))
 
+    def _infobulle(self, widget, fn_texte):
+        """Infobulle au survol ; fn_texte() rend le texte (contenu dynamique)."""
+        etat = {'top': None}
+
+        def _montrer(_e=None):
+            if etat['top'] is not None:
+                return
+            txt = fn_texte()
+            if not txt:
+                return
+            top = tk.Toplevel(widget)
+            top.wm_overrideredirect(True)
+            top.wm_geometry(f"+{widget.winfo_rootx() + 10}"
+                            f"+{widget.winfo_rooty() + widget.winfo_height() + 2}")
+            tk.Label(top, text=txt, font=("Segoe UI", 8), bg=BG_LOG, fg=FG_TEXT,
+                     relief='solid', bd=1, padx=6, pady=2).pack()
+            etat['top'] = top
+
+        def _cacher(_e=None):
+            if etat['top'] is not None:
+                etat['top'].destroy()
+                etat['top'] = None
+
+        widget.bind('<Enter>', _montrer)
+        widget.bind('<Leave>', _cacher)
+
+    def _maj_etat_cle(self):
+        """Indicateur « Clé API : configurée / absente » de l'étape 2."""
+        lbl = getattr(self, '_stepper_cle_etat', None)
+        if lbl is None:
+            return
+        etat = interface_helpers.etat_cle_api(self._claude_key.get())
+        lbl.configure(text=f"Clé API : {etat}",
+                      fg=FG_OK if etat == "configurée" else FG_WARN)
+
     def _on_ocr_mode_change(self):
         """Affiche/masque clé API et ID session dans la page OCR ET dans le stepper."""
         mode = self._ocr_mode.get()
@@ -3826,8 +3926,15 @@ class TriosSeconverterApp(tk.Tk):
             if needs_api:
                 self._stepper_api_key_frame.pack(
                     fill='x', padx=12, pady=(0, 4))
+                self._maj_etat_cle()
             else:
                 self._stepper_api_key_frame.pack_forget()
+        # Bloc Claude (modèle, lot, relecture forcée) : mode « claude » seul.
+        if hasattr(self, '_stepper_claude_frame'):
+            if mode == 'claude':
+                self._stepper_claude_frame.pack(fill='x', padx=0, pady=(0, 4))
+            else:
+                self._stepper_claude_frame.pack_forget()
         if hasattr(self, '_stepper_agent_frame'):
             if needs_agent:
                 self._stepper_agent_frame.pack(
