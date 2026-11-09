@@ -80,6 +80,16 @@ FONT_H1 = ("Segoe UI", 18, "bold")
 FONT_H2 = ("Segoe UI", 11, "bold")
 FONT_MONO = ("Consolas", 9)
 
+# Libellés des moteurs OCR (l'ordre d'affichage est donné par interface_helpers.moteurs_visibles).
+_LIBELLES_MOTEURS = {
+    "tesseract": "Tesseract (local)",
+    "claude": "Claude Vision (API)",
+    "docling": "Docling (local IA)",
+    "ollama": "Ollama Vision (local)",
+    "hybrid": "Hybride",
+    "agent": "Agent Claude",
+}
+
 
 # ── Animation d'accueil ───────────────────────────────────────────────
 
@@ -1006,6 +1016,11 @@ class TriosSeconverterApp(tk.Tk):
                 self._dev_tabs_container.pack_forget()
                 self._dev_toggle_lbl.configure(fg=FG_MUTED)
                 ind_dev.configure(bg=BG_CARD)
+            self._poser_moteurs_stepper()
+            cible = interface_helpers.page_apres_bascule_dev(
+                self._current_page, self._dev_mode_on)
+            if cible != self._current_page:
+                self._show_page(cible)
 
         dev_btn_frame.bind('<Button-1>', _toggle_dev)
         self._dev_toggle_lbl.bind('<Button-1>', _toggle_dev)
@@ -1638,23 +1653,8 @@ class TriosSeconverterApp(tk.Tk):
 
         radio_row = tk.Frame(lf_ocr, bg=BG_PANEL)
         radio_row.pack(fill='x', padx=12, pady=10)
-
-        modes = [
-            ("Tesseract (local)",      "tesseract"),
-            ("Claude Vision (API)",    "claude"),
-            ("Docling (local IA)",     "docling"),
-            ("Ollama Vision (local)",  "ollama"),
-            ("Hybride",                "hybrid"),
-            ("Agent Claude",           "agent"),
-        ]
-        for lbl, val in modes:
-            tk.Radiobutton(
-                radio_row, text=lbl, variable=self._ocr_mode, value=val,
-                font=FONT_MAIN, fg=FG_TEXT, bg=BG_PANEL,
-                selectcolor=BG_CARD, activebackground=BG_PANEL,
-                activeforeground=FG_TEXT,
-                command=self._on_ocr_mode_change,
-            ).pack(side='left', padx=(0, 12))
+        self._stepper_radio_row = radio_row
+        self._poser_moteurs_stepper()
 
         # Clé API — visible uniquement pour Claude/Hybride/Agent
         self._stepper_api_key_frame = tk.Frame(lf_ocr, bg=BG_PANEL)
@@ -3754,6 +3754,24 @@ class TriosSeconverterApp(tk.Tk):
         parent.columnconfigure(0, weight=1)
 
     # ── Gestion du mode OCR ───────────────────────────────────────────
+
+    def _poser_moteurs_stepper(self):
+        """(Re)construit les boutons moteur de l'étape 2 : hors Dev, seuls le socle
+        (Tesseract, Claude) et le moteur expérimental déjà choisi sont proposés."""
+        row = getattr(self, '_stepper_radio_row', None)
+        if row is None:
+            return
+        for enfant in row.winfo_children():
+            enfant.destroy()
+        visibles = interface_helpers.moteurs_visibles(self._dev_mode_on, self._ocr_mode.get())
+        for val in visibles:
+            tk.Radiobutton(
+                row, text=_LIBELLES_MOTEURS.get(val, val), variable=self._ocr_mode, value=val,
+                font=FONT_MAIN, fg=FG_TEXT, bg=BG_PANEL,
+                selectcolor=BG_CARD, activebackground=BG_PANEL,
+                activeforeground=FG_TEXT,
+                command=self._on_ocr_mode_change,
+            ).pack(side='left', padx=(0, 12))
 
     def _on_ocr_mode_change(self):
         """Affiche/masque clé API et ID session dans la page OCR ET dans le stepper."""
