@@ -1108,39 +1108,41 @@ class TriosSeconverterApp(tk.Tk):
         )
         # NB : pas de .pack() — bouton retiré de la toolbar, accessible via stepper
 
-        # Boutons résultats
+        # Boutons résultats — créés mais non affichés : la barre du haut ne les montre
+        # (avec la barre de progression) qu'une fois une conversion terminée (point 9).
+        self._toolbar_inner = inner
         self._btn_excel = self._mini_btn(inner, "  Excel  ",    self._open_excel)
         self._btn_folder = self._mini_btn(inner, "  Dossier  ",  self._open_folder)
         self._btn_audit = self._mini_btn(inner, "  Audit  ",    self._lancer_audit)
         self._btn_observer = self._mini_btn(inner, " Observer ",   self._ouvrir_observateur)
 
-        for b in (self._btn_excel, self._btn_folder,
-                  self._btn_audit, self._btn_observer):
-            b.pack(side='left', padx=(4, 0))
-
         self._result_btns = [self._btn_excel, self._btn_folder,
                              self._btn_audit, self._btn_observer]
-        for b in self._result_btns:
-            b.configure_state('disabled')
 
-        # Côté droit : dico + progressbar
+        # Côté droit : barre de progression (packée à la fin de la conversion).
         right = tk.Frame(inner, bg=BG_PANEL)
-        right.pack(side='right', fill='y')
-
-        self._btn_dico = RoundedButton(
-            right, text="  Ajouter au lexique  ",
-            command=self._ajouter_au_lexique,
-            bg=BG_CARD, hover_bg=COL_ACC2,
-            width=155, height=36, font=FONT_BOLD,
-        )
-        self._btn_dico.pack(side='right', padx=(6, 0))
+        self._toolbar_right = right
 
         self._pbar = ttk.Progressbar(
             right, style="Trios.Horizontal.TProgressbar",
             orient='horizontal', mode='determinate', maximum=100,
             length=230
         )
+
+    def _afficher_barre_resultats(self):
+        """Montre les boutons résultats et la barre de progression (fin de conversion)."""
+        self._toolbar_right.pack(side='right', fill='y')
         self._pbar.pack(side='right', padx=(0, 8))
+        for b in self._result_btns:
+            b.pack(side='left', padx=(4, 0))
+            b.configure_state('normal')
+
+    def _masquer_barre_resultats(self):
+        """Cache les boutons résultats et la barre de progression (barre du haut au repos)."""
+        for b in self._result_btns:
+            b.pack_forget()
+        self._pbar.pack_forget()
+        self._toolbar_right.pack_forget()
 
     def _build_status_bar(self):
         """Barre de statut fine en bas de la fenêtre."""
@@ -4124,8 +4126,7 @@ class TriosSeconverterApp(tk.Tk):
         self.configure(cursor="watch")
         self._btn_start.configure_state('disabled')
         self._btn_start.set_text("⏳  Conversion en cours…")
-        for b in self._result_btns:
-            b.configure_state('disabled')
+        self._masquer_barre_resultats()
 
         tpl = self._tpl_manager.get(self._tpl_var.get())
         tables_word = self._tables_word_file.get().strip() or None
@@ -4536,8 +4537,7 @@ class TriosSeconverterApp(tk.Tk):
         self._set_progress(1.0, f"Terminé — {result['tableaux']} bornier(s) converti(s).")
         self._btn_start.configure_state('normal')
         self._btn_start.set_text("▶  Lancer la conversion")
-        for b in self._result_btns:
-            b.configure_state('normal')
+        self._afficher_barre_resultats()
         self._update_ctx_btn_states()
         self._dashboard_done(result)
 
