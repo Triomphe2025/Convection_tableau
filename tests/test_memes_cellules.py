@@ -10,8 +10,9 @@ Déterminisme (vérifié) : le rejeu .jsonl ne lance ni OCR (pas de Tesseract) n
 lexique est neutralisé ici (dossier vide) — la sortie ne dépend donc ni de Tesseract ni des
 classeurs de référence hors git, seulement du code.
 
-Hors de la suite rapide : lancer en une commande
-    set MEMES_CELLULES=1 && env\\Scripts\\python.exe -m pytest tests/test_memes_cellules.py -v
+Dans la suite normale (~5 s) : il protège chaque commit sans qu'on pense à le lancer.
+Le lancer seul :
+    env\\Scripts\\python.exe -m pytest tests/test_memes_cellules.py -v
 Régénérer l'instantané (changement voulu du moteur, depuis main) :
     env\\Scripts\\python.exe -m tests.test_memes_cellules --regenerer
 """
@@ -20,7 +21,6 @@ import contextlib
 import io
 import json
 import logging
-import os
 import sys
 import tempfile
 import unittest
@@ -67,8 +67,6 @@ def generer_instantane():
     return {nom: rejeu_dump(rel) for nom, rel in JOURNAUX.items()}
 
 
-@unittest.skipUnless(os.environ.get('MEMES_CELLULES'),
-                     "filet mêmes cellules — lancer avec MEMES_CELLULES=1")
 class TestMemesCellules(unittest.TestCase):
 
     @classmethod

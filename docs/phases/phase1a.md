@@ -53,13 +53,13 @@ Règles (valables à chaque étape) :
 
 ---
 
-## Étape 1 — lancer le filet « mêmes cellules » (une commande)
+## Étape 1 — le filet « mêmes cellules »
 
-Le filet est hors de la suite rapide (gate par variable d'environnement, motif du projet).
-Pour le lancer seul :
+Le filet est dans la suite normale (~5 s) : il protège chaque commit sans qu'on pense à le
+lancer. Il part avec `pytest tests\`. Pour le lancer seul :
 
 ```powershell
-$env:MEMES_CELLULES = "1"; env\Scripts\python.exe -m pytest tests/test_memes_cellules.py -v
+env\Scripts\python.exe -m pytest tests/test_memes_cellules.py -v
 ```
 
 Régénérer l'instantané (seulement sur un changement voulu du moteur) :
