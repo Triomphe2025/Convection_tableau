@@ -217,7 +217,9 @@ class LecteurLot:
 
         _enregistrer_lot(dossier_sortie, batch.id, table, infos[0]['model'])
         self._on_log(f"  Lot {index}/{total} envoyé (id {batch.id})", 'info')
-        self._emettre(ev.LOT_CREE, lot=batch.id, total=len(requetes))
+        self._emettre(ev.LOT_CREE, lot=batch.id, total=len(requetes),
+                      compteurs={'requetes': len(requetes),
+                                 'taille_mo': round(octets / (1024 * 1024), 3)})
         return batch, table, 'ok'
 
     def _attendre_et_recuperer(self, client, envois, cache_actif, resultats) -> None:
@@ -244,13 +246,16 @@ class LecteurLot:
                 lues += rc.succeeded
                 attente += rc.processing
                 a_reprendre += rc.errored + rc.expired + rc.canceled
-                self._emettre(ev.LOT_ETAT, lot=bid, etat=maj.processing_status,
-                              total=rc.succeeded)
             if all(statut == 'ended' for statut in etats.values()):
                 break
             self._on_log(
                 f"  Lots en cours : {lues} lue(s), {attente} en attente"
                 + (f", {a_reprendre} à reprendre" if a_reprendre else ''), 'info')
+            self._emettre(ev.LOT_ETAT, etat='en_cours',
+                          compteurs={'lues': lues, 'en_attente': attente,
+                                     'a_reprendre': a_reprendre,
+                                     'total': sum(len(t) for t in tables.values()),
+                                     'delai': self._poll})
             if self._dormir() == 'arret':
                 self._annuler_en_cours(client, etats)
                 return

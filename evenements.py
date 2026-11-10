@@ -6,13 +6,14 @@ PySide6). L'absence de rappel on_evenement ne change rien au reste du pipeline.
 """
 from dataclasses import dataclass, field
 from time import time
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 # Types d'événements (au minimum).
 ANALYSE = 'analyse'            # nature d'une page (vectoriel / scan / …)
 PHASE = 'phase'               # analyse, lecture, contrôles, excel
 PAGE_DEBUT = 'page_debut'
-PAGE_LUE = 'page_lue'         # lignes extraites + zones
+PAGE_LUE = 'page_lue'         # lignes extraites + zones (par ligne) si déjà disponibles
+PAGE_ZONES = 'page_zones'     # zones par ligne arrivées après coup (lecture Tesseract prête)
 PAGE_ALERTE = 'page_alerte'
 LOT_CREE = 'lot_cree'
 LOT_ETAT = 'lot_etat'
@@ -23,37 +24,26 @@ ERREUR = 'erreur'
 
 @dataclass(frozen=True)
 class Evenement:
-    """Un événement du pipeline ; seuls les champs utiles au type sont renseignés."""
+    """Un événement du pipeline ; seuls les champs utiles au type sont renseignés.
+
+    `page` = numéro de page du PDF (1 = première page) ; `rang`/`total` = progression parmi
+    les pages lues ; `page_imprimee` = numéro imprimé dans le pied (affichage des alertes).
+    `zones` = [{'ligne': indice de ligne lue, 'boite': (x0, y0, x1, y1) en 0–1}].
+    `compteurs` = détail chiffré d'un lot (requêtes, taille, lues, en attente, délai…).
+    """
     type: str
     horodatage: float = field(default_factory=time)
     page: Optional[int] = None
+    rang: Optional[int] = None
     total: Optional[int] = None
+    page_imprimee: Optional[str] = None
     nature: Optional[str] = None
     etat: Optional[str] = None
     bornier: Optional[str] = None
     lignes: Optional[int] = None
-    zones: Optional[List[Tuple[float, float, float, float]]] = None
+    zones: Optional[List[dict]] = None
     alertes: Optional[List[str]] = None
     cout: Optional[dict] = None
     lot: Optional[str] = None
+    compteurs: Optional[dict] = None
     message: Optional[str] = None
-
-
-def zones_relatives(lecture) -> Optional[List[Tuple[float, float, float, float]]]:
-    """Boîtes des mots Tesseract d'une page en coordonnées 0–1, ou None si absentes.
-
-    `lecture` : objet à `.mots` (tuples x0, y0, x1, y1, texte, conf) et `.taille`
-    (largeur, hauteur en pixels). Les traits du cadre (« | ») et les mots vides sont
-    écartés. None si pas de lecture, pas de mot visible, ou taille nulle.
-    """
-    if lecture is None:
-        return None
-    largeur, hauteur = lecture.taille
-    if largeur <= 0 or hauteur <= 0:
-        return None
-    zones = [
-        (x0 / largeur, y0 / hauteur, x1 / largeur, y1 / hauteur)
-        for x0, y0, x1, y1, texte, _conf in lecture.mots
-        if texte.strip('|').strip()
-    ]
-    return zones or None

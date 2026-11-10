@@ -346,11 +346,13 @@ def grouper_lignes_mots(mots: List[Mot]) -> List[List[Mot]]:
 
 
 def _lignes_tesseract(lecture: LecturePage, bornes: List[float], pas: float, phase: float):
-    """Par ligne de la page : (mots coupés aux traits, mots bruts).
+    """Par ligne de la page : lignes [(mots coupés aux traits, mots bruts)] et boîtes parallèles.
 
     Chaque mot : (texte, colonne de grille, colonne du tableau, confiance, y du centre).
+    Chaque boîte : (x0, y0, x1, y1) en pixels, englobant les mots du cadre de la ligne.
     """
     lignes = []
+    boites = []
     for ligne in grouper_lignes_mots(lecture.mots):
         ligne = sorted(ligne, key=lambda m: m[0])
         dans_cadre = [m for m in ligne if bornes[0] <= m[0] < bornes[-1]]
@@ -365,7 +367,9 @@ def _lignes_tesseract(lecture: LecturePage, bornes: List[float], pas: float, pha
                  for m in dans_cadre]
         if coupes:
             lignes.append((coupes, bruts))
-    return lignes
+            boites.append((min(m[0] for m in dans_cadre), min(m[1] for m in dans_cadre),
+                           max(m[2] for m in dans_cadre), max(m[3] for m in dans_cadre)))
+    return lignes, boites
 
 
 def lignes_page(lecture: LecturePage, colonnes: List[str]) -> Dict:
@@ -377,11 +381,12 @@ def lignes_page(lecture: LecturePage, colonnes: List[str]) -> Dict:
     bornes = (bornes_page(lecture.traits, lecture.mots, colonnes, lecture.taille[0])
               if lecture.mots else None)
     if pas0 is None or bornes is None:
-        return {'lignes': [], 'traits': [], 'pas': None,
+        return {'lignes': [], 'boites': [], 'traits': [], 'pas': None,
                 'raison': ("aucun mot lu par Tesseract" if pas0 is None
                            else "colonnes du cadre non trouvées")}
     pas, phase = ajuster_grille([m[0] for m in lecture.mots], pas0)
-    return {'lignes': _lignes_tesseract(lecture, bornes, pas, phase),
+    lignes, boites = _lignes_tesseract(lecture, bornes, pas, phase)
+    return {'lignes': lignes, 'boites': boites,
             'traits': [(b - phase) / pas for b in bornes], 'pas': pas, 'raison': None}
 
 
@@ -431,6 +436,30 @@ def _mots_ligne(row: Dict) -> List[str]:
     if row.get('type') == 'section':
         return (row.get('text') or '').split()
     return [w for c in row.get('cells', []) for w in (c or '').split()]
+
+
+def zones_par_ligne(rows: List[Dict], colonnes: List[str], lecture: LecturePage) -> List[Dict]:
+    """[{'ligne': indice dans rows, 'boite': (x0, y0, x1, y1) en 0–1}] par ligne lue appariée.
+
+    Boîte = englobant de la ligne Tesseract appariée à la ligne lue (appariement de
+    apparier_rangs). Vide si la page n'est pas mesurable ou la taille inconnue. Les boîtes
+    de cellule ne sont pas fournies : l'appariement est au niveau de la ligne.
+    """
+    largeur, hauteur = lecture.taille
+    if largeur <= 0 or hauteur <= 0:
+        return []
+    page = lignes_page(lecture, colonnes)
+    lignes_t, boites = page['lignes'], page.get('boites') or []
+    if not lignes_t:
+        return []
+    _a_placer, paires = apparier_rangs(rows, lignes_t)
+    zones = []
+    for i_row, i_t in sorted(paires.items()):
+        if 0 <= i_t < len(boites):
+            x0, y0, x1, y1 = boites[i_t]
+            zones.append({'ligne': i_row,
+                          'boite': (x0 / largeur, y0 / hauteur, x1 / largeur, y1 / hauteur)})
+    return zones
 
 
 def placer_page(rows: List[Dict], colonnes: List[str],

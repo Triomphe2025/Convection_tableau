@@ -142,6 +142,9 @@ class Converter:
         self._verrou_tesseract = threading.Lock()
         self._compte_lignes = None   # Future : {page du PDF: compte}, ou None
         self._comptes_lignes: Dict[int, Dict] = {}
+        # Pages dont les zones (par ligne) ont déjà été émises (page_lue) : page_zones ne les
+        # réémet pas une fois la lecture Tesseract prête.
+        self._pages_zones_emises: set = set()
 
     # ── Helpers ───────────────────────────────────────────────────────
 
@@ -177,14 +180,39 @@ class Converter:
         self._on_progress(pct, msg)
 
     def _emettre(self, type_: str, **champs) -> None:
-        self._on_evenement(ev.Evenement(type=type_, **champs))
+        # Un écouteur qui lève ne doit jamais faire échouer la conversion (une ligne de journal).
+        try:
+            self._on_evenement(ev.Evenement(type=type_, **champs))
+        except Exception:
+            logging.exception("écouteur d'événement ignoré")
 
     def _emettre_alertes_pages(self, resultats: List[Dict]) -> None:
         """Un événement page_alerte par page portant des alertes (resultat['a_verifier'])."""
         for r in resultats:
             messages = [a.get('message') for a in (r.get('a_verifier') or []) if a.get('message')]
             if messages:
-                self._emettre(ev.PAGE_ALERTE, page=numero_page(r), alertes=messages)
+                self._emettre(ev.PAGE_ALERTE, page=r.get('_page_pdf'),
+                              page_imprimee=numero_page(r), alertes=messages)
+
+    def _zones_page(self, lecture, resultat: Dict) -> Optional[List[Dict]]:
+        """Zones par ligne de la page (positions_scan), ou None ; ne lève jamais."""
+        if lecture is None:
+            return None
+        try:
+            from positions_scan import zones_par_ligne
+            return zones_par_ligne(resultat.get('rows', []), list(self.template.columns), lecture)
+        except Exception:
+            return None
+
+    def _emettre_page_zones(self, page: int, resultat: Dict, lecture) -> None:
+        """Émet page_zones quand la lecture Tesseract d'une page est prête après son page_lue."""
+        if page in self._pages_zones_emises:
+            return
+        zones = self._zones_page(lecture, resultat)
+        if zones:
+            self._pages_zones_emises.add(page)
+            self._emettre(ev.PAGE_ZONES, page=page,
+                          page_imprimee=numero_page(resultat), zones=zones)
 
     def _est_annule(self) -> bool:
         """Vrai si l'utilisateur a demandé l'arrêt de la conversion."""
@@ -401,7 +429,8 @@ class Converter:
                 self.output_dir / f"{source_stem_r}_ollama.jsonl"
             )
 
-        self._emettre(ev.FIN, total=ok)
+        self._emettre(ev.FIN, total=ok,
+                      etat='arretee' if self._est_annule() else 'terminee')
         return {
             'tableaux':    ok,
             'total':       len(ocr_results) + len(word_results),
@@ -923,6 +952,7 @@ class Converter:
                               f"{bilan['raison']}")
                     continue
                 resultat['rows'] = rows
+                self._emettre_page_zones(page, resultat, lecture)
                 taux = ('non mesurable' if analyse['taux'] is None
                         else f"{analyse['taux']:.0%}".replace('%', ' %'))
                 self._log(
@@ -1402,6 +1432,7 @@ class Converter:
 
         results = []
         pages_cache = 0
+        self._pages_zones_emises = set()
         for i, img in enumerate(images):
             if self._est_annule():
                 self._log(f"  ⏹ Conversion arrêtée — {i}/{total} images traitées.")
@@ -1409,7 +1440,7 @@ class Converter:
             pct = 0.28 + (i / total) * 0.37   # 28 % → 65 %
             self._progress(pct, f"OCR {i + 1}/{total} : {img.name}")
             self._log(f"  OCR {i + 1}/{total} : {img.name}")
-            self._emettre(ev.PAGE_DEBUT, page=i + 1, total=total)
+            self._emettre(ev.PAGE_DEBUT, page=_num(img), rang=i + 1, total=total)
 
             if vision_extractor is not None:
                 # Page déjà lue par le lot ; sinon (cache, repli du lot, hors lot) appel normal.
@@ -1458,11 +1489,17 @@ class Converter:
                     'page_pdf': None})
 
             lignes = sum(1 for row in (result.get('rows') or []) if row.get('type') == 'data')
+            page_pdf = _num(img)
+            # Zones par ligne si la lecture Tesseract de la page est déjà prête (fil à part,
+            # sans attente) ; sinon page_zones sera émis au placement des positions.
+            zones = self._zones_page(self._lectures_tesseract.get(page_pdf), result)
+            if zones:
+                self._pages_zones_emises.add(page_pdf)
             self._emettre(
-                ev.PAGE_LUE, page=i + 1, total=total, lignes=lignes,
+                ev.PAGE_LUE, page=page_pdf, rang=i + 1, total=total, lignes=lignes,
+                page_imprimee=numero_page(result),
                 bornier=(result.get('metadata') or {}).get('BORNIER'),
-                zones=ev.zones_relatives(self._lectures_tesseract.get(i + 1)),
-                cout=result.get('api_usage'))
+                zones=zones, cout=result.get('api_usage'))
             results.append(result)
 
         if pages_cache:

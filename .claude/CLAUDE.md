@@ -159,7 +159,7 @@ Fichier Word source (.docx) — images de borniers scannés
 |---------|-----------------------------------------------|
 | `interface.py` | Interface graphique Tkinter — affichage uniquement, zéro logique métier |
 | `converter.py` | Orchestration des 4 étapes avec callbacks `on_progress` / `on_log` / `on_evenement` |
-| `evenements.py` | Événements structurés (dataclass `Evenement` figée + `zones_relatives`) émis EN PLUS de `on_progress`/`on_log` ; module pur, pour une interface qui suit le détail — `on_evenement` absent ne change rien |
+| `evenements.py` | Événements structurés (dataclass `Evenement` figée, module pur) émis EN PLUS de `on_progress`/`on_log` par `converter.py` et `claude_lot.py`, pour une interface qui suit le détail (zones par ligne via `positions_scan.zones_par_ligne`) — `on_evenement` absent ne change rien |
 | `ocr_processor.py` | `BornierTableExtractor` : prétraitement → OCR → colonnes → cellules → métadonnées |
 | `generer_classeur.py` | Génération Excel (2 feuilles distinctes) + Word combiné |
 | `word_table_importer.py` | Import tableaux depuis Word structuré (Doc.2) → feuille "tableaux word" |

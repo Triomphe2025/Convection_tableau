@@ -21,7 +21,8 @@ from config import Config
 from generer_classeur import generer_excel, texte_aux_positions
 from pdf_extractor import PdfTableExtractor
 from positions_scan import (LecturePage, ajuster_grille, colonne_caractere, couper_aux_traits,
-                            bornes_page, dpi_de_rendu, pas_initial, placer_page, replier)
+                            bornes_page, dpi_de_rendu, pas_initial, placer_page, replier,
+                            zones_par_ligne)
 from template import TemplateManager
 
 PAS, PHASE = 10.0, 5.0
@@ -383,3 +384,36 @@ class TestAncrageDesLignes(unittest.TestCase):
     def test_cle_trop_courte_pas_d_ancre(self):
         from positions_scan import _ancres
         self.assertEqual(_ancres(['B', 'A2'], ['B', 'A2']), [(1, 1)])
+
+
+class TestZonesParLigne(unittest.TestCase):
+    """Boîte Tesseract de chaque ligne lue appariée (pour l'écran de lecture en direct)."""
+
+    def test_une_boite_par_ligne_appariee(self):
+        rows = [_ligne('15B', 'M', 'SIG', 'AB'), _ligne('16C', 'N', 'SIG', 'CD')]
+        lecture = _lecture(
+            _mot(1, 1, '15B'), _mot(31, 1, 'M'), _mot(61, 1, 'SIG'), _mot(91, 1, 'AB'),
+            _mot(1, 2, '16C'), _mot(31, 2, 'N'), _mot(61, 2, 'SIG'), _mot(91, 2, 'CD'))
+        zones = zones_par_ligne(rows, COLONNES, lecture)
+        self.assertEqual([z['ligne'] for z in zones], [0, 1])
+        # Ligne 0 : mots de 15B (x0=15) à AB (x1=915+20=935), y de 100 à 130, sur 1200×2000.
+        x0, y0, x1, y1 = zones[0]['boite']
+        self.assertAlmostEqual(x0, 15 / 1200)
+        self.assertAlmostEqual(y0, 100 / 2000)
+        self.assertAlmostEqual(x1, 935 / 1200)
+        self.assertAlmostEqual(y1, 130 / 2000)
+        # Ligne 1 une rangée plus bas (y de 200 à 230).
+        self.assertAlmostEqual(zones[1]['boite'][1], 200 / 2000)
+
+    def test_page_non_mesurable_vide(self):
+        self.assertEqual(zones_par_ligne([_ligne('15B', 'M', 'S', 'A')], COLONNES,
+                                         _lecture()), [])
+
+    def test_taille_nulle_vide(self):
+        lecture = LecturePage(mots=[_mot(1, 1, '15B')], traits=list(TRAITS), dpi=300,
+                              taille=(0, 0))
+        self.assertEqual(zones_par_ligne([_ligne('15B', '', '', '')], COLONNES, lecture), [])
+
+
+if __name__ == '__main__':
+    unittest.main()
