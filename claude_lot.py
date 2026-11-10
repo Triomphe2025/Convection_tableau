@@ -25,6 +25,7 @@ from typing import Callable, Dict, List, Optional
 
 from config import Config
 import claude_ocr
+import evenements as ev
 
 logger = logging.getLogger(__name__)
 
@@ -79,12 +80,21 @@ class LecteurLot:
     """
 
     def __init__(self, extractor, on_log: Optional[Callable] = None,
-                 doit_arreter: Optional[Callable] = None, poll_secondes=None):
+                 doit_arreter: Optional[Callable] = None, poll_secondes=None,
+                 on_evenement: Optional[Callable] = None):
         self._ex = extractor
         self._on_log = on_log or (lambda *a, **k: None)
         self._doit_arreter = doit_arreter or (lambda: False)
+        self._on_evenement = on_evenement or (lambda e: None)
         self._poll = poll_secondes if poll_secondes is not None else \
             getattr(Config, 'CLAUDE_LOT_POLL_SECONDES', 30)
+
+    def _emettre(self, type_: str, **champs) -> None:
+        # Le lot ne lève jamais : une télémétrie qui échoue ne doit pas interrompre un lot payé.
+        try:
+            self._on_evenement(ev.Evenement(type=type_, **champs))
+        except Exception:
+            logger.exception("événement de lot ignoré")
 
     def lire(self, image_paths: List[Path], dossier_sortie) -> Dict[str, dict]:
         """Lit toutes les pages, découpées en lots sous le plafond de taille. Ne lève jamais.
@@ -207,6 +217,7 @@ class LecteurLot:
 
         _enregistrer_lot(dossier_sortie, batch.id, table, infos[0]['model'])
         self._on_log(f"  Lot {index}/{total} envoyé (id {batch.id})", 'info')
+        self._emettre(ev.LOT_CREE, lot=batch.id, total=len(requetes))
         return batch, table, 'ok'
 
     def _attendre_et_recuperer(self, client, envois, cache_actif, resultats) -> None:
@@ -233,6 +244,8 @@ class LecteurLot:
                 lues += rc.succeeded
                 attente += rc.processing
                 a_reprendre += rc.errored + rc.expired + rc.canceled
+                self._emettre(ev.LOT_ETAT, lot=bid, etat=maj.processing_status,
+                              total=rc.succeeded)
             if all(statut == 'ended' for statut in etats.values()):
                 break
             self._on_log(
@@ -244,6 +257,7 @@ class LecteurLot:
 
         for bid, table in tables.items():
             self._recuperer(client, bid, table, cache_actif, resultats)
+            self._emettre(ev.LOT_RECUPERE, lot=bid, total=len(table))
 
     def _annuler_en_cours(self, client, etats: Dict[str, str]) -> None:
         """Annule les lots pas encore terminés (arrêt utilisateur)."""

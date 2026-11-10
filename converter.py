@@ -22,6 +22,7 @@ from ocr_processor import BornierTableExtractor
 from config import Config
 from dossiers_travail import dossier_travail
 from template import TableTemplate, DEFAULT_TEMPLATE
+import evenements as ev
 
 
 class ConnexionPerdue(RuntimeError):
@@ -108,6 +109,7 @@ class Converter:
         tables_word_file: Optional[Path] = None,
         on_progress: Optional[Callable[[float, str], None]] = None,
         on_log: Optional[Callable[[str], None]] = None,
+        on_evenement: Optional[Callable] = None,
         on_validation: Optional[Callable] = None,
         on_column_mapping: Optional[Callable] = None,
         on_wide_template_confirm: Optional[Callable] = None,
@@ -119,6 +121,9 @@ class Converter:
         self.tables_word_file = Path(tables_word_file) if tables_word_file else None
         self._on_progress = on_progress or (lambda p, m: None)
         self._on_log = on_log or (lambda m: None)
+        # Événements structurés (étape 2) : émis EN PLUS de on_progress / on_log, pour une
+        # interface qui suit le détail. Absent par défaut → rien ne change pour l'existant.
+        self._on_evenement = on_evenement or (lambda e: None)
         self._on_validation = on_validation  # None = pas de validation interactive
         self._on_column_mapping = on_column_mapping  # None = mapping auto standard
         self._on_wide_template_confirm = on_wide_template_confirm  # None = pas de confirmation
@@ -164,9 +169,22 @@ class Converter:
                 f"  page {numero} ignorée : {motif_page_ignoree(diagnostic)}, "
                 f"images = {images} % de la page"
             )
+        etiquettes = {VECTORIEL: 'vectoriel', OCR_INVISIBLE: 'ocr_invisible', SCAN: 'scan'}
+        self._emettre(ev.ANALYSE, page=numero, total=total,
+                      nature=etiquettes.get(nature, 'ignoree'))
 
     def _progress(self, pct: float, msg: str) -> None:
         self._on_progress(pct, msg)
+
+    def _emettre(self, type_: str, **champs) -> None:
+        self._on_evenement(ev.Evenement(type=type_, **champs))
+
+    def _emettre_alertes_pages(self, resultats: List[Dict]) -> None:
+        """Un événement page_alerte par page portant des alertes (resultat['a_verifier'])."""
+        for r in resultats:
+            messages = [a.get('message') for a in (r.get('a_verifier') or []) if a.get('message')]
+            if messages:
+                self._emettre(ev.PAGE_ALERTE, page=numero_page(r), alertes=messages)
 
     def _est_annule(self) -> bool:
         """Vrai si l'utilisateur a demandé l'arrêt de la conversion."""
@@ -201,6 +219,14 @@ class Converter:
     # ── Pipeline ──────────────────────────────────────────────────────
 
     def run(self) -> Dict:
+        """Exécute le pipeline ; émet ERREUR avant de propager toute exception (reste inchangé)."""
+        try:
+            return self._executer()
+        except Exception as exc:
+            self._emettre(ev.ERREUR, message=str(exc))
+            raise
+
+    def _executer(self) -> Dict:
         """
         Exécute le pipeline de conversion.
 
@@ -217,6 +243,7 @@ class Converter:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self._verifier_template_large()
         self._a_valider = []
+        self._emettre(ev.PHASE, etat='analyse')
 
         source_ext = self.word_file.suffix.lower()
         self._verifier_moteurs()
@@ -224,6 +251,7 @@ class Converter:
             self._lancer_compte_lignes() if source_ext == '.pdf' and (
                 Config.CONTROLE_LIGNES or Config.CONTROLE_LIGNES_VECTORIEL) else None)
 
+        self._emettre(ev.PHASE, etat='lecture')
         if source_ext == '.pdf':
             _ocr_mode = getattr(Config, 'OCR_MODE', 'tesseract').lower()
             if _ocr_mode in ('claude', 'ollama', 'hybrid', 'agent'):
@@ -258,9 +286,11 @@ class Converter:
         self._log(f"  → {ok} / {len(ocr_results)} tableaux extraits.")
         self._progress(0.65, f"Extraction terminée : {ok}/{len(ocr_results)} tableaux.")
         if not self._est_annule():
+            self._emettre(ev.PHASE, etat='controles')
             if self._compte_lignes is not None:
                 self._controle_lignes(ocr_results)
             self._controler_qualite(ocr_results)
+            self._emettre_alertes_pages(ocr_results)
             self._valider_document(ocr_results)
 
         # ── Import tableaux Word structurés (optionnel) ───────────────
@@ -329,6 +359,7 @@ class Converter:
             )
 
         # ── Génération du classeur Excel ──────────────────────────────
+        self._emettre(ev.PHASE, etat='excel')
         self._log("Génération du classeur Excel…")
         self._progress(0.68, "Génération Excel…")
 
@@ -370,6 +401,7 @@ class Converter:
                 self.output_dir / f"{source_stem_r}_ollama.jsonl"
             )
 
+        self._emettre(ev.FIN, total=ok)
         return {
             'tableaux':    ok,
             'total':       len(ocr_results) + len(word_results),
@@ -1248,6 +1280,7 @@ class Converter:
             vision_extractor,
             on_log=lambda m, niveau='info': self._log(m),
             doit_arreter=self._est_annule,
+            on_evenement=self._on_evenement,
         )
         return lecteur.lire(a_lire, self.output_dir)
 
@@ -1376,6 +1409,7 @@ class Converter:
             pct = 0.28 + (i / total) * 0.37   # 28 % → 65 %
             self._progress(pct, f"OCR {i + 1}/{total} : {img.name}")
             self._log(f"  OCR {i + 1}/{total} : {img.name}")
+            self._emettre(ev.PAGE_DEBUT, page=i + 1, total=total)
 
             if vision_extractor is not None:
                 # Page déjà lue par le lot ; sinon (cache, repli du lot, hors lot) appel normal.
@@ -1423,6 +1457,12 @@ class Converter:
                                else 'Tesseract'),
                     'page_pdf': None})
 
+            lignes = sum(1 for row in (result.get('rows') or []) if row.get('type') == 'data')
+            self._emettre(
+                ev.PAGE_LUE, page=i + 1, total=total, lignes=lignes,
+                bornier=(result.get('metadata') or {}).get('BORNIER'),
+                zones=ev.zones_relatives(self._lectures_tesseract.get(i + 1)),
+                cout=result.get('api_usage'))
             results.append(result)
 
         if pages_cache:

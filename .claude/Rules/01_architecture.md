@@ -7,7 +7,8 @@ Chaque fichier Python du projet a un rôle unique. Ne jamais mélanger les rôle
 | Fichier | Rôle unique — ne toucher que si ce rôle change |
 |---------|-----------------------------------------------|
 | `interface.py` | Interface graphique Tkinter — affichage UNIQUEMENT, zéro logique métier |
-| `converter.py` | Orchestration des étapes avec callbacks `on_progress` / `on_log` |
+| `converter.py` | Orchestration des étapes avec callbacks `on_progress` / `on_log` / `on_evenement` |
+| `evenements.py` | Événements structurés de la conversion : dataclass `Evenement` figée + `zones_relatives` (boîtes Tesseract en 0–1) — module pur, émis EN PLUS de `on_progress`/`on_log` par `converter.py` et `claude_lot.py` ; `on_evenement` absent ne change rien |
 | `ocr_processor.py` | `BornierTableExtractor` : prétraitement → OCR → colonnes → cellules |
 | `pdf_extractor.py` | `PdfTableExtractor` : extraction des tableaux d'un PDF par couche texte (PyMuPDF), repli OCR Tesseract sur les pages raster ; classement d'une page (`diagnostiquer_page`/`classer_page` : vectoriel / OCR invisible / scan / vide) et routage en mode tesseract/docling (`_extract_page_routee`) et lecture exacte en grille de caractères (`grille_page`, `extract_page_grille`) |
 | `claude_ocr.py` | `ClaudeVisionExtractor` : OCR via Claude Vision (API Anthropic) + `LogReplayer` (replay du journal sans appel API) + parseur pipe partagé par les moteurs vision ; `_construire_requete` (source unique de la requête, consigne en cache) et `_traiter_reponse` (chemin unique : journal, cache, refus, troncature, parsing, retour — partagé par l'appel direct, le cache et le lot) |

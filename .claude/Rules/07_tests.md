@@ -72,6 +72,8 @@ tests/
   test_converter_verification.py     → Converter.verifier_conversion et ses aides privées
   test_non_regression_xlsx.py        → Le .xlsx du pipeline reste identique à l'instantané d'avant ; dump_classeur capture aussi les commentaires de cellule et l'en-tête/pied d'impression quand ils existent
   test_memes_cellules.py             → Filet « mêmes cellules » (dans la suite normale, ~5 s) : rejoue les 3 journaux .jsonl validés (PE011/PE012/6A133, sans API ni Tesseract, lexique neutralisé) et compare cellule par cellule à un instantané figé pris sur main — casse si le code change une cellule, un pied, un commentaire ou la mise en forme
+  test_evenements.py                 → evenements.py : dataclass Evenement (type, horodatage auto, champs None par défaut, message, figée) et zones_relatives (mots normalisés 0–1, traits « | » et vides écartés, None si pas de mot / taille nulle / lecture None)
+  test_converter_evenements.py       → on_evenement dans Converter (faux client du lot, sans réseau) : un test par type (analyse, phase, page_debut, page_lue, page_alerte, lot_cree/etat/recupere, fin, erreur) + équivalence précision 4 (même conversion rejeu et lot avec on_evenement=None puis avec un collecteur → instantané Excel identique)
   test_mesure_precision.py           → mesure_precision.py, une classe par fonction publique, dicts fabriqués
   test_mesurer_precision.py          → mesurer_precision.py (lecture xlsx/vérité/PDF, CSV, CLI), fichiers fabriqués
   test_positions_scan.py             → positions_scan.py sur lectures fabriquées : grille (pente, pas, phase, demi-pas), coupe aux traits (« 0815B/|RM »), jumeaux exacts / par rang / sans jumeau, déplacement (bord, débordement), sections, ancrage des lignes (ligne mal lue tenue par sa clé, clé en double, ancres croisées) ; rendu Excel (espaces, Courier New 11, False = avant)
@@ -121,7 +123,7 @@ tests/
   test_claude_opus5.py               → claude_ocr sur Opus 5 / 5.5 : table de capacités, paramètres envoyés, refus avec catégorie, bloc de réflexion, effort refusé, images PNG ≤ 2576 px
 ```
 
-**1438 tests passent** (`pytest tests\`, relevé le 2026-11-10), aucun échec attendu, plus 1 test lent
+**1457 tests passent** (`pytest tests\`, relevé le 2026-11-10), aucun échec attendu, plus 1 test lent
 facultatif (`VERIF_TEST_LENT=1`, relecture du scan de 15 pages, ~30 s). Le filet « mêmes
 cellules » (3 tests, ~5 s) est désormais dans la suite normale. Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.
