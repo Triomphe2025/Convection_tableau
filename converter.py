@@ -1312,7 +1312,12 @@ class Converter:
             doit_arreter=self._est_annule,
             on_evenement=self._on_evenement,
         )
-        return lecteur.lire(a_lire, self.output_dir)
+        from cache_lectures import empreinte_fichier
+        try:
+            empreinte = empreinte_fichier(self.word_file)
+        except Exception:
+            empreinte = None
+        return lecteur.lire(a_lire, self.output_dir, empreinte=empreinte)
 
     def _extraire_avec_progres(
         self, images_dir: Path, total_hint: int

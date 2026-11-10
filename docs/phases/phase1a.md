@@ -70,3 +70,13 @@ env\Scripts\python.exe -m tests.test_memes_cellules --regenerer
 
 Déterminisme vérifié : le rejeu `.jsonl` ne lance ni OCR (pas de Tesseract) ni appel API ; le
 lexique est neutralisé (dossier vide) — l'instantané ne dépend donc que du code.
+
+---
+
+## Limites connues pour la phase 2
+
+- La pause n'agit pas pendant l'attente d'un lot (le lot continue chez Anthropic) :
+  l'écran d'attente du lot ne propose pas Pause.
+- Les zones d'une page lue avant sa lecture Tesseract (page en cache) n'arrivent qu'au
+  placement, par l'événement `page_zones`.
+- Pas de boîtes de cellule, seulement de ligne : à ajouter en phase 1B (points à relire).

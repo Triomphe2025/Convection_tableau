@@ -21,7 +21,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from config import Config
 import claude_ocr
@@ -51,8 +51,10 @@ def _format_taille(octets: int) -> str:
     return f"{octets / 1024:.0f} Ko"
 
 
-def _enregistrer_lot(dossier_sortie, batch_id: str, table: Dict, modele: str) -> None:
-    """Écrit l'id du lot et la table custom_id → page dans le dossier de sortie (reprise possible).
+def _enregistrer_lot(dossier_sortie, batch_id: str, table: Dict, modele: str,
+                     empreinte: Optional[str] = None, profil: Optional[dict] = None) -> None:
+    """Écrit l'id du lot, l'empreinte du document, le modèle, le profil et la table custom_id
+    → page dans le dossier de sortie (reprise possible, ciblée sur le bon document).
 
     Jamais bloquant : un échec d'écriture laisse le lot se dérouler normalement.
     """
@@ -63,6 +65,8 @@ def _enregistrer_lot(dossier_sortie, batch_id: str, table: Dict, modele: str) ->
             json.dumps({
                 'id': batch_id,
                 'modele': modele,
+                'empreinte': empreinte,
+                'profil': profil,
                 'date': datetime.datetime.now().isoformat(timespec='seconds'),
                 'pages': {cid: str(info['image']) for cid, info in table.items()},
             }, ensure_ascii=False, indent=2),
@@ -96,12 +100,14 @@ class LecteurLot:
         except Exception:
             logger.exception("événement de lot ignoré")
 
-    def lire(self, image_paths: List[Path], dossier_sortie) -> Dict[str, dict]:
+    def lire(self, image_paths: List[Path], dossier_sortie,
+             empreinte: Optional[str] = None) -> Dict[str, dict]:
         """Lit toutes les pages, découpées en lots sous le plafond de taille. Ne lève jamais.
 
-        Tous les lots sont créés d'abord (un lot_<id>.json écrit dès chaque création), puis
-        attendus dans une seule boucle de sondage, puis récupérés : un lot n'attend pas la fin
-        du précédent pour partir.
+        À la relance, les lots non terminés du MÊME document (empreinte) et du MÊME modèle sont
+        repris d'abord et leurs pages ne sont jamais renvoyées (pas de double facturation). Les
+        pages encore manquantes partent ensuite en nouveaux lots (un lot_<id>.json par lot), tous
+        créés d'abord, puis attendus dans une seule boucle de sondage, puis récupérés.
         """
         resultats: Dict[str, dict] = {}
         image_paths = list(image_paths)
@@ -116,11 +122,21 @@ class LecteurLot:
         except ImportError:
             return {str(p): self._repli(p, "package anthropic absent") for p in image_paths}
 
+        modele = getattr(Config, 'CLAUDE_OCR_MODEL', 'claude-opus-5')
+        # Reprise d'abord : lots en cours du même document + modèle ; leurs pages sortent de la
+        # liste à envoyer (succès gardé, page expirée en repli — jamais renvoyée en lot).
+        if dossier_sortie:
+            resultats.update(
+                self._reprendre_lots_du_dossier(dossier_sortie, empreinte, modele))
+        a_envoyer = [p for p in image_paths if str(p) not in resultats]
+        if not a_envoyer:
+            return resultats
+
         cache_actif = (getattr(Config, 'CLAUDE_CACHE_LECTURES', False)
                        and not getattr(Config, 'CLAUDE_FORCER_RELECTURE', False))
 
         infos: List[dict] = []
-        for index, image_path in enumerate(image_paths):
+        for index, image_path in enumerate(a_envoyer):
             try:
                 prepa = self._preparer(image_path, cache_actif)
             except Exception as exc:
@@ -134,9 +150,6 @@ class LecteurLot:
 
         lots = self._decouper(infos)
         client_base = anthropic.Anthropic(api_key=api_key, max_retries=0)
-        # Un doublon côté serveur est un lot créé APRÈS le début de nos tentatives et dont l'id
-        # n'est pas déjà connu (lot créé cette exécution, ou lot_*.json d'une exécution passée).
-        heure_debut = datetime.datetime.now(datetime.timezone.utc)
         ids_connus = self._ids_lots_dossier(dossier_sortie)
 
         envois: List[tuple] = []          # (batch, table) des lots effectivement créés
@@ -144,7 +157,7 @@ class LecteurLot:
         for i, lot in enumerate(lots, 1):
             batch, table, statut = self._creer_lot(
                 anthropic, api_key, client_base, lot, i, len(lots),
-                dossier_sortie, heure_debut, ids_connus, resultats)
+                dossier_sortie, ids_connus, resultats, empreinte)
             if batch is not None:
                 envois.append((batch, table))
                 ids_connus.add(batch.id)
@@ -177,6 +190,47 @@ class LecteurLot:
             pass
         return ids
 
+    def _reprendre_lots_du_dossier(self, dossier_sortie, empreinte, modele) -> Dict[str, dict]:
+        """Reprend les lots non terminés du MÊME document (empreinte) et du MÊME modèle.
+
+        Les lots d'un autre document / modèle et les anciens fichiers sans empreinte sont laissés
+        tels quels (une ligne de journal), repris seulement par la reprise manuelle. Un lot
+        récupéré (ou expiré / annulé / introuvable) est marqué « termine » et n'est plus repris.
+        """
+        resultats: Dict[str, dict] = {}
+        try:
+            fichiers = sorted(Path(dossier_sortie).glob('lot_*.json'))
+        except Exception:
+            return resultats
+        for fichier in fichiers:
+            donnees = self._lire_fichier_lot(fichier)
+            if donnees is None or donnees.get('termine'):
+                continue
+            emp = donnees.get('empreinte')
+            if emp is None:
+                self._on_log(f"  Reprise : {fichier.name} sans empreinte — non repris "
+                             "automatiquement (reprise manuelle possible)", 'warn')
+                continue
+            if emp != empreinte or donnees.get('modele') != modele:
+                self._on_log(f"  Reprise : {fichier.name} d'un autre document ou modèle — "
+                             "laissé tel quel", 'info')
+                continue
+            res, fini = self._reprendre_un(fichier)
+            resultats.update(res)
+            if fini:
+                self._marquer_termine(fichier)
+        return resultats
+
+    def _marquer_termine(self, fichier) -> None:
+        """Marque un lot_<id>.json « termine » (résultats récupérés) : plus jamais repris."""
+        try:
+            donnees = json.loads(Path(fichier).read_text(encoding='utf-8'))
+            donnees['termine'] = True
+            Path(fichier).write_text(json.dumps(donnees, ensure_ascii=False, indent=2),
+                                     encoding='utf-8')
+        except Exception as exc:
+            logger.warning(f"Lot : marquage « termine » impossible ({exc})")
+
     def _decouper(self, infos: List[dict]) -> List[List[dict]]:
         """Groupe les pages en lots sous CLAUDE_LOT_TAILLE_MAX_MO (limite serveur 256 Mo/lot)."""
         max_octets = getattr(Config, 'CLAUDE_LOT_TAILLE_MAX_MO', 50) * 1024 * 1024
@@ -195,8 +249,8 @@ class LecteurLot:
         return lots
 
     def _creer_lot(self, anthropic_mod, api_key, client_base, infos, index, total,
-                   dossier_sortie, heure_debut, ids_connus, resultats):
-        """Crée un lot et écrit son lot_<id>.json. Rend (batch, table, statut).
+                   dossier_sortie, ids_connus, resultats, empreinte=None):
+        """Crée un lot et écrit son lot_<id>.json (empreinte + profil). Rend (batch, table, état).
 
         batch None avec statut 'arret' ou 'echec' : les pages du lot sont mises en repli.
         """
@@ -208,14 +262,17 @@ class LecteurLot:
             'info')
 
         batch, statut = self._creer(
-            anthropic_mod, api_key, client_base, requetes, octets, heure_debut, ids_connus)
+            anthropic_mod, api_key, client_base, requetes, octets, ids_connus)
         if batch is None:
             for info in infos:
                 resultats.setdefault(str(info['image']),
                                      self._repli(info['image'], "lot indisponible"))
             return None, table, statut          # 'arret' ou 'echec'
 
-        _enregistrer_lot(dossier_sortie, batch.id, table, infos[0]['model'])
+        profil = {'effort': getattr(Config, 'CLAUDE_EFFORT', None),
+                  'thinking': getattr(Config, 'CLAUDE_THINKING', None),
+                  'max_tokens': infos[0]['max_tokens']}
+        _enregistrer_lot(dossier_sortie, batch.id, table, infos[0]['model'], empreinte, profil)
         self._on_log(f"  Lot {index}/{total} envoyé (id {batch.id})", 'info')
         self._emettre(ev.LOT_CREE, lot=batch.id, total=len(requetes),
                       compteurs={'requetes': len(requetes),
@@ -280,34 +337,38 @@ class LecteurLot:
         if chemin.is_dir():
             resultats: Dict[str, dict] = {}
             for fichier in sorted(chemin.glob('lot_*.json')):
-                resultats.update(self._reprendre_un(fichier))
+                res, _ = self._reprendre_un(fichier)
+                resultats.update(res)
             return resultats
-        return self._reprendre_un(chemin)
+        res, _ = self._reprendre_un(chemin)
+        return res
 
-    def _reprendre_un(self, lot_fichier) -> Dict[str, dict]:
-        """Reprend un seul lot_<id>.json. Ne lève jamais.
+    def _reprendre_un(self, lot_fichier) -> Tuple[Dict[str, dict], bool]:
+        """Reprend un seul lot_<id>.json. Ne lève jamais. Rend (résultats, fini).
 
-        Lot terminé : récupère les résultats. Encore en cours : reprend l'attente. Expiré /
-        annulé / introuvable : les pages manquantes sont rendues en `repli_normal` (converter
-        les relit en appel normal) — même mécanisme qu'une page non lue d'un lot courant.
+        fini = True quand le lot a atteint un état final (récupéré, ou introuvable / purgé) : le
+        fichier peut être marqué « termine ». fini = False sur arrêt ou indisponibilité passagère
+        (le lot reste repris plus tard). Lot terminé : récupère les résultats. Encore en cours :
+        reprend l'attente. Expiré / annulé / introuvable : pages manquantes en `repli_normal`.
         """
         resultats: Dict[str, dict] = {}
         donnees = self._lire_fichier_lot(lot_fichier)
         if donnees is None:
-            return resultats
+            return resultats, False
         batch_id = donnees.get('id', '')
         pages = donnees.get('pages', {})
         if not batch_id or not pages:
             self._on_log("  Reprise : fichier de lot sans identifiant ni pages — ignoré", 'warn')
-            return resultats
+            return resultats, False
 
         api_key = getattr(Config, 'CLAUDE_API_KEY', '').strip()
         if not api_key:
-            return {str(p): self._repli(p, "clé API absente") for p in pages.values()}
+            return {str(p): self._repli(p, "clé API absente") for p in pages.values()}, False
         try:
             import anthropic
         except ImportError:
-            return {str(p): self._repli(p, "package anthropic absent") for p in pages.values()}
+            return ({str(p): self._repli(p, "package anthropic absent")
+                     for p in pages.values()}, False)
 
         cache_actif = (getattr(Config, 'CLAUDE_CACHE_LECTURES', False)
                        and not getattr(Config, 'CLAUDE_FORCER_RELECTURE', False))
@@ -324,18 +385,19 @@ class LecteurLot:
                 continue
             table[cid] = dict(prepa, image=image_path)
         if not table:
-            return resultats
+            return resultats, False
 
         client = anthropic.Anthropic(api_key=api_key, max_retries=0)
         etat = self._etat(client, batch_id)
         if etat is None:
-            # Lot introuvable (expiré et purgé côté serveur, ou supprimé) : relecture normale.
+            # Lot introuvable (expiré et purgé côté serveur, ou supprimé) : relecture normale,
+            # état final → fichier marqué « termine ».
             self._on_log(
                 f"  Reprise : lot {batch_id} introuvable — pages relues en appel normal", 'warn')
             for info in table.values():
                 resultats.setdefault(str(info['image']),
                                      self._repli(info['image'], "lot introuvable"))
-            return resultats
+            return resultats, True
 
         if getattr(etat, 'processing_status', 'ended') != 'ended':
             self._on_log(
@@ -346,12 +408,12 @@ class LecteurLot:
                 for info in table.values():
                     resultats.setdefault(str(info['image']),
                                          self._repli(info['image'], "arrêt demandé"))
-                return resultats
+                return resultats, False
             if statut == 'indisponible':
                 for info in table.values():
                     resultats.setdefault(str(info['image']),
                                          self._repli(info['image'], "lot indisponible"))
-                return resultats
+                return resultats, False
         else:
             self._on_log(
                 f"  Reprise : lot {batch_id} terminé — récupération des résultats", 'info')
@@ -359,10 +421,11 @@ class LecteurLot:
         # Terminé : pages réussies par le chemin de lecture unique, le reste (errored / expired /
         # canceled, ou absent des résultats) en repli pour relecture en appel normal.
         self._recuperer(client, batch_id, table, cache_actif, resultats)
+        self._emettre(ev.LOT_RECUPERE, lot=batch_id, total=len(table))
         for info in table.values():
             resultats.setdefault(str(info['image']),
                                  self._repli(info['image'], "page non rendue par le lot"))
-        return resultats
+        return resultats, True
 
     def _lire_fichier_lot(self, lot_fichier) -> Optional[dict]:
         """Lit un fichier lot_<id>.json. None si absent ou illisible (jamais d'exception)."""
@@ -389,8 +452,7 @@ class LecteurLot:
         return {'requete': requete, 'model': model, 'max_tokens': max_tokens,
                 'cle_cache': cle_cache}
 
-    def _creer(self, anthropic_mod, api_key, client_base, requetes, octets,
-               heure_debut, ids_connus):
+    def _creer(self, anthropic_mod, api_key, client_base, requetes, octets, ids_connus):
         """Crée un lot. Rend (batch, 'ok') ou (None, 'arret' | 'echec').
 
         Client dédié sans relance interne (max_retries=0) et délai proportionnel à la taille,
@@ -399,6 +461,9 @@ class LecteurLot:
         dépassé — un lot récent du même nombre de requêtes, créé après le début de nos tentatives
         et encore inconnu, est repris plutôt que recréé (doublon facturé deux fois).
         """
+        # Heure de départ prise au début de CE lot (pas une fois pour tout le document) : la
+        # recherche de doublon n'inclut pas les lots déjà créés pour les lots précédents.
+        heure_debut = datetime.datetime.now(datetime.timezone.utc)
         base = getattr(Config, 'CLAUDE_LOT_TIMEOUT_BASE_S', 60)
         par_mo = getattr(Config, 'CLAUDE_LOT_TIMEOUT_PAR_MO_S', 6)
         timeout = base + par_mo * (octets / (1024 * 1024))
@@ -503,6 +568,11 @@ class LecteurLot:
             self._on_log(
                 f"  Lot en cours : {rc.succeeded} lue(s), {rc.processing} en attente"
                 + (f", {a_reprendre} à reprendre" if a_reprendre else ''), 'info')
+            self._emettre(ev.LOT_ETAT, lot=batch.id, etat='en_cours',
+                          compteurs={'lues': rc.succeeded, 'en_attente': rc.processing,
+                                     'a_reprendre': a_reprendre,
+                                     'total': rc.succeeded + rc.processing + a_reprendre,
+                                     'delai': self._poll})
             if self._dormir() == 'arret':
                 return 'arret'
         return 'fini'
