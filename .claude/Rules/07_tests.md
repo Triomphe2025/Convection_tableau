@@ -123,9 +123,10 @@ tests/
   test_champs_constants.py           → Champs constants (P.E.T.) : case vide reprise si les autres pages sont unanimes (colorée), sinon vide + alerte ; valeur lue différente conservée + alerte ; INDICE jamais repris ; jamais d'un document à l'autre
   test_caracteres_illisibles.py      → « ?? » pour un caractère illisible : consigne du prompt, gardé par le parseur, coloré dans l'Excel
   test_claude_opus5.py               → claude_ocr sur Opus 5 / 5.5 : table de capacités, paramètres envoyés, refus avec catégorie, bloc de réflexion, effort refusé, images PNG ≤ 2576 px
+  test_spec_modules.py               → MODULES_PROJET du .spec : chaque module projet atteint depuis interface.py / converter.py / service_conversion.py (imports suivis par AST, relatifs compris) y figure, et aucune entrée morte ; échoue en nommant les modules manquants (garde-fou exe incomplet)
 ```
 
-**1471 tests passent** (`pytest tests\`, relevé le 2026-11-10), aucun échec attendu, plus 1 test lent
+**1473 tests passent** (`pytest tests\`, relevé le 2026-11-12), aucun échec attendu, plus 1 test lent
 facultatif (`VERIF_TEST_LENT=1`, relecture du scan de 15 pages, ~30 s). Le filet « mêmes
 cellules » (3 tests, ~5 s) est désormais dans la suite normale. Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.
