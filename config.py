@@ -282,6 +282,35 @@ class Config:
     PDF_VISIBILITE_MARGE = 0.15
 
     # ========================================
+    # 🧭 DÉTECTION DE TYPE (types_documents.detecter_type)
+    # ========================================
+
+    # Nombre de premières pages lues pour reconnaître le type (pied + colonnes).
+    DETECTION_PAGES_ECHANTILLON = 3
+
+    # Grand côté (points PDF) au-delà duquel une page est « grand format » (plan).
+    # Un A4 (842 pt) ou un A3 (1191 pt) reste un tableau : le format ne sert qu'à
+    # séparer les plans (A1/A0 : 2384/3370 pt) des tableaux, jamais à les départager.
+    DETECTION_GRAND_FORMAT_PT = 1400
+
+    # En dessous de ce nombre de caractères, la page est tenue pour scannée : son
+    # pied est lu par Tesseract plutôt que par la couche texte.
+    DETECTION_MIN_CARS_NATIF = 20
+
+    # Bande basse de la page (part de la hauteur) rendue pour Tesseract : seul le
+    # pied est lu, pour rester rapide (en-têtes de colonnes non vus sur un scan).
+    DETECTION_PIED_BANDE = 0.22
+    DETECTION_TESSERACT_DPI = 150
+    DETECTION_PSM = 6
+
+    # Confiance plafonnée quand plusieurs modèles sont indiscernables (ex æquo :
+    # « Répartiteur » et « REPARTITEUR ») : le fichier est « à préciser ».
+    DETECTION_CONFIANCE_EX_AEQUO_MAX = 0.5
+
+    # Confiance d'un plan reconnu au seul grand format (aucun mot de pied bornier).
+    DETECTION_CONFIANCE_PLAN_FORMAT = 0.7
+
+    # ========================================
     # 🔎 VÉRIFICATION DE CONVERSION
     # ========================================
 

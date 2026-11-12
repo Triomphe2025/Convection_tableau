@@ -84,6 +84,21 @@ Config.TESSERACT_PATH   # référencer uniquement
 
 La confiance basse réutilise `OCR_REOCR_THRESHOLD` (pas de paramètre dédié).
 
+## Détection de type (section « DÉTECTION DE TYPE », `types_documents.detecter_type`)
+
+`detecter_type(chemin)` reconnaît un fichier : extension, puis format de page, puis texte du
+pied des pages réparties (couche texte native, sinon Tesseract sur la bande du pied).
+
+| Paramètre | Valeur défaut | Rôle |
+|-----------|--------------|------|
+| `DETECTION_PAGES_ECHANTILLON` | `3` | Pages lues, réparties sur le document (pied/colonnes sur les pages intérieures, pas la garde) |
+| `DETECTION_GRAND_FORMAT_PT` | `1400` | Grand côté (pt) au-delà duquel = grand format (plan) ; A4 (842) et A3 (1191) restent des tableaux |
+| `DETECTION_MIN_CARS_NATIF` | `20` | Sous ce nombre de caractères, page tenue pour scannée → pied lu par Tesseract |
+| `DETECTION_PIED_BANDE` | `0.22` | Part basse de la page rendue pour Tesseract (seul le pied, rapide) |
+| `DETECTION_TESSERACT_DPI` / `DETECTION_PSM` | `150` / `6` | Rendu basse résolution et mode de segmentation Tesseract de la détection |
+| `DETECTION_CONFIANCE_EX_AEQUO_MAX` | `0.5` | Confiance plafonnée quand plusieurs modèles sont indiscernables (« à préciser ») |
+| `DETECTION_CONFIANCE_PLAN_FORMAT` | `0.7` | Confiance d'un plan reconnu au seul grand format (aucun mot de pied bornier) |
+
 ## Routage PDF par page (section « ROUTAGE PDF PAR PAGE »)
 
 Dans tous les modes OCR, chaque page d'un PDF est classée (`pdf_extractor.diagnostiquer_page`) :
