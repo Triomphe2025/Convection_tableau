@@ -124,9 +124,10 @@ tests/
   test_caracteres_illisibles.py      → « ?? » pour un caractère illisible : consigne du prompt, gardé par le parseur, coloré dans l'Excel
   test_claude_opus5.py               → claude_ocr sur Opus 5 / 5.5 : table de capacités, paramètres envoyés, refus avec catégorie, bloc de réflexion, effort refusé, images PNG ≤ 2576 px
   test_spec_modules.py               → MODULES_PROJET du .spec : chaque module projet atteint depuis interface.py / converter.py / service_conversion.py (imports suivis par AST, relatifs compris) y figure, et aucune entrée morte ; échoue en nommant les modules manquants (garde-fou exe incomplet)
+  test_types_documents.py            → types_documents.py : registre en mémoire (un type « tableau » par modèle, défauts déduits de footer_detect_keywords / footer_left_label / columns ; familles intégrées Plan → DXF, Excel → .xlsx, Journal → .jsonl), doublon Répartiteur/REPARTITEUR signalé sans suppression ; un templates.json portant les nouveaux champs optionnels est relu sans erreur par TemplateManager et rend les mêmes modèles (from_dict filtre les clés inconnues)
 ```
 
-**1473 tests passent** (`pytest tests\`, relevé le 2026-11-12), aucun échec attendu, plus 1 test lent
+**1480 tests passent** (`pytest tests\`, relevé le 2026-11-12), aucun échec attendu, plus 1 test lent
 facultatif (`VERIF_TEST_LENT=1`, relecture du scan de 15 pages, ~30 s). Le filet « mêmes
 cellules » (3 tests, ~5 s) est désormais dans la suite normale. Barrière de régression à ne jamais abaisser.
 Les 3 fichiers `test_*.py` de la racine (31 tests) se lancent séparément.
