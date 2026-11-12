@@ -300,7 +300,8 @@ class Config:
     # Bande basse de la page (part de la hauteur) rendue pour Tesseract : seul le
     # pied est lu, pour rester rapide (en-têtes de colonnes non vus sur un scan).
     DETECTION_PIED_BANDE = 0.22
-    DETECTION_TESSERACT_DPI = 150
+    # 130 DPI : l'en-tête + le pied d'un scan de 15 pages restent sous 4 s (budget détection).
+    DETECTION_TESSERACT_DPI = 130
     DETECTION_PSM = 6
 
     # Confiance plafonnée quand plusieurs modèles sont indiscernables (ex æquo :
@@ -309,6 +310,14 @@ class Config:
 
     # Confiance d'un plan reconnu au seul grand format (aucun mot de pied bornier).
     DETECTION_CONFIANCE_PLAN_FORMAT = 0.7
+
+    # En dessous de cette confiance, le résultat est « à préciser » (l'interface
+    # proposera le modèle le plus proche) ; borne inférieure stricte.
+    DETECTION_SEUIL_SUR = 0.7
+
+    # Bande haute d'un scan (part de la hauteur) rendue pour Tesseract : l'en-tête
+    # du tableau (noms de colonnes) y est lu en plus du pied, pour distinguer le modèle.
+    DETECTION_ENTETE_BANDE = 0.33
 
     # ========================================
     # 🔎 VÉRIFICATION DE CONVERSION

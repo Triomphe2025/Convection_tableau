@@ -133,11 +133,22 @@ def _tokens_type(t: TypeDocument):
     return pied, cart, cols
 
 
-def _score_type(texte_norm: str, t: TypeDocument):
+def _compte_mot(texte_upper, token) -> int:
+    # Un mot de reconnaissance ne compte que s'il est entier : les espaces et points
+    # qu'un scan glisse entre les lettres (« J A R », « P.E.T ») sont tolérés, mais
+    # « FIL » dans PROFIL / FILERIE ne compte pas (bornes de mot alphanumériques).
+    cn = _normaliser(token)
+    if not cn:
+        return 0
+    motif = r'(?<![A-Z0-9])' + r'[^A-Z0-9]*'.join(cn) + r'(?![A-Z0-9])'
+    return 1 if re.search(motif, (texte_upper or '').upper()) else 0
+
+
+def _score_type(texte_upper: str, t: TypeDocument):
     pied, cart, cols = _tokens_type(t)
-    n_pied = sum(1 for m in pied if m in texte_norm)
-    n_cart = 1 if cart and cart in texte_norm else 0
-    n_col = sum(1 for c in cols if c in texte_norm)
+    n_pied = sum(1 for m in pied if _compte_mot(texte_upper, m))
+    n_cart = 1 if cart and _compte_mot(texte_upper, cart) else 0
+    n_col = sum(1 for c in cols if _compte_mot(texte_upper, c))
     return n_pied, n_cart, n_col
 
 
@@ -148,18 +159,39 @@ def _confiance(n_pied, n_cart, n_col, total_pied, total_col) -> float:
     return 0.5 * part_famille + 0.5 * part_modele
 
 
+def a_preciser(confiance, preuves) -> bool:
+    """True si le résultat est incertain : « à préciser » déjà noté, ou confiance faible.
+
+    L'interface l'utilise pour afficher le modèle le plus proche comme proposition à confirmer.
+    """
+    from config import Config
+    if any("à préciser" in (p or "") for p in (preuves or ())):
+        return True
+    return confiance < Config.DETECTION_SEUIL_SUR
+
+
+def _rects_bandes(x0, y0, x1, y1):
+    """Bandes à lire sur un scan : en-tête (haut, colonnes) et pied (bas), pleine largeur."""
+    from config import Config
+    h = y1 - y0
+    entete = (x0, y0, x1, y0 + h * Config.DETECTION_ENTETE_BANDE)
+    pied = (x0, y1 - h * Config.DETECTION_PIED_BANDE, x1, y1)
+    return [entete, pied]
+
+
 def _decider(texte, types, grand_format):
     """Cœur de la détection : choisit le type « tableau » le mieux reconnu dans `texte`.
 
     Aucun mot bornier + grand format → plan ; aucun mot + format standard → inconnu.
-    Plusieurs modèles indiscernables (mêmes colonnes) → confiance plafonnée, « à préciser ».
+    Plusieurs modèles indiscernables (mêmes colonnes) → confiance plafonnée, « à préciser » ;
+    un seul modèle mais faiblement reconnu (sous le seuil sûr) → « à préciser » aussi.
     """
     from config import Config
-    texte_norm = _normaliser(texte)
+    texte_upper = (texte or '').upper()
     tableaux = [t for t in types.values() if t.famille == "tableau"]
     scored = []
     for t in tableaux:
-        n_pied, n_cart, n_col = _score_type(texte_norm, t)
+        n_pied, n_cart, n_col = _score_type(texte_upper, t)
         scored.append((n_pied + n_cart + n_col, n_pied, n_cart, n_col, t))
 
     meilleur = max((s[0] for s in scored), default=0)
@@ -186,6 +218,8 @@ def _decider(texte, types, grand_format):
         noms = ", ".join(sorted(s[4].nom for s in gagnants))
         conf = min(conf, Config.DETECTION_CONFIANCE_EX_AEQUO_MAX)
         preuves.append(f"à préciser entre : {noms}")
+    elif conf < Config.DETECTION_SEUIL_SUR:
+        preuves.append(f"à préciser (confiance faible) — modèle le plus proche : {t.nom}")
     return t, conf, preuves
 
 
@@ -204,8 +238,8 @@ def _grand_format(chemin) -> Tuple[bool, float]:
     return cote > Config.DETECTION_GRAND_FORMAT_PT, cote
 
 
-def _tesseract_pied(page) -> str:
-    """Texte de la bande basse d'une page scannée, lu par Tesseract en basse résolution."""
+def _tesseract_texte(page) -> str:
+    """En-tête (colonnes) et pied d'un scan, lus par Tesseract en basse résolution."""
     from config import Config
     if not Config.TESSERACT_TROUVE:
         return ""
@@ -214,12 +248,15 @@ def _tesseract_pied(page) -> str:
     from PIL import Image
     pytesseract.pytesseract.tesseract_cmd = Config.TESSERACT_PATH
     r = page.rect
-    bande = fitz.Rect(r.x0, r.y1 - r.height * Config.DETECTION_PIED_BANDE, r.x1, r.y1)
     echelle = Config.DETECTION_TESSERACT_DPI / 72.0
-    pix = page.get_pixmap(matrix=fitz.Matrix(echelle, echelle), clip=bande)
-    img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
-    return pytesseract.image_to_string(
-        img, lang=Config.OCR_LANGUAGE, config=f"--psm {Config.DETECTION_PSM}")
+    morceaux = []
+    for x0, y0, x1, y1 in _rects_bandes(r.x0, r.y0, r.x1, r.y1):
+        pix = page.get_pixmap(matrix=fitz.Matrix(echelle, echelle),
+                              clip=fitz.Rect(x0, y0, x1, y1))
+        img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+        morceaux.append(pytesseract.image_to_string(
+            img, lang=Config.OCR_LANGUAGE, config=f"--psm {Config.DETECTION_PSM}"))
+    return "\n".join(morceaux)
 
 
 def _indices_echantillon(n_pages: int, n: int) -> List[int]:
@@ -247,10 +284,10 @@ def _lire_texte_pdf(chemin) -> Tuple[str, set]:
                 morceaux.append(natif)
                 sources.add("texte natif")
             else:
-                lu = _tesseract_pied(page)
+                lu = _tesseract_texte(page)
                 if lu.strip():
                     morceaux.append(lu)
-                    sources.add("Tesseract pied")
+                    sources.add("Tesseract (pied + en-tête)")
     finally:
         doc.close()
     return " ".join(morceaux), sources

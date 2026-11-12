@@ -233,3 +233,125 @@ class TestDetecterType:
             Path(f.name).unlink(missing_ok=True)
         assert type_.famille == "tableau"
         assert conf > 0.0
+
+
+class TestAPreciser:
+    """a_preciser : indicateur « à préciser » que l'interface lira (correction 1)."""
+
+    def test_confiance_sous_seuil_est_a_preciser(self):
+        assert td.a_preciser(0.4, ["modèle le plus proche : X"]) is True
+
+    def test_confiance_haute_sans_mention_est_sure(self):
+        assert td.a_preciser(0.85, ["modèle le plus proche : X"]) is False
+
+    def test_seuil_exact_est_sur(self):
+        # Borne inférieure stricte : pile au seuil = sûr.
+        assert td.a_preciser(Config.DETECTION_SEUIL_SUR, ["modèle le plus proche : X"]) is False
+
+    def test_mention_a_preciser_force_meme_haute(self):
+        assert td.a_preciser(0.95, ["à préciser entre : A, B"]) is True
+
+
+class TestCompteMot:
+    """_compte_mot : un mot n'est reconnu qu'entier, espaces du scan tolérés (correction 2)."""
+
+    def test_mot_entier_present(self):
+        assert td._compte_mot("SIGNAL JAR ABOUTISSANT", "JAR") == 1
+
+    def test_mot_espace_scan_compte(self):
+        assert td._compte_mot("SIGNAL J A R ABOUTISSANT", "JAR") == 1
+
+    def test_ponctuation_toleree(self):
+        assert td._compte_mot("NO PLAN : X  P.E.T : Y", "P.E.T") == 1
+
+    def test_sous_chaine_profil_rejetee(self):
+        # « FIL » dans PROFIL / FILERIE ne compte pas pour la colonne FIL.
+        assert td._compte_mot("DIVERS PROFIL FILERIE", "FIL") == 0
+
+    def test_absent_rend_zero(self):
+        assert td._compte_mot("BORNE COULEUR", "SIGNAL") == 0
+
+
+class TestMotEntierScore:
+    """_score_type compte les colonnes au mot entier (correction 2)."""
+
+    def test_fil_dans_filaire_ne_compte_pas(self):
+        rep2 = _modele("REP2", ["FIL", "TENANT"], ["NO PLAN"], "SIEMENS")
+        texte = "TENANT  DRIDPO FILAIRE Q2  NO PLAN : 1  SIEMENS"
+        t = td.registre(modeles={"REP2": rep2})["REP2"]
+        n_pied, n_cart, n_col = td._score_type(texte.upper(), t)
+        assert n_col == 1  # TENANT compte, FIL (dans FILAIRE) non
+
+
+class TestRectsBandes:
+    """_rects_bandes : la lecture d'un scan couvre l'en-tête (haut) ET le pied (bas) (corr. 3)."""
+
+    def test_deux_bandes_haut_et_bas(self):
+        bandes = td._rects_bandes(0.0, 0.0, 100.0, 1000.0)
+        assert len(bandes) == 2
+        (hx0, hy0, hx1, hy1), (px0, py0, px1, py1) = bandes
+        assert hy0 == 0.0
+        assert hy1 == 1000.0 * Config.DETECTION_ENTETE_BANDE
+        assert py1 == 1000.0
+        assert py0 == 1000.0 - 1000.0 * Config.DETECTION_PIED_BANDE
+        assert hx0 == 0.0 and hx1 == 100.0 and px0 == 0.0 and px1 == 100.0
+
+
+class TestDeciderSeuil:
+    """_decider ajoute « à préciser » sous le seuil sûr, avec le modèle proche (corr. 1)."""
+
+    def test_confiance_faible_ajoute_a_preciser(self):
+        faible = _modele("Faible", ["ZZALPHA", "ZZBETA"], ["NO PLAN", "P.E.T"], "ACME")
+        texte = "NO PLAN : X  blabla divers"  # un seul mot de pied, aucune colonne
+        type_, conf, preuves = td._decider(texte, td.registre(modeles={"Faible": faible}),
+                                           grand_format=False)
+        assert type_.nom == "Faible"
+        assert conf < Config.DETECTION_SEUIL_SUR
+        texte_preuves = " ".join(preuves)
+        assert "à préciser" in texte_preuves
+        assert "Faible" in texte_preuves  # le type le plus proche est suggéré
+
+
+class TestVeriteTerrain:
+    """Un test par fichier affirmant le type métier connu de l'utilisateur (point 4)."""
+
+    def test_pe137_repartiteur_a_preciser(self):
+        type_, conf, preuves = td.detecter_type(FIXTURES / "223400PE137.pdf")
+        assert type_.nom in ("Répartiteur", "REPARTITEUR")
+        assert td.a_preciser(conf, preuves) is True
+        assert "REPARTITEUR 2" not in " ".join(preuves)
+
+    def test_pe133_repartiteur_a_preciser(self):
+        type_, conf, preuves = td.detecter_type(FIXTURES / "6A23111PE133_extrait_8pages.pdf")
+        assert type_.nom in ("Répartiteur", "REPARTITEUR")
+        assert td.a_preciser(conf, preuves) is True
+        assert "REPARTITEUR 2" not in " ".join(preuves)
+
+    def test_pe135_repartiteur2(self):
+        type_, conf, preuves = td.detecter_type(FIXTURES / "223400PE135.pdf")
+        assert type_.nom == "REPARTITEUR 2"
+
+    def test_pe011_repartiteur2(self):
+        # « FIL » est ici un vrai mot (colonne) : REPARTITEUR 2 reste le bon type.
+        type_, conf, preuves = td.detecter_type(FIXTURES / "223111PE011_extrait_10pages.pdf")
+        assert type_.nom == "REPARTITEUR 2"
+
+    def test_pe012_bornier_standard(self):
+        type_, conf, preuves = td.detecter_type(FIXTURES / "223111PE012_extrait_10pages.pdf")
+        assert type_.nom == "Bornier standard"
+
+    def test_scan_pe102_colonnes_lues_par_tesseract(self):
+        # La bande d'en-tête (correction 3) fait lire les colonnes du scan : le modèle
+        # est distingué avec certitude (plus d'ex æquo du seul pied).
+        if not Config.TESSERACT_TROUVE:
+            raise AssertionError("Tesseract requis (présent en CI du projet)")
+        debut = time.perf_counter()
+        type_, conf, preuves = td.detecter_type(FIXTURES / "scan_6A23111PE102_15p.pdf")
+        duree = time.perf_counter() - debut
+        texte = " ".join(preuves)
+        assert type_ is not None and type_.famille == "tableau"
+        assert any("Tesseract" in p for p in preuves)
+        assert "colonnes" in texte           # en-tête lu grâce à la bande haute
+        assert "à préciser entre" not in texte  # modèle unique, plus d'ex æquo du pied seul
+        assert conf >= Config.DETECTION_SEUIL_SUR
+        assert duree < 8.0  # budget détection < 4 s visé ; marge pour les CI lentes
