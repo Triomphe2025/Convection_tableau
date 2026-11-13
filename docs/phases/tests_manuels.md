@@ -75,3 +75,44 @@ Les 6 vérifications visuelles du rapport final de la phase 0 (points 3, 7, 9, 1
     - dans la console Anthropic → Batches, **aucun nouveau lot** n'est créé à la relance (le lot
       d'origine est repris, donc **pas re-facturé**) ;
     - l'**Excel est produit** à la fin, complet.
+
+---
+
+## Phase 1B — moteur préparé (détection, estimation, points à relire)
+
+Rien ne change à l'écran : ces essais portent sur ce que le moteur **produit** (fichiers,
+estimations, reconnaissance). Les points 1.B.3 et 1.B.4 se lancent par un petit script Python
+(`env\Scripts\python.exe`), le reste depuis l'exe.
+
+- [ ] **1B.1 — `<nom>_points.json` écrit à côté de l'Excel (vrai scan + Claude).**
+  - Mode OCR **Claude**, convertir un PDF **scanné** de 2–3 pages qui a des cases douteuses.
+  - Attendu : à côté de l'Excel, un fichier **`<nom>_points.json`** ; l'ouvrir et vérifier que
+    chaque **cellule colorée** de la feuille Borniers y a **un point** (sorte, `cellule_excel`,
+    `page_imprimee`, `bornier`), et que les **zones** de cellule (0–1) tombent sur les bonnes cases.
+
+- [ ] **1B.2 — Points d'une conversion arrêtée.**
+  - Lancer une conversion, puis **Arrêter** en cours.
+  - Attendu : `<nom>_points.json` est **quand même écrit**, avec `"arrete": true` et seulement les
+    points des **pages déjà lues** ; aucune erreur, l'appli reste utilisable.
+
+- [ ] **1B.3 — Estimation : ordre de grandeur sur un document connu.**
+  - Dans un terminal, à la racine du projet :
+    `env\Scripts\python.exe -c "import estimation,types_documents as t; print(estimation.estimer(r'CHEMIN.pdf', None, profil='claude', modele='claude-opus-5-5'))"`
+  - Attendu : `pages` par nature plausibles, `cout_usd` et `duree` du **bon ordre de grandeur** pour
+    ce document ; `approche` vaut `True`. (Les moyennes s'affinent si `ESTIMATION_JOURNAUX_DOSSIER` /
+    `ESTIMATION_STATS_FICHIER` pointent sur tes vraies conversions.)
+
+- [ ] **1B.4 — Détection de type sur des fichiers clients.**
+  - `env\Scripts\python.exe -c "import types_documents as t; print(t.detecter_type(r'CHEMIN'))"`
+    sur un PDF de tableaux, un scan, un `.jsonl`, un `.xlsx`, un plan grand format.
+  - Attendu : famille correcte (tableau / plan / journal / excel) ; pour un modèle indiscernable,
+    « à préciser » avec le modèle le plus proche ; fichier inconnu → `(None, 0)`.
+
+- [ ] **1B.5 — `points_relire` embarqué dans l'exe.**
+  - Reconstruire l'exe (`build_exe.bat`) puis vérifier dans le journal de build qu'il n'y a **pas**
+    d'avertissement « module not found: points_relire » ; une conversion depuis l'exe écrit bien
+    `<nom>_points.json`.
+
+- [ ] **1B.6 — Modèle réel du scan 6A23111PE102 (facultatif).**
+  - Vérifier sur le document d'origine **quel modèle** est le scan PE102. S'il est bien un
+    **Bornier standard**, me le dire pour resserrer le test de détection sur ce nom.
