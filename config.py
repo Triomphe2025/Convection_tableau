@@ -311,6 +311,13 @@ class Config:
     # Confiance d'un plan reconnu au seul grand format (aucun mot de pied bornier).
     DETECTION_CONFIANCE_PLAN_FORMAT = 0.7
 
+    # Plan reconnu à ses mots de cartouche (quel que soit le format) : un document qui porte
+    # au moins DETECTION_MOTS_PLAN_MIN de ces mots ET aucun en-tête de colonne bornier est un
+    # Plan. Les vrais plans sont souvent en A3 (pas « grand format »), d'où cette règle.
+    DETECTION_MOTS_PLAN = ("DESSINATEUR", "APPROBATEUR", "FOLIO", "ECHELLE", "TITRE")
+    DETECTION_MOTS_PLAN_MIN = 2
+    DETECTION_CONFIANCE_PLAN_CARTOUCHE = 0.8
+
     # En dessous de cette confiance, le résultat est « à préciser » (l'interface
     # proposera le modèle le plus proche) ; borne inférieure stricte.
     DETECTION_SEUIL_SUR = 0.7

@@ -38,6 +38,70 @@ def _modele(nom, colonnes, mots_pied, cartouche):
     )
 
 
+def _pdf_scan(n_pages, largeur_pt=595, hauteur_pt=842):
+    """PDF de n pages couvertes d'une image blanche, sans couche texte → Tesseract invoqué."""
+    import io as _io
+    import fitz
+    from PIL import Image
+    tampon = _io.BytesIO()
+    Image.new('RGB', (16, 16), 'white').save(tampon, format='PNG')
+    png = tampon.getvalue()
+    doc = fitz.open()
+    for _ in range(n_pages):
+        page = doc.new_page(width=largeur_pt, height=hauteur_pt)
+        page.insert_image(page.rect, stream=png)
+    f = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    f.close()
+    doc.save(f.name)
+    doc.close()
+    return Path(f.name)
+
+
+class TestTesseractIndisponible:
+
+    def test_detecter_type_ne_leve_pas_et_passe_a_preciser(self):
+        from unittest.mock import patch
+        scan = _pdf_scan(1)
+        echec = RuntimeError("langue fra absente")
+        with patch.object(Config, 'TESSERACT_TROUVE', True), \
+                patch('pytesseract.image_to_string', side_effect=echec):
+            type_, conf, preuves = td.detecter_type(scan)   # ne doit pas lever
+        texte = " ".join(preuves)
+        assert "Tesseract indisponible" in texte
+        assert td.a_preciser(conf, preuves)
+        scan.unlink(missing_ok=True)
+
+
+class TestPlanParCartouche:
+
+    def test_a3_avec_mots_de_cartouche_est_plan(self):
+        pdf = _pdf_temporaire(842, 1191, "TITRE DESSINATEUR APPROBATEUR FOLIO ECHELLE")  # A3
+        type_, conf, preuves = td.detecter_type(pdf)
+        assert type_ is not None and type_.nom == "Plan", preuves
+        assert not td.a_preciser(conf, preuves), preuves
+        assert conf >= Config.DETECTION_SEUIL_SUR
+        pdf.unlink(missing_ok=True)
+
+    def test_aucune_fixture_pdf_ne_devient_plan(self):
+        for pdf in sorted(FIXTURES.glob("*.pdf")):
+            type_, _, preuves = td.detecter_type(pdf)
+            nom = getattr(type_, "nom", None)
+            assert nom != "Plan", f"{pdf.name} classé Plan à tort : {preuves}"
+
+
+class TestBudgetDetectionScan:
+
+    def test_scan_40_pages_sous_4s(self):
+        if not Config.TESSERACT_TROUVE:
+            raise AssertionError("Tesseract requis (présent en CI du projet)")
+        scan = _pdf_scan(40)
+        debut = time.perf_counter()
+        td.detecter_type(scan)
+        duree = time.perf_counter() - debut
+        scan.unlink(missing_ok=True)
+        assert duree < 4.0, f"détection {duree:.2f}s > 4 s"
+
+
 class TestRegistre:
 
     def test_contient_les_modeles_livres(self):

@@ -89,7 +89,9 @@ La confiance basse réutilise `OCR_REOCR_THRESHOLD` (pas de paramètre dédié).
 `detecter_type(chemin)` reconnaît un fichier : extension, puis format de page, puis texte des
 pages réparties (couche texte native, sinon Tesseract sur l'en-tête + le pied d'un scan). Un mot
 de reconnaissance ne compte qu'entier (espaces du scan tolérés) ; sous `DETECTION_SEUIL_SUR` le
-résultat est « à préciser » (`a_preciser`).
+résultat est « à préciser » (`a_preciser`). Tesseract en échec (langue absente, programme
+introuvable) ne lève jamais : preuve « Tesseract indisponible » et « à préciser ». Un document à
+≥ `DETECTION_MOTS_PLAN_MIN` mots de cartouche sans en-tête de colonne bornier est un Plan.
 
 | Paramètre | Valeur défaut | Rôle |
 |-----------|--------------|------|
@@ -101,6 +103,9 @@ résultat est « à préciser » (`a_preciser`).
 | `DETECTION_TESSERACT_DPI` / `DETECTION_PSM` | `130` / `6` | Rendu basse résolution et segmentation Tesseract ; 130 DPI tient l'en-tête + le pied d'un scan de 15 pages sous 4 s |
 | `DETECTION_CONFIANCE_EX_AEQUO_MAX` | `0.5` | Confiance plafonnée quand plusieurs modèles sont indiscernables (« à préciser ») |
 | `DETECTION_CONFIANCE_PLAN_FORMAT` | `0.7` | Confiance d'un plan reconnu au seul grand format (aucun mot de pied bornier) |
+| `DETECTION_MOTS_PLAN` | `DESSINATEUR, APPROBATEUR, FOLIO, ECHELLE, TITRE` | Mots de cartouche d'un plan : un document qui en porte ≥ `DETECTION_MOTS_PLAN_MIN` et aucun en-tête de colonne bornier est un Plan, quel que soit le format (les vrais plans sont souvent en A3) |
+| `DETECTION_MOTS_PLAN_MIN` | `2` | Nombre minimal de mots de cartouche pour reconnaître un Plan |
+| `DETECTION_CONFIANCE_PLAN_CARTOUCHE` | `0.8` | Confiance d'un plan reconnu à ses mots de cartouche |
 | `DETECTION_SEUIL_SUR` | `0.7` | Sous cette confiance (borne stricte), le résultat est « à préciser » (modèle le plus proche proposé) ; `a_preciser(confiance, preuves)` le lit |
 
 ## Estimation avant lancement (section « ESTIMATION AVANT LANCEMENT », `estimation.py`)

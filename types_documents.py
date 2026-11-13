@@ -194,6 +194,16 @@ def _decider(texte, types, grand_format):
         n_pied, n_cart, n_col = _score_type(texte_upper, t)
         scored.append((n_pied + n_cart + n_col, n_pied, n_cart, n_col, t))
 
+    # Plan reconnu à ses mots de cartouche, quel que soit le format (les vrais plans sont
+    # souvent en A3) : au moins N mots de cartouche ET aucun en-tête de colonne bornier.
+    n_col_total = sum(s[3] for s in scored)
+    n_plan = sum(1 for m in Config.DETECTION_MOTS_PLAN
+                 if _compte_mot(texte_upper, _normaliser(m)))
+    if n_plan >= Config.DETECTION_MOTS_PLAN_MIN and n_col_total == 0:
+        return (TYPE_PLAN, Config.DETECTION_CONFIANCE_PLAN_CARTOUCHE,
+                [f"{n_plan} mots de cartouche de plan",
+                 "aucun en-tête de colonne bornier → plan"])
+
     meilleur = max((s[0] for s in scored), default=0)
     if meilleur == 0:
         if grand_format:
@@ -238,11 +248,19 @@ def _grand_format(chemin) -> Tuple[bool, float]:
     return cote > Config.DETECTION_GRAND_FORMAT_PT, cote
 
 
+class TesseractIndisponible(Exception):
+    """Tesseract introuvable ou en échec (langue absente) : la détection reste « à préciser »."""
+
+
 def _tesseract_texte(page) -> str:
-    """En-tête (colonnes) et pied d'un scan, lus par Tesseract en basse résolution."""
+    """En-tête (colonnes) et pied d'un scan, lus par Tesseract en basse résolution.
+
+    Lève TesseractIndisponible si Tesseract est introuvable ou échoue (jamais propagé plus haut :
+    detecter_type ne lève pas, il passe « à préciser »).
+    """
     from config import Config
     if not Config.TESSERACT_TROUVE:
-        return ""
+        raise TesseractIndisponible("Tesseract introuvable")
     import fitz
     import pytesseract
     from PIL import Image
@@ -250,12 +268,15 @@ def _tesseract_texte(page) -> str:
     r = page.rect
     echelle = Config.DETECTION_TESSERACT_DPI / 72.0
     morceaux = []
-    for x0, y0, x1, y1 in _rects_bandes(r.x0, r.y0, r.x1, r.y1):
-        pix = page.get_pixmap(matrix=fitz.Matrix(echelle, echelle),
-                              clip=fitz.Rect(x0, y0, x1, y1))
-        img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
-        morceaux.append(pytesseract.image_to_string(
-            img, lang=Config.OCR_LANGUAGE, config=f"--psm {Config.DETECTION_PSM}"))
+    try:
+        for x0, y0, x1, y1 in _rects_bandes(r.x0, r.y0, r.x1, r.y1):
+            pix = page.get_pixmap(matrix=fitz.Matrix(echelle, echelle),
+                                  clip=fitz.Rect(x0, y0, x1, y1))
+            img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+            morceaux.append(pytesseract.image_to_string(
+                img, lang=Config.OCR_LANGUAGE, config=f"--psm {Config.DETECTION_PSM}"))
+    except Exception as exc:   # langue absente, programme introuvable à l'exécution, etc.
+        raise TesseractIndisponible(str(exc)) from exc
     return "\n".join(morceaux)
 
 
@@ -283,11 +304,15 @@ def _lire_texte_pdf(chemin) -> Tuple[str, set]:
             if len(natif.strip()) >= Config.DETECTION_MIN_CARS_NATIF:
                 morceaux.append(natif)
                 sources.add("texte natif")
-            else:
-                lu = _tesseract_texte(page)
-                if lu.strip():
-                    morceaux.append(lu)
-                    sources.add("Tesseract (pied + en-tête)")
+            elif "Tesseract indisponible" not in sources:
+                try:
+                    lu = _tesseract_texte(page)
+                except TesseractIndisponible:
+                    sources.add("Tesseract indisponible")
+                else:
+                    if lu.strip():
+                        morceaux.append(lu)
+                        sources.add("Tesseract (pied + en-tête)")
     finally:
         doc.close()
     return " ".join(morceaux), sources
@@ -333,4 +358,7 @@ def detecter_type(chemin):
         entete.append("texte : " + ", ".join(sorted(sources)))
 
     type_, conf, preuves = _decider(texte, types, grand)
+    if "Tesseract indisponible" in sources:
+        preuves = preuves + ["Tesseract indisponible (langue absente ou programme "
+                             "introuvable) → à préciser"]
     return type_, conf, entete + preuves
