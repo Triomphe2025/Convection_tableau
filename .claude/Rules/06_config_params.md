@@ -103,6 +103,21 @@ résultat est « à préciser » (`a_preciser`).
 | `DETECTION_CONFIANCE_PLAN_FORMAT` | `0.7` | Confiance d'un plan reconnu au seul grand format (aucun mot de pied bornier) |
 | `DETECTION_SEUIL_SUR` | `0.7` | Sous cette confiance (borne stricte), le résultat est « à préciser » (modèle le plus proche proposé) ; `a_preciser(confiance, preuves)` le lit |
 
+## Estimation avant lancement (section « ESTIMATION AVANT LANCEMENT », `estimation.py`)
+
+`estimer(chemin, type, profil, lot, modele, dossier_sortie)` prévoit pages par nature, pages
+déjà faites, tokens, coût et durée **sans rastériser ni lancer Tesseract** (ordre de grandeur,
+`approche: True`). Nature des pages = règle partagée `pdf_extractor.classer_page`.
+
+| Paramètre | Valeur défaut | Rôle |
+|-----------|--------------|------|
+| `ESTIMATION_JOURNAUX_DOSSIER` | `DOSSIER_UTILISATEUR` | Dossier balayé (récursif) pour les moyennes par modèle ; les tests le redirigent (`tests/conftest.py`) |
+| `ESTIMATION_JOURNAUX_MAX` | `20` | Seuls les N journaux `.jsonl` les plus récents sont lus (jamais tout le dossier à chaque dépôt) ; moyennes mémoïsées une fois par session |
+| `ESTIMATION_TOKENS_PAR_PAGE_DEFAUT` | `(6300, 350)` | Repli (entrée, sortie) quand aucun journal ne donne l'usage du modèle (mesuré sur un vrai journal Opus 5.5) |
+| `ESTIMATION_SECONDES_PAR_PAGE` | par moteur | Durée indicative par page lue (tesseract + chaque modèle), repli quand les journaux n'ont pas d'horodatages |
+| `ESTIMATION_SECONDES_PAR_PAGE_DEFAUT` | `8.0` | Durée par page d'un moteur non listé |
+| `ESTIMATION_DUREE_LOT_TEXTE` | `souvent moins d'1 h, 24 h au plus` | Mode lot : pas de durée chiffrée |
+
 ## Routage PDF par page (section « ROUTAGE PDF PAR PAGE »)
 
 Dans tous les modes OCR, chaque page d'un PDF est classée (`pdf_extractor.diagnostiquer_page`) :

@@ -824,6 +824,33 @@ class Config:
     # un passage si le coût cumulé l'a atteint.
     CAMPAGNE_BUDGET_MAX_USD = 10.0
 
+    # ---- Estimation avant lancement (phase 1B, étape 3, estimation.py) ----
+    # estimer(...) prévoit, SANS rastériser ni lancer Tesseract, les pages par nature
+    # (règle partagée pdf_extractor.classer_page), les tokens, le coût (CLAUDE_PRIX_MODELES,
+    # -50 % en lot) et la durée. Ordre de grandeur affiché avant de lancer, jamais une promesse.
+    # Dossier balayé pour les moyennes par modèle (journaux .jsonl des conversions) : seuls les
+    # ESTIMATION_JOURNAUX_MAX plus récents sont lus, une seule fois par session (mémoïsé).
+    ESTIMATION_JOURNAUX_DOSSIER = _DOSSIER_UTILISATEUR
+    ESTIMATION_JOURNAUX_MAX = 20
+    # Repli quand aucun journal ne donne l'usage du modèle visé (mesuré sur un vrai journal
+    # Opus 5.5 : ~6300 tokens d'entrée, ~350 de sortie par page scannée).
+    ESTIMATION_TOKENS_PAR_PAGE_DEFAUT = (6300, 350)
+    # Durée indicative par page lue, par moteur (repli quand les journaux n'ont pas
+    # d'horodatages) ; ordre de grandeur.
+    ESTIMATION_SECONDES_PAR_PAGE = {
+        'tesseract':                 1.5,
+        'claude-haiku-4-5-20251001': 4.0,
+        'claude-haiku-5-5':          4.0,
+        'claude-sonnet-5':           6.0,
+        'claude-sonnet-5-5':         6.0,
+        'claude-opus-5':             14.0,
+        'claude-opus-5-5':           12.0,
+        'claude-fable-5-1':          20.0,
+    }
+    ESTIMATION_SECONDES_PAR_PAGE_DEFAUT = 8.0
+    # Mode lot : pas de durée chiffrée (un lot aboutit en général en moins d'1 h, 24 h au plus).
+    ESTIMATION_DUREE_LOT_TEXTE = "souvent moins d'1 h, 24 h au plus"
+
     # Grand côté maximal (px) des images envoyées à Claude : au-delà, l'image
     # est réduite avant l'envoi (limite de résolution des modèles actuels).
     CLAUDE_IMAGE_MAX_PX = 2576
