@@ -350,6 +350,7 @@ class TestVeriteTerrain:
         duree = time.perf_counter() - debut
         texte = " ".join(preuves)
         assert type_ is not None and type_.famille == "tableau"
+        assert type_.nom == "Bornier standard"  # colonnes du scan lues → modèle exact (confirmé)
         assert any("Tesseract" in p for p in preuves)
         assert "colonnes" in texte           # en-tête lu grâce à la bande haute
         assert "à préciser entre" not in texte  # modèle unique, plus d'ex æquo du pied seul

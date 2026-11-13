@@ -6,13 +6,27 @@ compare, cellule par cellule, l'Excel produit à un instantané figé pris sur `
 casse si — et seulement si — le code change une cellule, un pied, un commentaire ou la mise en
 forme. Il réutilise `dump_classeur` de test_non_regression_xlsx.
 
-Déterminisme (vérifié) : le rejeu .jsonl ne lance ni OCR (pas de Tesseract) ni appel API, et le
-lexique est neutralisé ici (dossier vide) — la sortie ne dépend donc ni de Tesseract ni des
-classeurs de référence hors git, seulement du code.
+Déterminisme (vérifié) : le rejeu .jsonl ne lance ni OCR (pas de Tesseract) ni appel API, et les
+TROIS clés du lexique sont neutralisées ici (dossiers vides, y compris QUALITE_LEXIQUE_REFERENCE
+= references/excels_valides, hors git) — la sortie ne dépend donc ni de Tesseract ni des
+classeurs de référence de la machine, seulement du code.
 
 Dans la suite normale (~5 s) : il protège chaque commit sans qu'on pense à le lancer.
 Le lancer seul :
     env\\Scripts\\python.exe -m pytest tests/test_memes_cellules.py -v
+Chaque journal est rejoué avec SON vrai modèle de tableau (le journal n'enregistre que le
+modèle Claude, pas le modèle de tableau) : PE011 → REPARTITEUR 2, PE012 → Bornier standard,
+PE133 → Répartiteur. Un mauvais modèle changerait en-têtes, pied et largeurs de colonnes.
+
+Un 4e cas (223111PE011_lexique) rejoue PE011 avec un mini-lexique figé (tests/fixtures/
+mini_lexique, deux formes : OCFSCS, OC FS 14 50) : il garde les alertes de cohérence du lexique
+sous le filet (les deux cellules CC FS colorées COULEUR_QUALITE et commentées). Sans ce
+mini-lexique, le cas devient rouge.
+
+L'instantané est un vrai « avant » : il est régénéré depuis le code de `main` (3a78399) dans
+un worktree jetable (le mini-lexique y est copié), pas depuis la branche. Le filet est donc vert
+tant que la branche rend, cellule par cellule, la même chose que `main`.
+
 Régénérer l'instantané (changement voulu du moteur, depuis main) :
     env\\Scripts\\python.exe -m tests.test_memes_cellules --regenerer
 """
@@ -40,16 +54,43 @@ JOURNAUX = {
     '223111PE012': 'rejeu_claude/223111PE012_extrait_10pages_claude.jsonl',
     '6A23111PE133': 'rejeu_claude/6A23111PE133_extrait_8pages_claude.jsonl',
 }
+# Vrai modèle de tableau de chaque document (le journal ne l'enregistre pas).
+MODELES = {
+    '223111PE011': 'REPARTITEUR 2',
+    '223111PE012': 'Bornier standard',
+    '6A23111PE133': 'Répartiteur',
+}
+# Mini-lexique figé du 4e cas : deux formes seulement (OCFSCS, OC FS 14 50).
+MINI_LEXIQUE = FIXTURES / 'mini_lexique'
 
 
-def rejeu_dump(journal_rel):
-    """Rejoue un journal (lexique neutralisé, sortie temporaire) et rend l'instantané."""
+def _cas():
+    """(nom, journal, modèle, dossier lexique) ; lexique None = neutralisé (dossier vide)."""
+    for nom, rel in JOURNAUX.items():
+        yield nom, rel, MODELES[nom], None
+    # 4e cas : PE011 + mini-lexique → garde les alertes de cohérence sous le filet.
+    yield '223111PE011_lexique', JOURNAUX['223111PE011'], MODELES['223111PE011'], MINI_LEXIQUE
+
+
+CAS = {nom: (rel, modele, lex) for nom, rel, modele, lex in _cas()}
+
+
+def rejeu_dump(journal_rel, modele, lexique_reference=None):
+    """Rejoue un journal avec son modèle (sortie temporaire) et rend l'instantané.
+
+    Les trois clés du lexique sont neutralisées (dossiers vides) ; QUALITE_LEXIQUE_REFERENCE
+    pointe sur `lexique_reference` quand il est fourni, sinon sur un dossier vide — la sortie ne
+    dépend donc jamais de references/excels_valides (hors git), seulement du code et du lexique
+    explicitement passé.
+    """
     journal = FIXTURES / journal_rel
-    tpl = TemplateManager().get('Bornier standard')
+    tpl = TemplateManager().get(modele)
     with tempfile.TemporaryDirectory() as sortie, tempfile.TemporaryDirectory() as lex_vide:
+        reference = Path(lexique_reference) if lexique_reference else Path(lex_vide)
         with patch.multiple(Config,
                             QUALITE_LEXIQUE_DOSSIER=lex_vide,
-                            QUALITE_LEXIQUE_COMPILE=str(Path(lex_vide) / 'absent.json')):
+                            QUALITE_LEXIQUE_COMPILE=str(Path(lex_vide) / 'absent.json'),
+                            QUALITE_LEXIQUE_REFERENCE=reference):
             niveau = logging.root.manager.disable
             logging.disable(logging.CRITICAL)
             try:
@@ -64,7 +105,7 @@ def rejeu_dump(journal_rel):
 
 
 def generer_instantane():
-    return {nom: rejeu_dump(rel) for nom, rel in JOURNAUX.items()}
+    return {nom: rejeu_dump(rel, modele, lex) for nom, rel, modele, lex in _cas()}
 
 
 class TestMemesCellules(unittest.TestCase):
@@ -76,7 +117,8 @@ class TestMemesCellules(unittest.TestCase):
     def _comparer(self, nom):
         self.assertIn(nom, self.attendu, f"{nom} absent de l'instantané")
         attendu = self.attendu[nom]
-        obtenu = rejeu_dump(JOURNAUX[nom])
+        rel, modele, lex = CAS[nom]
+        obtenu = rejeu_dump(rel, modele, lex)
         self.assertEqual(sorted(obtenu), sorted(attendu), f"{nom} : feuilles différentes")
         for feuille, ref in attendu.items():
             cur = obtenu[feuille]
@@ -97,6 +139,9 @@ class TestMemesCellules(unittest.TestCase):
 
     def test_pe133(self):
         self._comparer('6A23111PE133')
+
+    def test_pe011_lexique(self):
+        self._comparer('223111PE011_lexique')
 
 
 if __name__ == '__main__':
