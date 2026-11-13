@@ -27,8 +27,10 @@ Config.TRAVAIL_DOSSIER = Path(_CACHE_TESTS.name) / 'travail'
 # du cache l'activent explicitement) — les autres tests ne sont pas perturbés.
 Config.CLAUDE_CACHE_DOSSIER = Path(_CACHE_TESTS.name) / 'cache_claude'
 Config.CLAUDE_CACHE_LECTURES = False
-# Estimation : les moyennes par modèle ne se calculent jamais sur les journaux de la machine.
+# Estimation : les moyennes par modèle ne se calculent jamais sur les journaux ni les
+# statistiques de lecture de la machine (ni n'y sont écrites par les conversions des tests).
 Config.ESTIMATION_JOURNAUX_DOSSIER = Path(_CACHE_TESTS.name) / 'journaux'
+Config.ESTIMATION_STATS_FICHIER = Path(_CACHE_TESTS.name) / 'statistiques_lecture.jsonl'
 
 import hashlib  # noqa: E402
 import shutil  # noqa: E402

@@ -39,7 +39,7 @@ def _pdf_scan(chemin, n):
     doc.close()
 
 
-def _journal(chemin, modele, usages, horodatages=None):
+def _journal(chemin, modele, usages, horodatages=None, empreinte=None):
     """Écrit un journal .jsonl : une ligne success par usage (input, output)."""
     with open(chemin, 'w', encoding='utf-8') as f:
         for i, (entree, sortie) in enumerate(usages):
@@ -47,6 +47,15 @@ def _journal(chemin, modele, usages, horodatages=None):
                      'usage': {'input_tokens': entree, 'output_tokens': sortie}}
             if horodatages:
                 ligne['ts'] = horodatages[i]
+            if empreinte:
+                ligne['empreinte'] = empreinte
+            f.write(json.dumps(ligne) + '\n')
+
+
+def _stats(chemin, lignes):
+    """Écrit un fichier de statistiques de lecture (.jsonl)."""
+    with open(chemin, 'w', encoding='utf-8') as f:
+        for ligne in lignes:
             f.write(json.dumps(ligne) + '\n')
 
 
@@ -78,6 +87,46 @@ class TestMoyennesModele(unittest.TestCase):
 
     def setUp(self):
         estimation.reinitialiser_cache()
+        # Pas de statistiques de la machine : ces tests portent sur journaux / constante.
+        self._tmp = __import__('tempfile').TemporaryDirectory()
+        self._p = patch.object(Config, 'ESTIMATION_STATS_FICHIER',
+                               Path(self._tmp.name) / 'absent.jsonl')
+        self._p.start()
+
+    def tearDown(self):
+        self._p.stop()
+        self._tmp.cleanup()
+
+    def test_statistiques_prioritaires_sur_journaux(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            stats = Path(d) / 'stats.jsonl'
+            _stats(stats, [{'modele': 'M', 'moteur': 'claude', 'pages_lues': 2,
+                            'tokens_entree': 1000, 'tokens_sortie': 100, 'secondes': 20}])
+            jd = Path(d) / 'j'
+            jd.mkdir()
+            _journal(jd / 'a_claude.jsonl', 'M', [(9999, 9999)])   # ignoré : les stats priment
+            with patch.object(Config, 'ESTIMATION_STATS_FICHIER', stats), \
+                    patch.object(Config, 'ESTIMATION_JOURNAUX_DOSSIER', jd):
+                m = estimation.moyennes_modele('M')
+        assert m['source'] == 'statistiques'
+        assert m['tokens'] == (500.0, 50.0)   # 1000/2, 100/2
+        assert m['secondes'] == 10.0          # 20 s / 2 pages
+
+    def test_stats_sans_pages_retombe_sur_journaux(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            stats = Path(d) / 'stats.jsonl'
+            _stats(stats, [{'modele': 'M', 'pages_lues': 0,
+                            'tokens_entree': 0, 'tokens_sortie': 0, 'secondes': 0}])
+            jd = Path(d) / 'j'
+            jd.mkdir()
+            _journal(jd / 'a_claude.jsonl', 'M', [(100, 10)])
+            with patch.object(Config, 'ESTIMATION_STATS_FICHIER', stats), \
+                    patch.object(Config, 'ESTIMATION_JOURNAUX_DOSSIER', jd):
+                m = estimation.moyennes_modele('M')
+        assert m['source'] == 'journaux'
+        assert m['tokens'] == (100.0, 10.0)
 
     def test_moyenne_depuis_journal(self):
         import tempfile
@@ -124,8 +173,11 @@ class TestEstimer(unittest.TestCase):
         estimation.reinitialiser_cache()
         self._tmp = __import__('tempfile').TemporaryDirectory()
         self.dossier = Path(self._tmp.name)
-        # Journaux vides → tokens de repli (constante) : maths déterministes.
-        self._p = patch.object(Config, 'ESTIMATION_JOURNAUX_DOSSIER', self.dossier / 'vide')
+        # Journaux et statistiques vides → tokens de repli (constante) : maths déterministes.
+        self._p = patch.multiple(
+            Config,
+            ESTIMATION_JOURNAUX_DOSSIER=self.dossier / 'vide',
+            ESTIMATION_STATS_FICHIER=self.dossier / 'absent.jsonl')
         self._p.start()
 
     def tearDown(self):
@@ -179,6 +231,21 @@ class TestEstimer(unittest.TestCase):
         assert res['pages_en_cache'] == 2
         assert res['pages_a_lire'] == 3   # 5 scan - 2 déjà faites
 
+    def test_cache_connu_par_empreinte_nom_different(self):
+        from cache_lectures import empreinte_fichier
+        pdf = self._pdf(5)
+        emp = empreinte_fichier(pdf)
+        sortie = self.dossier / 'sortie'
+        sortie.mkdir()
+        # Nom de journal sans rapport avec le document, mais portant son empreinte.
+        _journal(sortie / 'autre_nom_claude.jsonl', 'claude-opus-5-5',
+                 [(1, 1), (1, 1), (1, 1)], empreinte=emp)
+        res = estimation.estimer(pdf, None, profil='claude', modele='claude-opus-5-5',
+                                 dossier_sortie=sortie)
+        assert res['cache_connu'] is True
+        assert res['pages_en_cache'] == 3
+        assert res['approche'] is True
+
     def test_cache_inconnu_sans_dossier(self):
         pdf = self._pdf(5)
         res = estimation.estimer(pdf, None, profil='claude', modele='claude-opus-5-5')
@@ -224,6 +291,61 @@ class TestBudget(unittest.TestCase):
                 duree = time.perf_counter() - debut
         assert res['pages']['total'] == 720
         assert duree < 2.0, f"{duree:.2f}s"
+
+
+class TestStatistiquesConverter(unittest.TestCase):
+    """Le Converter ajoute une ligne de statistiques de lecture à la fin d'une conversion."""
+
+    def _converter(self, dossier):
+        from converter import Converter
+        return Converter(word_file=dossier / 'x.pdf', output_dir=dossier, template=None)
+
+    def test_ecrit_une_ligne_sur_pages_lues_par_le_moteur(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            stats = d / 'stats.jsonl'
+            conv = self._converter(d)
+            results = [
+                {'detection_method': 'claude-vision',
+                 'api_usage': {'model': 'claude-opus-5-5', 'input_tokens': 100,
+                               'output_tokens': 10}},
+                {'detection_method': 'claude-vision',
+                 'api_usage': {'model': 'claude-opus-5-5', 'input_tokens': 200,
+                               'output_tokens': 20}},
+                {'detection_method': 'pdf-grille'},   # grille : pas de moteur payant
+            ]
+            with patch.multiple(Config, ESTIMATION_STATS_FICHIER=stats, OCR_MODE='claude'):
+                conv._ecrire_statistiques(results)
+            lignes = [json.loads(x) for x in stats.read_text(encoding='utf-8').splitlines()]
+        assert len(lignes) == 1
+        ligne = lignes[0]
+        assert ligne['modele'] == 'claude-opus-5-5'
+        assert ligne['moteur'] == 'claude'
+        assert ligne['pages_lues'] == 2
+        assert ligne['tokens_entree'] == 300
+        assert ligne['tokens_sortie'] == 30
+
+    def test_aucune_ligne_si_aucune_page_lue(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            stats = d / 'stats.jsonl'
+            conv = self._converter(d)
+            with patch.object(Config, 'ESTIMATION_STATS_FICHIER', stats):
+                conv._ecrire_statistiques([{'detection_method': 'log-replay'}])
+            assert not stats.exists()
+
+    def test_ne_leve_jamais_si_ecriture_impossible(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            bloquant = d / 'fichier'
+            bloquant.write_text('x', encoding='utf-8')   # un fichier, pas un dossier
+            conv = self._converter(d)
+            results = [{'api_usage': {'model': 'M', 'input_tokens': 1, 'output_tokens': 1}}]
+            with patch.object(Config, 'ESTIMATION_STATS_FICHIER', bloquant / 'sous.jsonl'):
+                conv._ecrire_statistiques(results)   # ne doit pas lever
 
 
 if __name__ == '__main__':

@@ -64,15 +64,36 @@ def _journaux_recents(dossier):
     return journaux[:Config.ESTIMATION_JOURNAUX_MAX]
 
 
-def moyennes_modele(modele):
-    """(mémoïsé) {'tokens': (entrée, sortie), 'secondes': s|None, 'source': ..., 'n': ...}.
+def _dernieres_lignes(chemin, maxi):
+    """Les `maxi` dernières lignes JSON d'un fichier .jsonl (ordre conservé)."""
+    lignes = list(_lignes(chemin))
+    return lignes[-maxi:] if maxi else lignes
 
-    Moyennes des lignes réussies du modèle dans les journaux récents ; à défaut des tokens, la
-    constante documentée. `secondes` : moyenne des écarts d'horodatage entre pages (None si les
-    journaux n'en portent pas → la durée retombe sur la constante par moteur).
+
+def _depuis_statistiques(modele):
+    """(tokens, secondes, n) du modèle depuis les statistiques de lecture, ou (None, None, 0).
+
+    Une ligne par conversion (totaux) ; moyenne par page poolée sur les dernières lignes.
     """
-    if modele in _moyennes_cache:
-        return _moyennes_cache[modele]
+    entrees = sorties = pages = secondes = 0
+    for ligne in _dernieres_lignes(Config.ESTIMATION_STATS_FICHIER, Config.ESTIMATION_STATS_MAX):
+        if ligne.get('modele') != modele:
+            continue
+        lues = ligne.get('pages_lues') or 0
+        if lues <= 0 or not ligne.get('tokens_entree'):
+            continue
+        pages += lues
+        entrees += ligne.get('tokens_entree', 0)
+        sorties += ligne.get('tokens_sortie', 0)
+        secondes += ligne.get('secondes', 0) or 0
+    if pages <= 0:
+        return None, None, 0
+    sec = secondes / pages if secondes else None
+    return (entrees / pages, sorties / pages), sec, pages
+
+
+def _depuis_journaux(modele):
+    """(tokens, secondes, n) du modèle depuis les journaux .jsonl récents, ou (None, None, 0)."""
     entrees, sorties, ecarts = [], [], []
     for journal in _journaux_recents(Config.ESTIMATION_JOURNAUX_DOSSIER):
         precedent = None
@@ -92,14 +113,30 @@ def moyennes_modele(modele):
                     ecarts.append(ecart)
             if instant is not None:
                 precedent = instant
-    if entrees:
-        tokens = (sum(entrees) / len(entrees), sum(sorties) / len(sorties))
-        source = 'journaux'
-    else:
-        tokens = tuple(Config.ESTIMATION_TOKENS_PAR_PAGE_DEFAUT)
-        source = 'constante'
+    if not entrees:
+        return None, None, 0
     secondes = sum(ecarts) / len(ecarts) if ecarts else None
-    resultat = {'tokens': tokens, 'secondes': secondes, 'source': source, 'n': len(entrees)}
+    return (sum(entrees) / len(entrees), sum(sorties) / len(sorties)), secondes, len(entrees)
+
+
+def moyennes_modele(modele):
+    """(mémoïsé) {'tokens': (entrée, sortie), 'secondes': s|None, 'source': ..., 'n': ...}.
+
+    Priorité : statistiques de lecture (une ligne par conversion) → journaux .jsonl (usage par
+    page) → constante documentée. `secondes` : moyenne par page (None si introuvable → la durée
+    retombe sur la constante par moteur). Calculé une seule fois par session.
+    """
+    if modele in _moyennes_cache:
+        return _moyennes_cache[modele]
+    tokens, secondes, n = _depuis_statistiques(modele)
+    source = 'statistiques'
+    if tokens is None:
+        tokens, secondes, n = _depuis_journaux(modele)
+        source = 'journaux'
+    if tokens is None:
+        tokens, secondes, n = tuple(Config.ESTIMATION_TOKENS_PAR_PAGE_DEFAUT), None, 0
+        source = 'constante'
+    resultat = {'tokens': tokens, 'secondes': secondes, 'source': source, 'n': n}
     _moyennes_cache[modele] = resultat
     return resultat
 
@@ -126,24 +163,45 @@ def _pages_non_pdf(chemin):
     return 1
 
 
+def _empreinte(chemin):
+    """Empreinte SHA-256 du document, ou None si illisible."""
+    try:
+        from cache_lectures import empreinte_fichier
+        chemin = Path(chemin)
+        return empreinte_fichier(chemin) if chemin.is_file() else None
+    except Exception:
+        return None
+
+
+def _compter_pages(journaux, modele):
+    """Pages réussies du modèle dans ces journaux."""
+    return sum(1 for journal in journaux for ligne in _lignes(journal)
+               if ligne.get('success') and ligne.get('model') == modele)
+
+
 def _pages_faites(chemin, modele, dossier_sortie):
     """(pages déjà faites, cache connu) depuis un journal partiel du MÊME document.
 
-    Cherche <radical>*_claude.jsonl dans le dossier de sortie et compte ses pages réussies pour
-    le modèle. Sans dossier (ou sans journal correspondant) : (0, False) → l'écran affiche « au
-    plus ».
+    Reconnaît le journal par l'empreinte du document quand une ligne la porte (sûr), et par le
+    nom de fichier (<radical>*_claude.jsonl) seulement en repli (`approche` reste True). Sans
+    dossier (ou sans journal correspondant) : (0, False) → l'écran affiche « au plus ».
     """
     if not dossier_sortie:
         return 0, False
     dossier = Path(dossier_sortie)
     if not dossier.is_dir():
         return 0, False
-    journaux = list(dossier.glob(Path(chemin).stem + '*_claude.jsonl'))
-    if not journaux:
-        return 0, False
-    faites = sum(1 for journal in journaux for ligne in _lignes(journal)
-                 if ligne.get('success') and ligne.get('model') == modele)
-    return faites, True
+    tous = sorted(dossier.glob('*_claude.jsonl'))
+    empreinte = _empreinte(chemin)
+    if empreinte:
+        par_empreinte = [j for j in tous
+                         if any(ligne.get('empreinte') == empreinte for ligne in _lignes(j))]
+        if par_empreinte:
+            return _compter_pages(par_empreinte, modele), True
+    par_nom = list(dossier.glob(Path(chemin).stem + '*_claude.jsonl'))
+    if par_nom:
+        return _compter_pages(par_nom, modele), True
+    return 0, False
 
 
 def _duree_par_page(profil, modele):

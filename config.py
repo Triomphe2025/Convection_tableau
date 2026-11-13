@@ -832,6 +832,12 @@ class Config:
     # ESTIMATION_JOURNAUX_MAX plus récents sont lus, une seule fois par session (mémoïsé).
     ESTIMATION_JOURNAUX_DOSSIER = _DOSSIER_UTILISATEUR
     ESTIMATION_JOURNAUX_MAX = 20
+    # Statistiques de lecture : le Converter ajoute une ligne par conversion réussie à ce
+    # fichier central (moteur, modèle, pages lues, tokens, secondes). estimer le lit EN
+    # PRIORITÉ (les ESTIMATION_STATS_MAX dernières lignes) avant les journaux puis la constante
+    # (source_tokens = "statistiques"). Jamais d'échec de conversion si l'écriture rate.
+    ESTIMATION_STATS_FICHIER = _DOSSIER_UTILISATEUR / 'statistiques_lecture.jsonl'
+    ESTIMATION_STATS_MAX = 200
     # Repli quand aucun journal ne donne l'usage du modèle visé (mesuré sur un vrai journal
     # Opus 5.5 : ~6300 tokens d'entrée, ~350 de sortie par page scannée).
     ESTIMATION_TOKENS_PAR_PAGE_DEFAUT = (6300, 350)

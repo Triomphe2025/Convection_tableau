@@ -9,10 +9,13 @@ Utilise des callbacks de progression pour l'interface graphique.
 """
 
 import re
+import json
+import time
 import logging
 import tempfile
 import threading
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -132,6 +135,7 @@ class Converter:
         # la double lecture et le contrôle de conservation sans 2e OCR.
         self._lectures_tesseract: Dict[int, object] = {}
         self._derniers_resultats: Optional[List[Dict]] = None  # lus par verifier_conversion
+        self._t0 = time.monotonic()  # début de la conversion (durée des statistiques de lecture)
         # Pages à présenter à la validation interactive, une fois le document entier lu et
         # contrôlé : {'result', 'image' (fonction → chemin), 'relire' (image, feedback →
         # résultat, ou None), 'moteur', 'page_pdf' (positions à recalculer, ou None)}.
@@ -429,8 +433,10 @@ class Converter:
                 self.output_dir / f"{source_stem_r}_ollama.jsonl"
             )
 
-        self._emettre(ev.FIN, total=ok,
-                      etat='arretee' if self._est_annule() else 'terminee')
+        etat = 'arretee' if self._est_annule() else 'terminee'
+        if etat == 'terminee':
+            self._ecrire_statistiques(ocr_results)
+        self._emettre(ev.FIN, total=ok, etat=etat)
         return {
             'tableaux':    ok,
             'total':       len(ocr_results) + len(word_results),
@@ -438,6 +444,39 @@ class Converter:
             'log':         log_path_out,
             'log_ollama':  log_ollama_path_out,
         }
+
+    def _ecrire_statistiques(self, ocr_results: List[Dict]) -> None:
+        """Ajoute une ligne de statistiques de lecture (moteur, modèle, pages lues, tokens,
+        secondes) au fichier central — pour affiner l'estimation. Ne fait JAMAIS échouer la
+        conversion ; rien n'est écrit si aucune page n'a été lue par un moteur payant."""
+        try:
+            entree = sortie = pages = 0
+            modele = ''
+            for resultat in ocr_results or []:
+                usage = resultat.get('api_usage')
+                if not usage:
+                    continue
+                pages += 1
+                entree += usage.get('input_tokens', 0) or 0
+                sortie += usage.get('output_tokens', 0) or 0
+                modele = usage.get('model') or modele
+            if pages <= 0:
+                return
+            ligne = {
+                'ts': datetime.now().isoformat(timespec='seconds'),
+                'moteur': getattr(Config, 'OCR_MODE', '').lower(),
+                'modele': modele,
+                'pages_lues': pages,
+                'tokens_entree': entree,
+                'tokens_sortie': sortie,
+                'secondes': round(time.monotonic() - self._t0, 1),
+            }
+            chemin = Path(Config.ESTIMATION_STATS_FICHIER)
+            chemin.parent.mkdir(parents=True, exist_ok=True)
+            with open(chemin, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(ligne, ensure_ascii=False) + '\n')
+        except Exception as exc:
+            self._log(f"  ⚠ statistiques de lecture non écrites : {exc}")
 
     # ── Extraction PDF → images → OCR vision ─────────────────────────
 

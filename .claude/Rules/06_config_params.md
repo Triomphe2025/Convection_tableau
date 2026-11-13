@@ -113,6 +113,8 @@ déjà faites, tokens, coût et durée **sans rastériser ni lancer Tesseract** 
 |-----------|--------------|------|
 | `ESTIMATION_JOURNAUX_DOSSIER` | `DOSSIER_UTILISATEUR` | Dossier balayé (récursif) pour les moyennes par modèle ; les tests le redirigent (`tests/conftest.py`) |
 | `ESTIMATION_JOURNAUX_MAX` | `20` | Seuls les N journaux `.jsonl` les plus récents sont lus (jamais tout le dossier à chaque dépôt) ; moyennes mémoïsées une fois par session |
+| `ESTIMATION_STATS_FICHIER` | `DOSSIER_UTILISATEUR / statistiques_lecture.jsonl` | Le Converter y ajoute une ligne par conversion réussie (moteur, modèle, pages lues, tokens, secondes) ; `estimer` le lit **en priorité** (source_tokens = « statistiques ») ; les tests le redirigent |
+| `ESTIMATION_STATS_MAX` | `200` | Nombre de dernières lignes de statistiques lues pour les moyennes par modèle |
 | `ESTIMATION_TOKENS_PAR_PAGE_DEFAUT` | `(6300, 350)` | Repli (entrée, sortie) quand aucun journal ne donne l'usage du modèle (mesuré sur un vrai journal Opus 5.5) |
 | `ESTIMATION_SECONDES_PAR_PAGE` | par moteur | Durée indicative par page lue (tesseract + chaque modèle), repli quand les journaux n'ont pas d'horodatages |
 | `ESTIMATION_SECONDES_PAR_PAGE_DEFAUT` | `8.0` | Durée par page d'un moteur non listé |
