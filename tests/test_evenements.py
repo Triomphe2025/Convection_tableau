@@ -16,7 +16,8 @@ class TestEvenement(unittest.TestCase):
         e = ev.Evenement(type=ev.PAGE_DEBUT)
         self.assertEqual(e.type, ev.PAGE_DEBUT)
         for champ in ('page', 'rang', 'total', 'page_imprimee', 'nature', 'etat', 'bornier',
-                      'lignes', 'zones', 'alertes', 'cout', 'lot', 'compteurs', 'message'):
+                      'lignes', 'zones', 'alertes', 'cout', 'lot', 'compteurs', 'message',
+                      'points'):
             self.assertIsNone(getattr(e, champ), champ)
 
     def test_horodatage_rempli_automatiquement(self):
@@ -40,6 +41,10 @@ class TestEvenement(unittest.TestCase):
     def test_message_porte_le_texte_libre(self):
         e = ev.Evenement(type=ev.ERREUR, message="réseau coupé")
         self.assertEqual(e.message, "réseau coupé")
+
+    def test_fin_porte_le_chemin_des_points(self):
+        e = ev.Evenement(type=ev.FIN, etat='terminee', points=r'C:\x\doc_points.json')
+        self.assertEqual(e.points, r'C:\x\doc_points.json')
 
     def test_fige_pas_de_mutation(self):
         e = ev.Evenement(type=ev.PHASE, etat='lecture')

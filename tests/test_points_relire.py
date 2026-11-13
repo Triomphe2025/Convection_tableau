@@ -10,6 +10,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import openpyxl
 
@@ -153,6 +154,122 @@ class TestZoneCellule(unittest.TestCase):
     def test_zone_none_sans_positions(self):
         p = self._point_confiance({})
         assert p['zone'] is None
+
+
+class TestPointsDePage(unittest.TestCase):
+    """Points de page entière (sans cellule) : page_degradee (controle_page) et verification."""
+
+    def test_page_degradee_et_verification(self):
+        valides = [{'headers': ['TENANT', 'JAR', 'ABOUTISSANT', 'SIGNAL'], 'rows': [],
+                    'metadata': {'PAGE': '5', 'BORNIER': 'B1'}, '_page_pdf': 5,
+                    'controle_page': {'degradee': True, 'taux': 0.15}}]
+        verdicts = [{'page': 9, 'page_imprimee': '9', 'bornier': 'B2',
+                     'message': 'divergence relecture du scan'}]
+        wb = openpyxl.Workbook()
+        obj = pr.construire(valides, wb.active, debuts=[1], verdicts=verdicts)
+        pages = {p['sorte']: p for p in obj['points'] if p['cellule_excel'] is None}
+        assert set(pages) == {'page_degradee', 'verification'}
+        assert pages['page_degradee']['page'] == 5
+        assert pages['page_degradee']['cellule_excel'] is None
+        assert 'dégradé' in pages['page_degradee']['raison']
+        assert pages['verification']['page'] == 9
+
+
+class TestReconstructionDebuts(unittest.TestCase):
+    """Deux tableaux + un tableau coupé par un saut de page : les débuts reconstruits depuis
+    row_breaks donnent les mêmes points que la disposition réelle de generer_classeur."""
+
+    def _pages_multi(self):
+        grand = [{'type': 'data', 'cells': [str(i), 'J', 'PF', 'TC'],
+                  'confidence': ([50] if i == 0 else [100]) + [100, 100, 100]}
+                 for i in range(55)]      # > PAGE_SIZE → tableau coupé sur 2 pages A4
+        petit = [{'type': 'data', 'cells': ['01', '??', 'PF', 'TC'], 'confidence': [100] * 4}]
+        return [
+            _page(1, pet='EPEULE', data_colors=True),   # tableau 1 (5 couleurs)
+            dict(_page(2, pet='EPEULE'), rows=grand),    # tableau 2, coupé
+            dict(_page(3, pet='EPEULE'), rows=petit),    # tableau 3 (illisible)
+        ]
+
+    def test_memes_points_avec_et_sans_debuts(self):
+        from generer_classeur import generer_excel
+        import contextlib
+        import io
+        pages = self._pages_multi()
+        tpl = TemplateManager().get('REPARTITEUR')
+        d = tempfile.mkdtemp()
+        sortie = Path(d) / 's.xlsx'
+        with contextlib.redirect_stdout(io.StringIO()):
+            dispo = generer_excel(pages, pe.PdfTableExtractor(tpl), sortie)
+        ws = openpyxl.load_workbook(sortie)['Borniers']
+        reel = pr.construire(dispo['valides'], ws, debuts=dispo['debuts'])
+        reconstruit = pr.construire(dispo['valides'], ws)     # débuts via row_breaks
+
+        def cles(o):
+            return sorted((p['cellule_excel'], p['sorte']) for p in o['points'])
+        assert cles(reel) == cles(reconstruit)
+        # Invariant : chaque point à cellule désigne une cellule au bon fond + commentaire.
+        for p in (x for x in reconstruit['points'] if x['cellule_excel']):
+            cellule = ws[p['cellule_excel']]
+            assert _rgb(cellule) == _COULEUR_DE_SORTE[p['sorte']]
+            assert cellule.comment is not None
+
+
+class TestInvariantQuatreCasDuFilet(unittest.TestCase):
+    """Invariant de bout en bout : le Converter produit l'Excel ET <nom>_points.json ; chaque
+    cellule colorée de Borniers a son point, chaque point désigne une cellule au bon fond."""
+
+    def _convertir(self, nom):
+        import contextlib
+        import io
+        import json as _json
+        import logging
+        from glob import glob
+        from converter import Converter
+        from tests.test_memes_cellules import CAS, FIXTURES
+        rel, modele, lex = CAS[nom]
+        tpl = TemplateManager().get(modele)
+        d = tempfile.mkdtemp()
+        with tempfile.TemporaryDirectory() as vide:
+            reference = Path(lex) if lex else Path(vide)
+            with patch.multiple(Config, QUALITE_LEXIQUE_DOSSIER=vide,
+                                QUALITE_LEXIQUE_COMPILE=str(Path(vide) / 'absent.json'),
+                                QUALITE_LEXIQUE_REFERENCE=reference,
+                                ESTIMATION_STATS_FICHIER=Path(vide) / 'stats.jsonl'):
+                niveau = logging.root.manager.disable
+                logging.disable(logging.CRITICAL)
+                try:
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        Converter(word_file=FIXTURES / rel, output_dir=Path(d), template=tpl,
+                                  on_log=lambda *a, **k: None).run()
+                finally:
+                    logging.disable(niveau)
+        excel = glob(str(Path(d) / '*.xlsx'))[0]
+        points = Path(excel).with_name(Path(excel).stem + '_points.json')
+        ws = openpyxl.load_workbook(excel)['Borniers']
+        return ws, _json.loads(points.read_text(encoding='utf-8'))
+
+    def _verifier(self, nom):
+        ws, obj = self._convertir(nom)
+        colorees = {c.coordinate for ligne in ws.iter_rows() for c in ligne
+                    if _rgb(c) in _COULEUR_DE_SORTE.values()}
+        pts = [p for p in obj['points'] if p['cellule_excel']]
+        self.assertEqual({p['cellule_excel'] for p in pts}, colorees, nom)
+        for p in pts:
+            cellule = ws[p['cellule_excel']]
+            self.assertEqual(_rgb(cellule), _COULEUR_DE_SORTE[p['sorte']], f"{nom} {p}")
+            self.assertIsNotNone(cellule.comment, f"{nom} {p}")
+
+    def test_pe011(self):
+        self._verifier('223111PE011')
+
+    def test_pe012(self):
+        self._verifier('223111PE012')
+
+    def test_pe133(self):
+        self._verifier('6A23111PE133')
+
+    def test_pe011_lexique(self):
+        self._verifier('223111PE011_lexique')
 
 
 if __name__ == '__main__':

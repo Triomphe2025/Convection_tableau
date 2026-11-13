@@ -68,24 +68,34 @@ def _bornier(meta):
     return (meta.get('BORNIER') or meta.get('CABLE') or '') or None
 
 
-def _suggestion(resultat, rang, colonne):
-    """Suggestion de l'alerte de cette cellule (« peut-être … »), ou None."""
-    for a in resultat.get('a_verifier') or []:
-        if a.get('ligne') == rang and a.get('colonne') == colonne:
-            if a.get('proposition'):
-                return a['proposition']
-            m = _SUGGESTION_RE.search(a.get('message') or '')
-            if m:
-                return m.group(1)
-    return None
-
-
-def _confiance(resultat, rang, colonne):
+def _donnees_alerte(resultat, rang, colonne, sorte):
+    """(raison, suggestion, confiance) de la cellule, depuis les DONNÉES d'alerte
+    (a_verifier, corrections_o, confidence) — jamais le texte du commentaire."""
     rows = resultat.get('rows') or []
-    if rang is None or rang >= len(rows):
-        return None
-    confs = rows[rang].get('confidence') or []
-    return confs[colonne] if colonne is not None and colonne < len(confs) else None
+    row = rows[rang] if rang is not None and rang < len(rows) else {}
+    confs = row.get('confidence') or []
+    conf = confs[colonne] if colonne is not None and colonne < len(confs) else None
+    if sorte == 'confiance_basse':
+        return f"confiance OCR basse ({conf} %)", None, conf
+    if sorte == 'illisible':
+        return f"caractère illisible ({Config.MARQUEUR_ILLISIBLE})", None, conf
+    if sorte == 'corrige':
+        origine = (row.get('corrections_o') or {}).get(colonne)
+        raison = (f"coquille O/0 corrigée, l'original porte {origine}" if origine
+                  else "coquille O/0 corrigée")
+        return raison, None, conf
+    if sorte in ('conservation', 'qualite'):
+        for a in resultat.get('a_verifier') or []:
+            if a.get('ligne') == rang and a.get('colonne') == colonne:
+                sug = a.get('proposition')
+                if not sug:
+                    m = _SUGGESTION_RE.search(a.get('message') or '')
+                    sug = m.group(1) if m else None
+                return a.get('message'), sug, conf
+        return None, None, conf
+    if sorte == 'deduit':
+        return "case de pied déduite des autres pages du document", None, None
+    return None, None, conf
 
 
 def _zone(resultat, rang, colonne, n_cols):
@@ -110,6 +120,7 @@ def _point_cellule(cellule, sorte, resultat, debut, n_cols):
     colonne_i = cellule.column - 1
     rang = None if sorte in _SORTE_PIED else _rang_de_ligne(debut, resultat, cellule.row)
     colonne = (headers[colonne_i] if rang is not None and colonne_i < len(headers) else None)
+    raison, suggestion, confiance = _donnees_alerte(resultat, rang, colonne_i, sorte)
     return {
         'id': f"{cellule.coordinate}-{sorte}",
         'etat': 'a_voir',
@@ -120,38 +131,50 @@ def _point_cellule(cellule, sorte, resultat, debut, n_cols):
         'ligne': None if rang is None else rang + 1,
         'colonne': colonne,
         'valeur': cellule.value,
-        'suggestion': None if rang is None else _suggestion(resultat, rang, colonne_i),
-        'raison': cellule.comment.text if cellule.comment else None,
-        'confiance': _confiance(resultat, rang, colonne_i),
+        'suggestion': suggestion,
+        'raison': raison,
+        'confiance': confiance,
         'cellule_excel': cellule.coordinate,
         'zone': _zone(resultat, rang, colonne_i, n_cols),
     }
 
 
-def _points_pages(valides):
-    """Points de page entière (sans cellule) : scan dégradé, vérification."""
+def _point_page(sorte, page, page_imprimee, bornier, raison, n):
+    return {
+        'id': f"page-{page}-{sorte}-{n}", 'etat': 'a_voir', 'sorte': sorte,
+        'page': page, 'page_imprimee': page_imprimee, 'bornier': bornier,
+        'ligne': None, 'colonne': None, 'valeur': None, 'suggestion': None,
+        'raison': raison, 'confiance': None, 'cellule_excel': None, 'zone': None,
+    }
+
+
+def _points_pages(valides, verdicts=None):
+    """Points de page entière (sans cellule), depuis les DONNÉES : scan dégradé
+    (`controle_page['degradee']`) et vérification (`verdicts`)."""
     points = []
     for resultat in valides:
-        meta = resultat.get('metadata') or {}
-        for a in resultat.get('a_verifier') or []:
-            if a.get('ligne') is not None or a.get('colonne') is not None:
-                continue
-            sorte = 'page_degradee' if 'dégrad' in (a.get('type') or '') else 'verification'
-            points.append({
-                'id': f"page{resultat.get('_page_pdf')}-{sorte}-{len(points)}",
-                'etat': 'a_voir', 'sorte': sorte,
-                'page': resultat.get('_page_pdf'), 'page_imprimee': meta.get('PAGE'),
-                'bornier': _bornier(meta), 'ligne': None, 'colonne': None, 'valeur': None,
-                'suggestion': None, 'raison': a.get('message'), 'confiance': None,
-                'cellule_excel': None, 'zone': None,
-            })
+        cp = resultat.get('controle_page') or {}
+        if cp.get('degradee'):
+            meta = resultat.get('metadata') or {}
+            taux = cp.get('taux')
+            raison = (f"scan dégradé (divergence {taux:.0%})" if isinstance(taux, (int, float))
+                      else "scan dégradé")
+            points.append(_point_page('page_degradee', resultat.get('_page_pdf'),
+                                      meta.get('PAGE'), _bornier(meta), raison, len(points)))
+    for v in verdicts or []:
+        points.append(_point_page('verification', v.get('page'), v.get('page_imprimee'),
+                                  v.get('bornier'), v.get('message'), len(points)))
     return points
 
 
-def construire(valides, ws, document='', empreinte='', excel='', type_doc='', modele='',
-               arrete=False):
-    """Objet englobant des points à relire, reflet des cellules colorées de la feuille Borniers."""
-    debuts = _debuts_blocs(ws)
+def construire(valides, ws, debuts=None, document='', empreinte='', excel='', type_doc='',
+               modele='', arrete=False, verdicts=None):
+    """Objet englobant des points à relire, reflet des cellules colorées de la feuille Borniers.
+
+    `debuts` : débuts de bloc de la disposition réelle rendue par generer_classeur ; à défaut,
+    reconstruits depuis les sauts de page du classeur (repli, équivalent).
+    """
+    debuts = debuts if debuts is not None else _debuts_blocs(ws)
     points = []
     for ligne in ws.iter_rows():
         for cellule in ligne:
@@ -162,7 +185,7 @@ def construire(valides, ws, document='', empreinte='', excel='', type_doc='', mo
             resultat = valides[i] if i < len(valides) else {}
             n_cols = len(resultat.get('headers') or [])
             points.append(_point_cellule(cellule, sorte, resultat, debuts[i], n_cols))
-    points += _points_pages(valides)
+    points += _points_pages(valides, verdicts)
     return {
         'version': VERSION,
         'document': document,

@@ -100,7 +100,11 @@ class TestConversionPdf(unittest.TestCase):
         self.assertEqual(len(fichiers), 1)
         donnees = json.loads(fichiers[0].read_text('utf-8'))
         self.assertGreater(len(LecturePage.depuis_dict(donnees).mots), 100)
-        self.assertEqual(list((self.dossier / 'sortie').rglob('*.json')), [])
+        # La lecture Tesseract va dans le cache de l'appli, jamais à côté des fichiers de
+        # l'utilisateur ; seul <nom>_points.json (points à relire, étape 4) est écrit en sortie.
+        jsons = list((self.dossier / 'sortie').rglob('*.json'))
+        self.assertTrue(all(j.name.endswith('_points.json') for j in jsons),
+                        f"seul <nom>_points.json est attendu en sortie : {jsons}")
 
     def test_deuxieme_conversion_sans_deuxieme_ocr(self):
         with patch.object(positions_scan, 'lire_page',

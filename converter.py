@@ -397,8 +397,9 @@ class Converter:
 
         source_stem = self.word_file.stem if self.word_file.is_file() else self.word_file.name
         excel_path = self.output_dir / f"{source_stem}.xlsx"
+        dispo_excel = None
         try:
-            generer_excel(
+            dispo_excel = generer_excel(
                 ocr_results, extractor, excel_path,
                 word_results=word_results if word_results else None,
                 on_log=self._log,
@@ -436,7 +437,8 @@ class Converter:
         etat = 'arretee' if self._est_annule() else 'terminee'
         if etat == 'terminee':
             self._ecrire_statistiques(ocr_results)
-        self._emettre(ev.FIN, total=ok, etat=etat)
+        chemin_points = self._ecrire_points(dispo_excel, excel_path, etat)
+        self._emettre(ev.FIN, total=ok, etat=etat, points=chemin_points)
         return {
             'tableaux':    ok,
             'total':       len(ocr_results) + len(word_results),
@@ -477,6 +479,34 @@ class Converter:
                 f.write(json.dumps(ligne, ensure_ascii=False) + '\n')
         except Exception as exc:
             self._log(f"  ⚠ statistiques de lecture non écrites : {exc}")
+
+    def _ecrire_points(self, dispo, excel_path, etat) -> Optional[str]:
+        """Écrit <nom>_points.json (points à relire : cellules colorées + pages signalées) à
+        côté de l'Excel, sur terminee comme sur arretee (points des pages déjà lues). Toute la
+        collecte est dans points_relire ; ne fait JAMAIS échouer la conversion."""
+        try:
+            if not dispo:
+                return None
+            import openpyxl
+            import points_relire
+            from cache_lectures import empreinte_fichier
+            ws = openpyxl.load_workbook(str(excel_path))[dispo.get('feuille', 'Borniers')]
+            try:
+                empreinte = empreinte_fichier(self.word_file) if self.word_file.is_file() else ''
+            except Exception:
+                empreinte = ''
+            objet = points_relire.construire(
+                dispo['valides'], ws, debuts=dispo.get('debuts'),
+                document=self.word_file.stem, empreinte=empreinte, excel=str(excel_path),
+                type_doc=getattr(self.template, 'name', ''), modele=Config.CLAUDE_OCR_MODEL,
+                arrete=(etat == 'arretee'))
+            chemin = excel_path.with_name(f"{excel_path.stem}_points.json")
+            points_relire.ecrire(objet, chemin)
+            self._log(f"  points à relire : {len(objet['points'])} dans {chemin.name}")
+            return str(chemin)
+        except Exception as exc:
+            self._log(f"  ⚠ points à relire non écrits : {exc}")
+            return None
 
     # ── Extraction PDF → images → OCR vision ─────────────────────────
 

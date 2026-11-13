@@ -47,3 +47,4 @@ class Evenement:
     lot: Optional[str] = None
     compteurs: Optional[dict] = None
     message: Optional[str] = None
+    points: Optional[str] = None   # FIN : chemin du <nom>_points.json écrit (ou None)

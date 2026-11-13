@@ -751,7 +751,7 @@ def generer_excel(
     output_path: Path,
     word_results: List[Dict] = None,
     on_log: Optional[Callable[[str], None]] = None,
-) -> None:
+) -> Dict:
     """
     Génère le classeur Excel avec deux feuilles distinctes :
       - « Borniers »       : tableaux issus de l'OCR sur les images
@@ -932,6 +932,9 @@ def generer_excel(
         f"\n  ✓ Classeur Excel enregistré : {output_path.name}"
         f"  ({total} borniers OCR, {current_row - 1} lignes)\n"
     )
+    # Disposition réelle rendue (valides traités, débuts de bloc) : utilisée par points_relire
+    # pour désigner exactement les cellules colorées. Les appelants existants l'ignorent.
+    return {'valides': valides, 'debuts': debuts_blocs, 'feuille': ws.title}
 
 
 # ──────────────────────────────────────────────────────────────────────
