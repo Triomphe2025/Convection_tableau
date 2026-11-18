@@ -462,6 +462,21 @@ def zones_par_ligne(rows: List[Dict], colonnes: List[str], lecture: LecturePage)
     return zones
 
 
+def bornes_normalisees(colonnes: List[str], lecture: LecturePage) -> Optional[List[float]]:
+    """Bornes des colonnes de la page en 0–1 (part de la largeur), ou None si non mesurable.
+
+    Mêmes bornes que `bornes_page` (traits du cadre, bord absent au bord de l'image), divisées
+    par la largeur : même repère que les boîtes de `zones_par_ligne` (x / largeur). Permet de
+    couper une boîte de ligne en boîte de cellule (points à relire)."""
+    largeur = lecture.taille[0]
+    if largeur <= 0 or not lecture.mots:
+        return None
+    bornes = bornes_page(lecture.traits, lecture.mots, colonnes, largeur)
+    if bornes is None:
+        return None
+    return [b / largeur for b in bornes]
+
+
 def placer_page(rows: List[Dict], colonnes: List[str],
                 lecture: LecturePage) -> Tuple[List[Dict], Dict]:
     """Lignes lues avec 'debuts' {colonne: débuts des mots} ; bilan du placement.

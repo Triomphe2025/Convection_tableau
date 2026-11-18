@@ -20,9 +20,9 @@ import openpyxl
 from config import Config
 from generer_classeur import generer_excel, texte_aux_positions
 from pdf_extractor import PdfTableExtractor
-from positions_scan import (LecturePage, ajuster_grille, colonne_caractere, couper_aux_traits,
-                            bornes_page, dpi_de_rendu, pas_initial, placer_page, replier,
-                            zones_par_ligne)
+from positions_scan import (LecturePage, ajuster_grille, bornes_normalisees, colonne_caractere,
+                            couper_aux_traits, bornes_page, dpi_de_rendu, pas_initial, placer_page,
+                            replier, zones_par_ligne)
 from template import TemplateManager
 
 PAS, PHASE = 10.0, 5.0
@@ -413,6 +413,37 @@ class TestZonesParLigne(unittest.TestCase):
         lecture = LecturePage(mots=[_mot(1, 1, '15B')], traits=list(TRAITS), dpi=300,
                               taille=(0, 0))
         self.assertEqual(zones_par_ligne([_ligne('15B', '', '', '')], COLONNES, lecture), [])
+
+
+class TestBornesNormalisees(unittest.TestCase):
+    """Bornes de colonnes en 0–1 (même repère que les boîtes) pour couper une ligne en cellule."""
+
+    def test_une_borne_de_plus_que_colonnes(self):
+        bornes = bornes_normalisees(COLONNES, _lecture(*REPERE_TESS))
+        self.assertEqual(len(bornes), len(COLONNES) + 1)
+
+    def test_bornes_croissantes_dans_0_1(self):
+        bornes = bornes_normalisees(COLONNES, _lecture(*REPERE_TESS))
+        self.assertEqual(bornes, sorted(bornes))
+        self.assertGreaterEqual(bornes[0], 0.0)
+        self.assertLessEqual(bornes[-1], 1.0)
+
+    def test_chaque_mot_entre_les_bornes_de_sa_colonne(self):
+        # Le 1er caractère d'un mot posé en colonne k tombe entre bornes[k] et bornes[k+1].
+        bornes = bornes_normalisees(COLONNES, _lecture(*REPERE_TESS))
+        for k, mot in enumerate((_mot(1, 1, 'A1'), _mot(31, 1, 'PH'),
+                                 _mot(61, 1, 'SIG'), _mot(91, 1, 'PH'))):
+            x = mot[0] / 1200
+            self.assertTrue(bornes[k] <= x < bornes[k + 1],
+                            f"colonne {k} : {x} hors [{bornes[k]}, {bornes[k + 1]})")
+
+    def test_page_sans_mot_none(self):
+        self.assertIsNone(bornes_normalisees(COLONNES, _lecture()))
+
+    def test_taille_nulle_none(self):
+        lecture = LecturePage(mots=[_mot(1, 1, '15B')], traits=list(TRAITS), dpi=300,
+                              taille=(0, 0))
+        self.assertIsNone(bornes_normalisees(COLONNES, lecture))
 
 
 if __name__ == '__main__':

@@ -208,11 +208,26 @@ class Converter:
         except Exception:
             return None
 
+    def _attacher_zones(self, resultat: Dict, lecture, colonnes: List[str]) -> None:
+        """Attache à la page scannée ses zones par ligne et ses bornes de colonnes (0–1) : c'est
+        ce que points_relire lit pour situer chaque cellule colorée sur l'image. Ne lève jamais."""
+        zones = self._zones_page(lecture, resultat)
+        if not zones:
+            return
+        resultat['zones'] = zones
+        try:
+            from positions_scan import bornes_normalisees
+            bornes = bornes_normalisees(colonnes, lecture)
+        except Exception:
+            bornes = None
+        if bornes:
+            resultat['bornes_colonnes'] = bornes
+
     def _emettre_page_zones(self, page: int, resultat: Dict, lecture) -> None:
         """Émet page_zones quand la lecture Tesseract d'une page est prête après son page_lue."""
         if page in self._pages_zones_emises:
             return
-        zones = self._zones_page(lecture, resultat)
+        zones = resultat.get('zones') or self._zones_page(lecture, resultat)
         if zones:
             self._pages_zones_emises.add(page)
             self._emettre(ev.PAGE_ZONES, page=page,
@@ -1021,6 +1036,7 @@ class Converter:
                               f"{bilan['raison']}")
                     continue
                 resultat['rows'] = rows
+                self._attacher_zones(resultat, lecture, colonnes)
                 self._emettre_page_zones(page, resultat, lecture)
                 taux = ('non mesurable' if analyse['taux'] is None
                         else f"{analyse['taux']:.0%}".replace('%', ' %'))

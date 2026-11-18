@@ -18,6 +18,7 @@ from unittest.mock import patch
 
 import fitz
 import openpyxl
+from PIL import Image
 
 from config import Config
 from converter import Converter
@@ -214,6 +215,81 @@ class TestIndicateurDePage(unittest.TestCase):
         self.assertFalse([m for m in journal if '⚠' in m and 'scan' in m])
         # Une seule page scannée, dégradée : plus de la moitié → synthèse puis la page.
         self.assertEqual([r[3] for r in feuille[1:]], ['synthèse', 'page dégradée'])
+
+
+class TestZonesDesPoints(unittest.TestCase):
+    """Bout en bout, fausse lecture Tesseract : les points de cellule situent la cellule sur
+    l'image (zone non nulle, coupée aux bornes de colonnes) ; les points de page restent sans
+    zone. Sans Tesseract installé : la lecture est fabriquée, pas lue."""
+
+    REPONSE = (
+        "TYPE_PAGE: listing\n"
+        "TENANT | JAR | ABOUTISSANT | SIGNAL\n"
+        "15B | 0785B | AB | ??\n"
+        "16C | 0787B | CD | SIG\n"
+        'META: {"PAGE": "1", "BORNIER": "", "PET": "", "NO_PLAN": "", "INDICE": ""}\n'
+    )
+    TRAITS = [0.0, 300.0, 600.0, 900.0, 1200.0]
+
+    @classmethod
+    def _mot(cls, col, ligne, texte):
+        x0 = 5.0 + 10.0 * col
+        return (x0, 100 * ligne, x0 + 10.0 * len(texte), 100 * ligne + 30, texte, 90)
+
+    @classmethod
+    def _lecture_fabriquee(cls, *a, **k):
+        mots = [cls._mot(1, 1, '15B'), cls._mot(31, 1, '0785B'), cls._mot(61, 1, 'AB'),
+                cls._mot(91, 1, 'XX'), cls._mot(1, 2, '16C'), cls._mot(31, 2, '0787B'),
+                cls._mot(61, 2, 'CD'), cls._mot(91, 2, 'SIG')]
+        return LecturePage(mots=mots, traits=list(cls.TRAITS), dpi=300, taille=(1200, 2000))
+
+    def _points(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dossier = Path(tmp)
+            pdf = dossier / 'scan.pdf'
+            png = dossier / 'blanc.png'
+            Image.new('RGB', (1200, 1600), 'white').save(png)
+            with fitz.open() as doc:
+                page = doc.new_page(width=600, height=800)
+                page.insert_image(page.rect, filename=str(png))
+                doc.save(str(pdf))
+
+            class Client(_FauxClient):
+                def _create(self, **kwargs):
+                    retour = super()._create(**kwargs)
+                    retour.content[0].text = TestZonesDesPoints.REPONSE
+                    return retour
+
+            with _mode_claude(), patch('anthropic.Anthropic', Client), \
+                    patch.object(Config, 'CLAUDE_CACHE_LECTURES', False), \
+                    patch.object(Converter, '_lecture_tesseract', self._lecture_fabriquee), \
+                    patch.object(Config, 'POSITIONS_CACHE_DOSSIER', dossier / 'cache'), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                resultat = Converter(word_file=pdf, output_dir=dossier / 'sortie',
+                                     template=TemplateManager().get('REPARTITEUR'),
+                                     on_log=lambda m: None).run()
+            chemin = Path(resultat['excel']).with_name(
+                Path(resultat['excel']).stem + '_points.json')
+            return json.loads(chemin.read_text('utf-8'))['points']
+
+    def test_point_de_cellule_a_une_zone_de_cellule(self):
+        points = self._points()
+        cellule = [p for p in points if p['sorte'] == 'illisible']
+        self.assertEqual(len(cellule), 1)
+        zone = cellule[0]['zone']
+        self.assertIsNotNone(zone)
+        self.assertEqual(zone['niveau'], 'cellule')
+        # Colonne SIGNAL (index 3) : coupée entre les bornes 0,75 et 1,0 de la page.
+        self.assertAlmostEqual(zone['boite'][0], 0.75)
+        self.assertAlmostEqual(zone['boite'][2], 1.0)
+        # Ligne de « 15B » sur le scan (y = 100 / 2000) : la zone désigne la bonne ligne.
+        self.assertAlmostEqual(zone['boite'][1], 0.05)
+
+    def test_point_de_page_reste_sans_zone(self):
+        points = self._points()
+        pages = [p for p in points if p['ligne'] is None]
+        self.assertTrue(pages)
+        self.assertTrue(all(p['zone'] is None for p in pages))
 
 
 class TestRejeuSansPdf(unittest.TestCase):
