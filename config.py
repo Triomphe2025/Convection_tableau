@@ -282,6 +282,51 @@ class Config:
     PDF_VISIBILITE_MARGE = 0.15
 
     # ========================================
+    # 🧭 DÉTECTION DE TYPE (types_documents.detecter_type)
+    # ========================================
+
+    # Nombre de premières pages lues pour reconnaître le type (pied + colonnes).
+    DETECTION_PAGES_ECHANTILLON = 3
+
+    # Grand côté (points PDF) au-delà duquel une page est « grand format » (plan).
+    # Un A4 (842 pt) ou un A3 (1191 pt) reste un tableau : le format ne sert qu'à
+    # séparer les plans (A1/A0 : 2384/3370 pt) des tableaux, jamais à les départager.
+    DETECTION_GRAND_FORMAT_PT = 1400
+
+    # En dessous de ce nombre de caractères, la page est tenue pour scannée : son
+    # pied est lu par Tesseract plutôt que par la couche texte.
+    DETECTION_MIN_CARS_NATIF = 20
+
+    # Bande basse de la page (part de la hauteur) rendue pour Tesseract : seul le
+    # pied est lu, pour rester rapide (en-têtes de colonnes non vus sur un scan).
+    DETECTION_PIED_BANDE = 0.22
+    # 130 DPI : l'en-tête + le pied d'un scan de 15 pages restent sous 4 s (budget détection).
+    DETECTION_TESSERACT_DPI = 130
+    DETECTION_PSM = 6
+
+    # Confiance plafonnée quand plusieurs modèles sont indiscernables (ex æquo :
+    # « Répartiteur » et « REPARTITEUR ») : le fichier est « à préciser ».
+    DETECTION_CONFIANCE_EX_AEQUO_MAX = 0.5
+
+    # Confiance d'un plan reconnu au seul grand format (aucun mot de pied bornier).
+    DETECTION_CONFIANCE_PLAN_FORMAT = 0.7
+
+    # Plan reconnu à ses mots de cartouche (quel que soit le format) : un document qui porte
+    # au moins DETECTION_MOTS_PLAN_MIN de ces mots ET aucun en-tête de colonne bornier est un
+    # Plan. Les vrais plans sont souvent en A3 (pas « grand format »), d'où cette règle.
+    DETECTION_MOTS_PLAN = ("DESSINATEUR", "APPROBATEUR", "FOLIO", "ECHELLE", "TITRE")
+    DETECTION_MOTS_PLAN_MIN = 2
+    DETECTION_CONFIANCE_PLAN_CARTOUCHE = 0.8
+
+    # En dessous de cette confiance, le résultat est « à préciser » (l'interface
+    # proposera le modèle le plus proche) ; borne inférieure stricte.
+    DETECTION_SEUIL_SUR = 0.7
+
+    # Bande haute d'un scan (part de la hauteur) rendue pour Tesseract : l'en-tête
+    # du tableau (noms de colonnes) y est lu en plus du pied, pour distinguer le modèle.
+    DETECTION_ENTETE_BANDE = 0.33
+
+    # ========================================
     # 🔎 VÉRIFICATION DE CONVERSION
     # ========================================
 
@@ -785,6 +830,39 @@ class Config:
     # Plafond de dépense d'une campagne de mesure : la campagne s'arrête avant
     # un passage si le coût cumulé l'a atteint.
     CAMPAGNE_BUDGET_MAX_USD = 10.0
+
+    # ---- Estimation avant lancement (phase 1B, étape 3, estimation.py) ----
+    # estimer(...) prévoit, SANS rastériser ni lancer Tesseract, les pages par nature
+    # (règle partagée pdf_extractor.classer_page), les tokens, le coût (CLAUDE_PRIX_MODELES,
+    # -50 % en lot) et la durée. Ordre de grandeur affiché avant de lancer, jamais une promesse.
+    # Dossier balayé pour les moyennes par modèle (journaux .jsonl des conversions) : seuls les
+    # ESTIMATION_JOURNAUX_MAX plus récents sont lus, une seule fois par session (mémoïsé).
+    ESTIMATION_JOURNAUX_DOSSIER = _DOSSIER_UTILISATEUR
+    ESTIMATION_JOURNAUX_MAX = 20
+    # Statistiques de lecture : le Converter ajoute une ligne par conversion réussie à ce
+    # fichier central (moteur, modèle, pages lues, tokens, secondes). estimer le lit EN
+    # PRIORITÉ (les ESTIMATION_STATS_MAX dernières lignes) avant les journaux puis la constante
+    # (source_tokens = "statistiques"). Jamais d'échec de conversion si l'écriture rate.
+    ESTIMATION_STATS_FICHIER = _DOSSIER_UTILISATEUR / 'statistiques_lecture.jsonl'
+    ESTIMATION_STATS_MAX = 200
+    # Repli quand aucun journal ne donne l'usage du modèle visé (mesuré sur un vrai journal
+    # Opus 5.5 : ~6300 tokens d'entrée, ~350 de sortie par page scannée).
+    ESTIMATION_TOKENS_PAR_PAGE_DEFAUT = (6300, 350)
+    # Durée indicative par page lue, par moteur (repli quand les journaux n'ont pas
+    # d'horodatages) ; ordre de grandeur.
+    ESTIMATION_SECONDES_PAR_PAGE = {
+        'tesseract':                 1.5,
+        'claude-haiku-4-5-20251001': 4.0,
+        'claude-haiku-5-5':          4.0,
+        'claude-sonnet-5':           6.0,
+        'claude-sonnet-5-5':         6.0,
+        'claude-opus-5':             14.0,
+        'claude-opus-5-5':           12.0,
+        'claude-fable-5-1':          20.0,
+    }
+    ESTIMATION_SECONDES_PAR_PAGE_DEFAUT = 8.0
+    # Mode lot : pas de durée chiffrée (un lot aboutit en général en moins d'1 h, 24 h au plus).
+    ESTIMATION_DUREE_LOT_TEXTE = "souvent moins d'1 h, 24 h au plus"
 
     # Grand côté maximal (px) des images envoyées à Claude : au-delà, l'image
     # est réduite avant l'envoi (limite de résolution des modèles actuels).

@@ -27,6 +27,7 @@ build/
 *.xls
 # Sauf les fixtures des tests dorés (données d'entrée figées)
 !tests/fixtures/*.xlsx
+!tests/fixtures/mini_lexique/*.xlsx
 
 # Historique local de mesurer_precision.py
 mesures.csv

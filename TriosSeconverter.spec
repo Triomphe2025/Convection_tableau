@@ -14,15 +14,17 @@ block_cipher = None
 # Modules du projet charges depuis l'interface, y compris ceux importes dans une fonction
 # (liste calculee en suivant les imports depuis interface.py).
 MODULES_PROJET = [
-    'agent_ocr', 'audit_claude', 'cache_claude', 'cache_lectures', 'claude_ocr', 'compte_lignes', 'config',
+    'agent_ocr', 'audit_claude', 'cache_claude', 'cache_lectures', 'claude_lot',
+    'claude_ocr', 'compte_lignes', 'config',
+    'evenements', 'service_conversion',
     'interface_helpers',
     'ligne_de_commande',
     'controle_conservation', 'controle_qualite', 'converter', 'data_dictionary', 'dossiers_travail',
     'ed25519_verif', 'licence',
     'textes_proteges',
     'docling_ocr', 'generer_classeur', 'hybrid_ocr', 'lexique_reference', 'ocr_processor',
-    'ollama_ocr', 'pdf_extractor', 'pied_page', 'polices_illisibles', 'positions_scan',
-    'recuperer_image',
+    'ollama_ocr', 'pdf_extractor', 'pied_page', 'points_relire', 'polices_illisibles',
+    'positions_scan', 'recuperer_image',
     'relecture_scan', 'template', 'verificateur', 'word_table_importer',
     'cad', 'cad.block_builder', 'cad.curve_fitter', 'cad.dxf_writer', 'cad.models',
     'cad.raster_tif_extractor', 'cad.segment_merger', 'cad.service', 'cad.source_detector',

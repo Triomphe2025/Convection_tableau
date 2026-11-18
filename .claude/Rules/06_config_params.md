@@ -84,6 +84,47 @@ Config.TESSERACT_PATH   # référencer uniquement
 
 La confiance basse réutilise `OCR_REOCR_THRESHOLD` (pas de paramètre dédié).
 
+## Détection de type (section « DÉTECTION DE TYPE », `types_documents.detecter_type`)
+
+`detecter_type(chemin)` reconnaît un fichier : extension, puis format de page, puis texte des
+pages réparties (couche texte native, sinon Tesseract sur l'en-tête + le pied d'un scan). Un mot
+de reconnaissance ne compte qu'entier (espaces du scan tolérés) ; sous `DETECTION_SEUIL_SUR` le
+résultat est « à préciser » (`a_preciser`). Tesseract en échec (langue absente, programme
+introuvable) ne lève jamais : preuve « Tesseract indisponible » et « à préciser ». Un document à
+≥ `DETECTION_MOTS_PLAN_MIN` mots de cartouche sans en-tête de colonne bornier est un Plan.
+
+| Paramètre | Valeur défaut | Rôle |
+|-----------|--------------|------|
+| `DETECTION_PAGES_ECHANTILLON` | `3` | Pages lues, réparties sur le document (pied/colonnes sur les pages intérieures, pas la garde) |
+| `DETECTION_GRAND_FORMAT_PT` | `1400` | Grand côté (pt) au-delà duquel = grand format (plan) ; A4 (842) et A3 (1191) restent des tableaux |
+| `DETECTION_MIN_CARS_NATIF` | `20` | Sous ce nombre de caractères, page tenue pour scannée → pied lu par Tesseract |
+| `DETECTION_PIED_BANDE` | `0.22` | Part basse de la page rendue pour Tesseract (le pied) |
+| `DETECTION_ENTETE_BANDE` | `0.33` | Part haute d'un scan rendue pour Tesseract (en-tête = noms de colonnes) : distingue le modèle d'un scan |
+| `DETECTION_TESSERACT_DPI` / `DETECTION_PSM` | `130` / `6` | Rendu basse résolution et segmentation Tesseract ; 130 DPI tient l'en-tête + le pied d'un scan de 15 pages sous 4 s |
+| `DETECTION_CONFIANCE_EX_AEQUO_MAX` | `0.5` | Confiance plafonnée quand plusieurs modèles sont indiscernables (« à préciser ») |
+| `DETECTION_CONFIANCE_PLAN_FORMAT` | `0.7` | Confiance d'un plan reconnu au seul grand format (aucun mot de pied bornier) |
+| `DETECTION_MOTS_PLAN` | `DESSINATEUR, APPROBATEUR, FOLIO, ECHELLE, TITRE` | Mots de cartouche d'un plan : un document qui en porte ≥ `DETECTION_MOTS_PLAN_MIN` et aucun en-tête de colonne bornier est un Plan, quel que soit le format (les vrais plans sont souvent en A3) |
+| `DETECTION_MOTS_PLAN_MIN` | `2` | Nombre minimal de mots de cartouche pour reconnaître un Plan |
+| `DETECTION_CONFIANCE_PLAN_CARTOUCHE` | `0.8` | Confiance d'un plan reconnu à ses mots de cartouche |
+| `DETECTION_SEUIL_SUR` | `0.7` | Sous cette confiance (borne stricte), le résultat est « à préciser » (modèle le plus proche proposé) ; `a_preciser(confiance, preuves)` le lit |
+
+## Estimation avant lancement (section « ESTIMATION AVANT LANCEMENT », `estimation.py`)
+
+`estimer(chemin, type, profil, lot, modele, dossier_sortie)` prévoit pages par nature, pages
+déjà faites, tokens, coût et durée **sans rastériser ni lancer Tesseract** (ordre de grandeur,
+`approche: True`). Nature des pages = règle partagée `pdf_extractor.classer_page`.
+
+| Paramètre | Valeur défaut | Rôle |
+|-----------|--------------|------|
+| `ESTIMATION_JOURNAUX_DOSSIER` | `DOSSIER_UTILISATEUR` | Dossier balayé (récursif) pour les moyennes par modèle ; les tests le redirigent (`tests/conftest.py`) |
+| `ESTIMATION_JOURNAUX_MAX` | `20` | Seuls les N journaux `.jsonl` les plus récents sont lus (jamais tout le dossier à chaque dépôt) ; moyennes mémoïsées une fois par session |
+| `ESTIMATION_STATS_FICHIER` | `DOSSIER_UTILISATEUR / statistiques_lecture.jsonl` | Le Converter y ajoute une ligne par conversion réussie (moteur, modèle, pages lues, tokens, secondes) ; `estimer` le lit **en priorité** (source_tokens = « statistiques ») ; les tests le redirigent |
+| `ESTIMATION_STATS_MAX` | `200` | Nombre de dernières lignes de statistiques lues pour les moyennes par modèle |
+| `ESTIMATION_TOKENS_PAR_PAGE_DEFAUT` | `(6300, 350)` | Repli (entrée, sortie) quand aucun journal ne donne l'usage du modèle (mesuré sur un vrai journal Opus 5.5) |
+| `ESTIMATION_SECONDES_PAR_PAGE` | par moteur | Durée indicative par page lue (tesseract + chaque modèle), repli quand les journaux n'ont pas d'horodatages |
+| `ESTIMATION_SECONDES_PAR_PAGE_DEFAUT` | `8.0` | Durée par page d'un moteur non listé |
+| `ESTIMATION_DUREE_LOT_TEXTE` | `souvent moins d'1 h, 24 h au plus` | Mode lot : pas de durée chiffrée |
+
 ## Routage PDF par page (section « ROUTAGE PDF PAR PAGE »)
 
 Dans tous les modes OCR, chaque page d'un PDF est classée (`pdf_extractor.diagnostiquer_page`) :

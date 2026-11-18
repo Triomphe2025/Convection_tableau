@@ -9,10 +9,13 @@ Utilise des callbacks de progression pour l'interface graphique.
 """
 
 import re
+import json
+import time
 import logging
 import tempfile
 import threading
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -22,6 +25,7 @@ from ocr_processor import BornierTableExtractor
 from config import Config
 from dossiers_travail import dossier_travail
 from template import TableTemplate, DEFAULT_TEMPLATE
+import evenements as ev
 
 
 class ConnexionPerdue(RuntimeError):
@@ -108,6 +112,7 @@ class Converter:
         tables_word_file: Optional[Path] = None,
         on_progress: Optional[Callable[[float, str], None]] = None,
         on_log: Optional[Callable[[str], None]] = None,
+        on_evenement: Optional[Callable] = None,
         on_validation: Optional[Callable] = None,
         on_column_mapping: Optional[Callable] = None,
         on_wide_template_confirm: Optional[Callable] = None,
@@ -119,6 +124,9 @@ class Converter:
         self.tables_word_file = Path(tables_word_file) if tables_word_file else None
         self._on_progress = on_progress or (lambda p, m: None)
         self._on_log = on_log or (lambda m: None)
+        # Événements structurés (étape 2) : émis EN PLUS de on_progress / on_log, pour une
+        # interface qui suit le détail. Absent par défaut → rien ne change pour l'existant.
+        self._on_evenement = on_evenement or (lambda e: None)
         self._on_validation = on_validation  # None = pas de validation interactive
         self._on_column_mapping = on_column_mapping  # None = mapping auto standard
         self._on_wide_template_confirm = on_wide_template_confirm  # None = pas de confirmation
@@ -127,6 +135,7 @@ class Converter:
         # la double lecture et le contrôle de conservation sans 2e OCR.
         self._lectures_tesseract: Dict[int, object] = {}
         self._derniers_resultats: Optional[List[Dict]] = None  # lus par verifier_conversion
+        self._t0 = time.monotonic()  # début de la conversion (durée des statistiques de lecture)
         # Pages à présenter à la validation interactive, une fois le document entier lu et
         # contrôlé : {'result', 'image' (fonction → chemin), 'relire' (image, feedback →
         # résultat, ou None), 'moteur', 'page_pdf' (positions à recalculer, ou None)}.
@@ -137,6 +146,9 @@ class Converter:
         self._verrou_tesseract = threading.Lock()
         self._compte_lignes = None   # Future : {page du PDF: compte}, ou None
         self._comptes_lignes: Dict[int, Dict] = {}
+        # Pages dont les zones (par ligne) ont déjà été émises (page_lue) : page_zones ne les
+        # réémet pas une fois la lecture Tesseract prête.
+        self._pages_zones_emises: set = set()
 
     # ── Helpers ───────────────────────────────────────────────────────
 
@@ -164,9 +176,62 @@ class Converter:
                 f"  page {numero} ignorée : {motif_page_ignoree(diagnostic)}, "
                 f"images = {images} % de la page"
             )
+        etiquettes = {VECTORIEL: 'vectoriel', OCR_INVISIBLE: 'ocr_invisible', SCAN: 'scan'}
+        self._emettre(ev.ANALYSE, page=numero, total=total,
+                      nature=etiquettes.get(nature, 'ignoree'))
 
     def _progress(self, pct: float, msg: str) -> None:
         self._on_progress(pct, msg)
+
+    def _emettre(self, type_: str, **champs) -> None:
+        # Un écouteur qui lève ne doit jamais faire échouer la conversion (une ligne de journal).
+        try:
+            self._on_evenement(ev.Evenement(type=type_, **champs))
+        except Exception:
+            logging.exception("écouteur d'événement ignoré")
+
+    def _emettre_alertes_pages(self, resultats: List[Dict]) -> None:
+        """Un événement page_alerte par page portant des alertes (resultat['a_verifier'])."""
+        for r in resultats:
+            messages = [a.get('message') for a in (r.get('a_verifier') or []) if a.get('message')]
+            if messages:
+                self._emettre(ev.PAGE_ALERTE, page=r.get('_page_pdf'),
+                              page_imprimee=numero_page(r), alertes=messages)
+
+    def _zones_page(self, lecture, resultat: Dict) -> Optional[List[Dict]]:
+        """Zones par ligne de la page (positions_scan), ou None ; ne lève jamais."""
+        if lecture is None:
+            return None
+        try:
+            from positions_scan import zones_par_ligne
+            return zones_par_ligne(resultat.get('rows', []), list(self.template.columns), lecture)
+        except Exception:
+            return None
+
+    def _attacher_zones(self, resultat: Dict, lecture, colonnes: List[str]) -> None:
+        """Attache à la page scannée ses zones par ligne et ses bornes de colonnes (0–1) : c'est
+        ce que points_relire lit pour situer chaque cellule colorée sur l'image. Ne lève jamais."""
+        zones = self._zones_page(lecture, resultat)
+        if not zones:
+            return
+        resultat['zones'] = zones
+        try:
+            from positions_scan import bornes_normalisees
+            bornes = bornes_normalisees(colonnes, lecture)
+        except Exception:
+            bornes = None
+        if bornes:
+            resultat['bornes_colonnes'] = bornes
+
+    def _emettre_page_zones(self, page: int, resultat: Dict, lecture) -> None:
+        """Émet page_zones quand la lecture Tesseract d'une page est prête après son page_lue."""
+        if page in self._pages_zones_emises:
+            return
+        zones = resultat.get('zones') or self._zones_page(lecture, resultat)
+        if zones:
+            self._pages_zones_emises.add(page)
+            self._emettre(ev.PAGE_ZONES, page=page,
+                          page_imprimee=numero_page(resultat), zones=zones)
 
     def _est_annule(self) -> bool:
         """Vrai si l'utilisateur a demandé l'arrêt de la conversion."""
@@ -201,6 +266,14 @@ class Converter:
     # ── Pipeline ──────────────────────────────────────────────────────
 
     def run(self) -> Dict:
+        """Exécute le pipeline ; émet ERREUR avant de propager toute exception (reste inchangé)."""
+        try:
+            return self._executer()
+        except Exception as exc:
+            self._emettre(ev.ERREUR, message=str(exc))
+            raise
+
+    def _executer(self) -> Dict:
         """
         Exécute le pipeline de conversion.
 
@@ -217,6 +290,7 @@ class Converter:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self._verifier_template_large()
         self._a_valider = []
+        self._emettre(ev.PHASE, etat='analyse')
 
         source_ext = self.word_file.suffix.lower()
         self._verifier_moteurs()
@@ -224,6 +298,7 @@ class Converter:
             self._lancer_compte_lignes() if source_ext == '.pdf' and (
                 Config.CONTROLE_LIGNES or Config.CONTROLE_LIGNES_VECTORIEL) else None)
 
+        self._emettre(ev.PHASE, etat='lecture')
         if source_ext == '.pdf':
             _ocr_mode = getattr(Config, 'OCR_MODE', 'tesseract').lower()
             if _ocr_mode in ('claude', 'ollama', 'hybrid', 'agent'):
@@ -258,9 +333,11 @@ class Converter:
         self._log(f"  → {ok} / {len(ocr_results)} tableaux extraits.")
         self._progress(0.65, f"Extraction terminée : {ok}/{len(ocr_results)} tableaux.")
         if not self._est_annule():
+            self._emettre(ev.PHASE, etat='controles')
             if self._compte_lignes is not None:
                 self._controle_lignes(ocr_results)
             self._controler_qualite(ocr_results)
+            self._emettre_alertes_pages(ocr_results)
             self._valider_document(ocr_results)
 
         # ── Import tableaux Word structurés (optionnel) ───────────────
@@ -329,13 +406,15 @@ class Converter:
             )
 
         # ── Génération du classeur Excel ──────────────────────────────
+        self._emettre(ev.PHASE, etat='excel')
         self._log("Génération du classeur Excel…")
         self._progress(0.68, "Génération Excel…")
 
         source_stem = self.word_file.stem if self.word_file.is_file() else self.word_file.name
         excel_path = self.output_dir / f"{source_stem}.xlsx"
+        dispo_excel = None
         try:
-            generer_excel(
+            dispo_excel = generer_excel(
                 ocr_results, extractor, excel_path,
                 word_results=word_results if word_results else None,
                 on_log=self._log,
@@ -370,6 +449,11 @@ class Converter:
                 self.output_dir / f"{source_stem_r}_ollama.jsonl"
             )
 
+        etat = 'arretee' if self._est_annule() else 'terminee'
+        if etat == 'terminee':
+            self._ecrire_statistiques(ocr_results)
+        chemin_points = self._ecrire_points(dispo_excel, excel_path, etat)
+        self._emettre(ev.FIN, total=ok, etat=etat, points=chemin_points)
         return {
             'tableaux':    ok,
             'total':       len(ocr_results) + len(word_results),
@@ -377,6 +461,67 @@ class Converter:
             'log':         log_path_out,
             'log_ollama':  log_ollama_path_out,
         }
+
+    def _ecrire_statistiques(self, ocr_results: List[Dict]) -> None:
+        """Ajoute une ligne de statistiques de lecture (moteur, modèle, pages lues, tokens,
+        secondes) au fichier central — pour affiner l'estimation. Ne fait JAMAIS échouer la
+        conversion ; rien n'est écrit si aucune page n'a été lue par un moteur payant."""
+        try:
+            entree = sortie = pages = 0
+            modele = ''
+            for resultat in ocr_results or []:
+                usage = resultat.get('api_usage')
+                if not usage:
+                    continue
+                pages += 1
+                entree += usage.get('input_tokens', 0) or 0
+                sortie += usage.get('output_tokens', 0) or 0
+                modele = usage.get('model') or modele
+            if pages <= 0:
+                return
+            ligne = {
+                'ts': datetime.now().isoformat(timespec='seconds'),
+                'moteur': getattr(Config, 'OCR_MODE', '').lower(),
+                'modele': modele,
+                'pages_lues': pages,
+                'tokens_entree': entree,
+                'tokens_sortie': sortie,
+                'secondes': round(time.monotonic() - self._t0, 1),
+            }
+            chemin = Path(Config.ESTIMATION_STATS_FICHIER)
+            chemin.parent.mkdir(parents=True, exist_ok=True)
+            with open(chemin, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(ligne, ensure_ascii=False) + '\n')
+        except Exception as exc:
+            self._log(f"  ⚠ statistiques de lecture non écrites : {exc}")
+
+    def _ecrire_points(self, dispo, excel_path, etat) -> Optional[str]:
+        """Écrit <nom>_points.json (points à relire : cellules colorées + pages signalées) à
+        côté de l'Excel, sur terminee comme sur arretee (points des pages déjà lues). Toute la
+        collecte est dans points_relire ; ne fait JAMAIS échouer la conversion."""
+        try:
+            if not dispo:
+                return None
+            import openpyxl
+            import points_relire
+            from cache_lectures import empreinte_fichier
+            ws = openpyxl.load_workbook(str(excel_path))[dispo.get('feuille', 'Borniers')]
+            try:
+                empreinte = empreinte_fichier(self.word_file) if self.word_file.is_file() else ''
+            except Exception:
+                empreinte = ''
+            objet = points_relire.construire(
+                dispo['valides'], ws, debuts=dispo.get('debuts'),
+                document=self.word_file.stem, empreinte=empreinte, excel=str(excel_path),
+                type_doc=getattr(self.template, 'name', ''), modele=Config.CLAUDE_OCR_MODEL,
+                arrete=(etat == 'arretee'))
+            chemin = excel_path.with_name(f"{excel_path.stem}_points.json")
+            points_relire.ecrire(objet, chemin)
+            self._log(f"  points à relire : {len(objet['points'])} dans {chemin.name}")
+            return str(chemin)
+        except Exception as exc:
+            self._log(f"  ⚠ points à relire non écrits : {exc}")
+            return None
 
     # ── Extraction PDF → images → OCR vision ─────────────────────────
 
@@ -891,6 +1036,8 @@ class Converter:
                               f"{bilan['raison']}")
                     continue
                 resultat['rows'] = rows
+                self._attacher_zones(resultat, lecture, colonnes)
+                self._emettre_page_zones(page, resultat, lecture)
                 taux = ('non mesurable' if analyse['taux'] is None
                         else f"{analyse['taux']:.0%}".replace('%', ' %'))
                 self._log(
@@ -1248,8 +1395,14 @@ class Converter:
             vision_extractor,
             on_log=lambda m, niveau='info': self._log(m),
             doit_arreter=self._est_annule,
+            on_evenement=self._on_evenement,
         )
-        return lecteur.lire(a_lire, self.output_dir)
+        from cache_lectures import empreinte_fichier
+        try:
+            empreinte = empreinte_fichier(self.word_file)
+        except Exception:
+            empreinte = None
+        return lecteur.lire(a_lire, self.output_dir, empreinte=empreinte)
 
     def _extraire_avec_progres(
         self, images_dir: Path, total_hint: int
@@ -1369,6 +1522,7 @@ class Converter:
 
         results = []
         pages_cache = 0
+        self._pages_zones_emises = set()
         for i, img in enumerate(images):
             if self._est_annule():
                 self._log(f"  ⏹ Conversion arrêtée — {i}/{total} images traitées.")
@@ -1376,6 +1530,7 @@ class Converter:
             pct = 0.28 + (i / total) * 0.37   # 28 % → 65 %
             self._progress(pct, f"OCR {i + 1}/{total} : {img.name}")
             self._log(f"  OCR {i + 1}/{total} : {img.name}")
+            self._emettre(ev.PAGE_DEBUT, page=_num(img), rang=i + 1, total=total)
 
             if vision_extractor is not None:
                 # Page déjà lue par le lot ; sinon (cache, repli du lot, hors lot) appel normal.
@@ -1423,6 +1578,18 @@ class Converter:
                                else 'Tesseract'),
                     'page_pdf': None})
 
+            lignes = sum(1 for row in (result.get('rows') or []) if row.get('type') == 'data')
+            page_pdf = _num(img)
+            # Zones par ligne si la lecture Tesseract de la page est déjà prête (fil à part,
+            # sans attente) ; sinon page_zones sera émis au placement des positions.
+            zones = self._zones_page(self._lectures_tesseract.get(page_pdf), result)
+            if zones:
+                self._pages_zones_emises.add(page_pdf)
+            self._emettre(
+                ev.PAGE_LUE, page=page_pdf, rang=i + 1, total=total, lignes=lignes,
+                page_imprimee=numero_page(result),
+                bornier=(result.get('metadata') or {}).get('BORNIER'),
+                zones=zones, cout=result.get('api_usage'))
             results.append(result)
 
         if pages_cache:
