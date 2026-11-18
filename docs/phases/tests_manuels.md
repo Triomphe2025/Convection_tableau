@@ -60,14 +60,20 @@ Les 6 vérifications visuelles du rapport final de la phase 0 (points 3, 7, 9, 1
 
 ## Phase 1A — moteur prêt pour la future interface (mode lot + reprise)
 
-- [ ] **1A.1 — PE082 en mode lot, avec reprise après fermeture.**
+- [x] **1A.1 — Conversion complète en mode lot.** _(validé sur PE142 et PE143, tâches 79 et 80 :
+  mode lot OK, points à relire = cellules colorées, à l'identique.)_
+  - Ouvrir l'exe, mode OCR **Claude**, cocher **« Mode lot »** (économique). Choisir un PDF, un
+    **dossier de sortie** et un **modèle** — **noter le modèle** choisi. Saisir la clé API.
+  - **Lancer** et laisser aller jusqu'au bout.
+  - Attendu : un fichier `lot_<id>.json` apparaît dans le dossier de sortie, l'**Excel est produit**
+    à la fin, complet, et le lot est facturé **−50 %**.
+
+- [ ] **1A.2 — Reprise après fermeture (sur le lot ci-dessus).**
   - **Avant de lancer** : ouvrir la console Anthropic → **Batches** et **noter l'état** (nombre de
     lots existants) pour pouvoir comparer après.
-  - Ouvrir l'exe, mode OCR **Claude**, cocher **« Mode lot »** (économique). Choisir **PE082.pdf**,
-    un **dossier de sortie** et un **modèle** — **noter le modèle** choisi. Saisir la clé API.
-  - **Lancer.** Pendant l'**attente du lot** (journal « en attente du lot »), **fermer l'appli**.
-    (Vérifier au passage qu'un lot est bien apparu dans la console Anthropic et qu'un fichier
-    `lot_<id>.json` est présent dans le dossier de sortie — ne pas le supprimer.)
+  - Lancer une conversion en **mode lot** (PE082.pdf, dossier et modèle notés). Pendant l'**attente
+    du lot** (journal « en attente du lot »), **fermer l'appli**. (Vérifier qu'un lot est apparu dans
+    la console Anthropic et qu'un `lot_<id>.json` est dans le dossier de sortie — ne pas le supprimer.)
   - **Relancer** l'exe avec **le même PDF**, **le même dossier de sortie** et **le même modèle** ;
     relancer la conversion.
   - Attendu :
@@ -84,7 +90,8 @@ Rien ne change à l'écran : ces essais portent sur ce que le moteur **produit**
 estimations, reconnaissance). Les points 1.B.3 et 1.B.4 se lancent par un petit script Python
 (`env\Scripts\python.exe`), le reste depuis l'exe.
 
-- [ ] **1B.1 — `<nom>_points.json` écrit à côté de l'Excel (vrai scan + Claude).**
+- [x] **1B.1 — `<nom>_points.json` écrit à côté de l'Excel (vrai scan + Claude).** _(validé sur
+  PE142/PE143, tâches 79 et 80 ; zones de cellule remplies depuis la correction du 2026-11-18.)_
   - Mode OCR **Claude**, convertir un PDF **scanné** de 2–3 pages qui a des cases douteuses.
   - Attendu : à côté de l'Excel, un fichier **`<nom>_points.json`** ; l'ouvrir et vérifier que
     chaque **cellule colorée** de la feuille Borniers y a **un point** (sorte, `cellule_excel`,
@@ -108,7 +115,8 @@ estimations, reconnaissance). Les points 1.B.3 et 1.B.4 se lancent par un petit 
   - Attendu : famille correcte (tableau / plan / journal / excel) ; pour un modèle indiscernable,
     « à préciser » avec le modèle le plus proche ; fichier inconnu → `(None, 0)`.
 
-- [ ] **1B.5 — `points_relire` embarqué dans l'exe.**
+- [x] **1B.5 — `points_relire` embarqué dans l'exe.** _(vérifié : présent dans Analysis-00.toc,
+  aucun avertissement « module not found » au build.)_
   - Reconstruire l'exe (`build_exe.bat`) puis vérifier dans le journal de build qu'il n'y a **pas**
     d'avertissement « module not found: points_relire » ; une conversion depuis l'exe écrit bien
     `<nom>_points.json`.
