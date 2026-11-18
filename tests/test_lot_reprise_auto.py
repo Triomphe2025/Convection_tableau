@@ -279,5 +279,37 @@ class TestEvenementsReprise(_Base):
         self.assertIn(ev.LOT_RECUPERE, types)
 
 
+class TestLotCreeEnSessionMarque(_Base):
+    """Un lot créé PUIS récupéré dans la même session est aussi marqué « termine »."""
+
+    def test_marque_termine_apres_recuperation_normale(self):
+        img1 = _image(self.tmp, 'p1.png')
+        lecteur = self._lecteur()
+        with patch('anthropic.Anthropic', Faux):
+            res = lecteur.lire([img1], self.sortie, empreinte='EMP')
+        self.assertTrue(res[str(img1)]['success'])
+        self.assertEqual(len(Faux.create_calls), 1)
+        fichiers = list(self.sortie.glob('lot_*.json'))
+        self.assertEqual(len(fichiers), 1)
+        donnees = json.loads(fichiers[0].read_text(encoding='utf-8'))
+        self.assertTrue(donnees.get('termine'))
+
+
+class TestForcerRelectureSauteLaReprise(_Base):
+    """« Relire même les pages en cache » : aucun lot en cours n'est repris."""
+
+    def test_aucun_lot_repris_si_forcer(self):
+        img1 = _image(self.tmp, 'p1.png')
+        self._ecrire_lot('A', [img1], empreinte='EMP')      # lot en cours du même document
+        Config.CLAUDE_FORCER_RELECTURE = True
+        lecteur = self._lecteur()
+        with patch('anthropic.Anthropic', Faux):
+            res = lecteur.lire([img1], self.sortie, empreinte='EMP')
+        self.assertNotIn('A', Faux.retrieve_calls)          # lot A jamais récupéré
+        self.assertNotIn('A', Faux.results_calls)
+        self.assertEqual(len(Faux.create_calls), 1)         # un nouveau lot à la place
+        self.assertTrue(res[str(img1)]['success'])
+
+
 if __name__ == '__main__':
     unittest.main()

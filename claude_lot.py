@@ -124,8 +124,9 @@ class LecteurLot:
 
         modele = getattr(Config, 'CLAUDE_OCR_MODEL', 'claude-opus-5')
         # Reprise d'abord : lots en cours du même document + modèle ; leurs pages sortent de la
-        # liste à envoyer (succès gardé, page expirée en repli — jamais renvoyée en lot).
-        if dossier_sortie:
+        # liste à envoyer (succès gardé, page expirée en repli — jamais renvoyée en lot). « Relire
+        # même les pages en cache » : aucun lot repris, tout est relu.
+        if dossier_sortie and not getattr(Config, 'CLAUDE_FORCER_RELECTURE', False):
             resultats.update(
                 self._reprendre_lots_du_dossier(dossier_sortie, empreinte, modele))
         a_envoyer = [p for p in image_paths if str(p) not in resultats]
@@ -170,7 +171,8 @@ class LecteurLot:
             for batch, _ in envois:
                 self._annuler(client_base, batch.id)
         elif envois:
-            self._attendre_et_recuperer(client_base, envois, cache_actif, resultats)
+            self._attendre_et_recuperer(client_base, envois, cache_actif, resultats,
+                                        dossier_sortie)
 
         # Toute page sans réponse (arrêt, lot non envoyé, absente des résultats) : repli normal.
         for info in infos:
@@ -279,10 +281,13 @@ class LecteurLot:
                                  'taille_mo': round(octets / (1024 * 1024), 3)})
         return batch, table, 'ok'
 
-    def _attendre_et_recuperer(self, client, envois, cache_actif, resultats) -> None:
+    def _attendre_et_recuperer(self, client, envois, cache_actif, resultats,
+                               dossier_sortie=None) -> None:
         """Attend tous les lots dans une seule boucle de sondage, puis récupère chacun.
 
         Arrêt demandé : les lots encore en cours sont annulés, leurs pages repartent en repli.
+        Un lot récupéré est marqué « termine » dans son lot_<id>.json (plus jamais repris), comme
+        à la reprise à la relance.
         """
         etats = {b.id: getattr(b, 'processing_status', 'in_progress') for b, _ in envois}
         tables = {b.id: table for b, table in envois}
@@ -319,6 +324,8 @@ class LecteurLot:
 
         for bid, table in tables.items():
             self._recuperer(client, bid, table, cache_actif, resultats)
+            if dossier_sortie:
+                self._marquer_termine(Path(dossier_sortie) / f'lot_{bid}.json')
             self._emettre(ev.LOT_RECUPERE, lot=bid, total=len(table))
 
     def _annuler_en_cours(self, client, etats: Dict[str, str]) -> None:
