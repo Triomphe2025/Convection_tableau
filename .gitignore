@@ -19,6 +19,9 @@ venv/
 dist/
 build/
 
+# Licence du poste (jamais commitée)
+*.triosse
+
 # Logs
 *.log
 

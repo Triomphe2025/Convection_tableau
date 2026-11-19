@@ -145,6 +145,15 @@ class TestExiger(_Base):
                 licence.exiger(dt.date(2026, 10, 14))
         self.assertIn(POSTE, str(cm.exception))
 
+    def test_exe_sans_licence_explique_le_renommage(self):
+        with patch.object(licence.sys, 'frozen', True, create=True), \
+                patch.object(licence, '_dossier_exe', lambda: self.dossier):
+            with self.assertRaises(licence.LicenceError) as cm:
+                licence.exiger(dt.date(2026, 10, 14))
+        message = str(cm.exception)
+        self.assertIn(Config.LICENCE_NOM, message)   # dire de renommer en licence.triosse
+        self.assertIn('à côté', message)             # placer le fichier à côté de l'exe
+
     def test_exe_licence_valable_rend_preavis(self):
         (self.dossier / Config.LICENCE_NOM).write_text(_texte(echeance='2026-10-24'), 'utf-8')
         with patch.object(licence.sys, 'frozen', True, create=True), \

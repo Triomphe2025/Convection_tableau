@@ -44,16 +44,10 @@ if errorlevel 1 (
 )
 echo.
 
-:: Nettoyer les anciens builds
-echo [2/3] Nettoyage des anciens builds...
-if exist dist\TriosSeconverter rmdir /s /q dist\TriosSeconverter
-if exist build               rmdir /s /q build
-echo [OK] Nettoyage effectue.
-echo.
-
-:: Construire l'executable
-echo [3/3] Construction de l'executable (peut prendre plusieurs minutes)...
-python -m PyInstaller TriosSeconverter.spec --noconfirm --clean
+:: Construire l'executable. outils_build.py preserve licence.triosse (deja a cote de l'exe,
+:: jamais lue ni copiee ailleurs), rebuild, la remet, puis supprime build\TriosSeconverter.
+echo [2/2] Construction de l'executable (peut prendre plusieurs minutes)...
+python outils_build.py TriosSeconverter.spec TriosSeconverter
 if errorlevel 1 (
     echo.
     echo [ERREUR] Build echoue. Verifiez les messages d'erreur ci-dessus.

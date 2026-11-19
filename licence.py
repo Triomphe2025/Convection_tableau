@@ -142,7 +142,9 @@ def exiger(aujourd_hui=None) -> str:
     except OSError:
         raise LicenceError(
             "Aucune licence trouvée. Transmettez cet identifiant de poste pour obtenir "
-            f"votre clé :\n\n    {identifiant_poste()}\n\n{_contact()}")
+            f"votre clé :\n\n    {identifiant_poste()}\n\n"
+            f"Placez le fichier reçu à côté de l'exe et renommez-le {Config.LICENCE_NOM}.\n\n"
+            f"{_contact()}")
     ok, infos, raison = licence_valide(texte, aujourd_hui)
     if ok:
         return message_preavis(infos, aujourd_hui)
