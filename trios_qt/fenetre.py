@@ -56,9 +56,22 @@ class FenetrePrincipale(QWidget):
         racine.addWidget(self._construire_barre_laterale())
         racine.addWidget(self._pile, 1)
 
+        self._monter_convertir()
+
         premiere = NAV_PRINCIPALE[0][0]
         self.boutons[premiere].setChecked(True)
         self._pile.setCurrentWidget(self.pages[premiere])
+
+    def _monter_convertir(self) -> None:
+        # Remplace le remplissage de la page générique « convertir » par l'écran réel.
+        from trios_qt.page_convertir import PageConvertir
+        page = self.pages["convertir"]
+        disposition = page.layout()
+        dernier = disposition.takeAt(disposition.count() - 1)
+        if dernier is not None and dernier.spacerItem() is None:
+            disposition.addItem(dernier)  # ce n'était pas le ressort : on le remet
+        self.page_convertir = PageConvertir(parent=page)
+        disposition.addWidget(self.page_convertir, 1)
 
     def _construire_barre_laterale(self) -> QWidget:
         c = self._jetons["couleurs"]

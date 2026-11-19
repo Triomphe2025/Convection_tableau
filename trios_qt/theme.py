@@ -156,6 +156,81 @@ QPushButton[classe="nav"]:checked {{
     color: {c['texte_discret']};
     font-size: {int(t['aide'])}px;
 }}
+#zone_depot {{
+    background-color: {c['surface']};
+    border: 2px dashed {c['trait']};
+    border-radius: {int(r['carte'])}px;
+    min-height: 150px;
+}}
+#depot_titre {{
+    color: {c['texte']};
+    font-size: {int(t['titre_bloc'])}px;
+    font-weight: 600;
+}}
+#depot_aide {{
+    color: {c['texte_discret']};
+    font-size: {int(t['aide'])}px;
+}}
+#depot_choisir, #panneau_gerer {{
+    background-color: {c['action_principale']};
+    color: {c['texte']};
+    border: none;
+    border-radius: {int(r['bouton'])}px;
+    padding: 8px 18px;
+    font-weight: 600;
+}}
+#depot_choisir:hover, #panneau_gerer:hover {{
+    background-color: {c['action_principale_survol']};
+}}
+#liste_fichiers {{
+    border: none;
+    background-color: transparent;
+}}
+#ligne_fichier {{
+    background-color: {c['surface']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['carte'])}px;
+}}
+#ligne_sigle {{
+    color: {c['texte_discret']};
+    font-weight: 700;
+}}
+#ligne_nom {{
+    color: {c['texte']};
+    font-weight: 500;
+}}
+#ligne_estimation {{
+    color: {c['texte_secondaire']};
+    font-size: {int(t['aide'])}px;
+}}
+#ligne_retirer {{
+    background-color: transparent;
+    color: {c['texte_discret']};
+    border: none;
+    font-size: {int(t['titre_bloc'])}px;
+}}
+#ligne_retirer:hover {{
+    color: {c['erreur']};
+}}
+#panneau_types {{
+    background-color: {c['barre_laterale']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['carte'])}px;
+    min-width: 220px;
+    max-width: 260px;
+}}
+#panneau_titre {{
+    color: {c['texte']};
+    font-size: {int(t['titre_bloc'])}px;
+    font-weight: 600;
+}}
+#panneau_type {{
+    color: {c['texte_secondaire']};
+    padding: 2px 0px;
+}}
+#anim_trios_glyphe {{
+    font-size: 54px;
+}}
 """.strip()
 
 
