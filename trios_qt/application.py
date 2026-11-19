@@ -5,9 +5,9 @@ QT_QPA_PLATFORM=offscreen sans bloquer la suite.
 """
 from __future__ import annotations
 
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget
+from PySide6.QtWidgets import QApplication
 
-TITRE_FENETRE = "TriosSeconverter"
+from trios_qt.fenetre import TITRE_FENETRE, FenetrePrincipale  # noqa: F401  (ré-export)
 
 
 def creer_application(argv=None) -> QApplication:
@@ -18,10 +18,5 @@ def creer_application(argv=None) -> QApplication:
     return app
 
 
-def creer_fenetre() -> QMainWindow:
-    fenetre = QMainWindow()
-    fenetre.setWindowTitle(TITRE_FENETRE)
-    fenetre.resize(1360, 900)
-    # Fenêtre vide à l'étape 1 ; la barre latérale et les écrans arrivent à l'étape 3.
-    fenetre.setCentralWidget(QWidget())
-    return fenetre
+def creer_fenetre() -> FenetrePrincipale:
+    return FenetrePrincipale()

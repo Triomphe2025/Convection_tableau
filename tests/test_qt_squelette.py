@@ -15,9 +15,11 @@ def test_creer_application_rend_un_singleton():
     assert app1 is app2
 
 
-def test_creer_fenetre_titre_et_zone_centrale(qtbot):
+def test_creer_fenetre_titre_et_pages(qtbot):
     creer_application([])
     fenetre = creer_fenetre()
     qtbot.addWidget(fenetre)
     assert fenetre.windowTitle() == TITRE_FENETRE
-    assert fenetre.centralWidget() is not None
+    # La fenêtre porte les 6 écrans (4 principaux + Réglages + Aide).
+    assert set(fenetre.pages) == {
+        "convertir", "relecture", "mise_en_forme", "plans", "reglages", "aide"}

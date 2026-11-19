@@ -80,6 +80,51 @@ QToolTip {{
     border-radius: {int(r['bouton'])}px;
     padding: 4px 8px;
 }}
+#barre_laterale {{
+    background-color: {c['barre_laterale']};
+    border-right: 1px solid {c['trait']};
+}}
+#logo {{
+    color: {c['texte']};
+    font-size: {int(t['titre_bloc'])}px;
+    font-weight: 700;
+}}
+QPushButton[classe="nav"] {{
+    background-color: transparent;
+    color: {c['texte_secondaire']};
+    border: none;
+    border-radius: {int(r['bouton'])}px;
+    padding: 9px 12px;
+    text-align: left;
+    font-size: {int(t['courant'])}px;
+    font-weight: 500;
+}}
+QPushButton[classe="nav"]:hover {{
+    background-color: {c['surface']};
+    color: {c['texte']};
+}}
+QPushButton[classe="nav"]:checked {{
+    background-color: {c['sureleve']};
+    color: {c['texte']};
+    font-weight: 600;
+}}
+#titre_ecran {{
+    color: {c['texte']};
+    font-size: {int(t['titre_ecran'])}px;
+    font-weight: 700;
+}}
+#carte_etat {{
+    background-color: {c['surface']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['carte'])}px;
+}}
+#etat_modele {{
+    color: {c['texte_secondaire']};
+}}
+#etat_version {{
+    color: {c['texte_discret']};
+    font-size: {int(t['aide'])}px;
+}}
 """.strip()
 
 
