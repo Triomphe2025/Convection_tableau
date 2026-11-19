@@ -12,6 +12,8 @@ from pathlib import Path
 
 from PySide6.QtGui import QFont, QFontDatabase
 
+HAUTEUR_PASTILLE = 20  # px, pilule à hauteur fixe (rayon = moitié) ; partagé avec fenetre.py
+
 # Graisses utilisées par jetons.json (polices.interface / polices.codes), en TTF statiques.
 _FICHIERS_POLICES = (
     "Inter-Regular.ttf", "Inter-Medium.ttf", "Inter-SemiBold.ttf", "Inter-Bold.ttf",
@@ -105,8 +107,8 @@ QPushButton[classe="nav"] {{
     color: {c['texte_secondaire']};
     border: none;
     border-radius: {int(r['bouton'])}px;
-    padding: 8px 10px;
-    min-height: 22px;
+    padding: 9px 10px;
+    min-height: 26px;
     text-align: left;
     font-size: {int(t['courant'])}px;
     font-weight: 400;
@@ -123,8 +125,8 @@ QPushButton[classe="nav"]:checked {{
 #pastille_compteur {{
     background-color: {_rgba(c['a_relire'], 0.18)};
     color: {c['a_relire']};
-    border-radius: {int(r['puce'])}px;
-    padding: 1px 7px;
+    border-radius: {int(HAUTEUR_PASTILLE / 2)}px;
+    padding: 0px 7px;
     font-size: {int(t['aide'])}px;
     font-weight: 600;
 }}
@@ -132,8 +134,8 @@ QPushButton[classe="nav"]:checked {{
     background-color: transparent;
     color: {c['texte_discret']};
     border: 1px solid {c['trait']};
-    border-radius: {int(r['puce'])}px;
-    padding: 0px 6px;
+    border-radius: {int(HAUTEUR_PASTILLE / 2)}px;
+    padding: 0px 7px;
     font-size: {int(t['aide'])}px;
     font-weight: 500;
 }}

@@ -132,7 +132,8 @@ class FenetrePrincipale(QWidget):
             pastille = QLabel("bêta")
             pastille.setObjectName("pastille_beta")
         pastille.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        rangee.addWidget(pastille)
+        pastille.setFixedHeight(theme.HAUTEUR_PASTILLE)  # pilule, pas bloc pleine hauteur
+        rangee.addWidget(pastille, 0, Qt.AlignmentFlag.AlignVCenter)
         self.pastilles = getattr(self, "pastilles", {})
         self.pastilles[bouton.objectName()] = pastille
 

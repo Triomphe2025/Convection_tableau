@@ -18,6 +18,26 @@ def _couleur_derriere(fenetre, label) -> str:
     return image.pixelColor(point).name().upper()
 
 
+def test_pastille_plus_courte_que_la_moitie_de_l_entree(qtbot):
+    # Pilule, pas bloc : nettement plus basse que l'entrée (maquette : ~20 px dans ~44 px).
+    app = creer_application([])
+    jetons = theme.appliquer_theme(app)
+    animations.definir_reduction(True)
+    try:
+        fenetre = FenetrePrincipale(jetons=jetons, points_a_relire=12)
+        fenetre.resize(1360, 872)
+        qtbot.addWidget(fenetre)
+        fenetre.show()
+        app.processEvents()
+        app.processEvents()
+        bouton = fenetre.boutons["relecture"]
+        pastille = fenetre.pastilles["nav_relecture"]
+        assert pastille.height() < bouton.height() / 2, (
+            f"pastille {pastille.height()} px vs entrée {bouton.height()} px")
+    finally:
+        animations.reinitialiser()
+
+
 def test_labels_transparents_sur_leurs_fonds(qtbot):
     app = creer_application([])
     jetons = theme.appliquer_theme(app)
