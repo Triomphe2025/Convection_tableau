@@ -1,0 +1,8 @@
+# Dépendances de la nouvelle interface Qt (aperçu, phase 2) — SÉPARÉES de requirements.txt
+# pour ne pas alourdir l'installation de l'équipe. Fusionnées à la bascule (phase 4).
+#
+# Installation : env\Scripts\python.exe -m pip install -r requirements-qt.txt
+#
+# PySide6 6.12.0 : roue officielle abi3 (cp310-abi3-win_amd64), compatible Python 3.14.
+PySide6==6.12.0
+pytest-qt==4.5.0

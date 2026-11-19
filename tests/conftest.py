@@ -3,11 +3,16 @@ Configuration pytest — ajoute le répertoire racine du projet au sys.path.
 Ce fichier est chargé automatiquement par pytest avant tout test.
 Les fichiers de tests n'ont donc plus besoin de sys.path.insert().
 """
+import os
 import sys
 import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Les tests Qt tournent sans affichage (machine sans écran, intégration continue) : le greffon
+# « offscreen » rend tout hors écran. setdefault laisse un vrai affichage prendre le dessus.
+os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
 from config import Config  # noqa: E402
 
