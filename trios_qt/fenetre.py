@@ -6,12 +6,15 @@ animations sont réduites.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (
     QButtonGroup, QHBoxLayout, QLabel, QPushButton, QStackedWidget, QVBoxLayout, QWidget,
 )
 
-from trios_qt import animations, theme
+from trios_qt import animations, icones, theme
+
+LARGEUR_BARRE = 232  # px, comme la maquette 01_convertir
+TAILLE_ICONE = 18
 
 TITRE_FENETRE = "TriosSeconverter"
 
@@ -35,6 +38,7 @@ class FenetrePrincipale(QWidget):
         super().__init__()
         self._jetons = jetons or theme.charger_jetons()
         self._points_a_relire = points_a_relire
+        self.setObjectName("fenetre")  # cible QSS du fond général (pas tous les QWidget)
         self.setWindowTitle(TITRE_FENETRE)
         self.resize(1360, 900)
 
@@ -57,16 +61,21 @@ class FenetrePrincipale(QWidget):
         self._pile.setCurrentWidget(self.pages[premiere])
 
     def _construire_barre_laterale(self) -> QWidget:
+        c = self._jetons["couleurs"]
         barre = QWidget()
         barre.setObjectName("barre_laterale")
-        barre.setFixedWidth(224)
+        barre.setFixedWidth(LARGEUR_BARRE)
         colonne = QVBoxLayout(barre)
         colonne.setContentsMargins(16, 20, 16, 16)
-        colonne.setSpacing(6)
+        colonne.setSpacing(4)
 
-        logo = QLabel("TriosSeconverter")
-        logo.setObjectName("logo")
-        colonne.addWidget(logo)
+        self._logo = QLabel()
+        self._logo.setObjectName("logo")
+        self._logo.setTextFormat(Qt.TextFormat.RichText)
+        self._logo.setText(
+            f'<span style="color:{c["rose_trios"]}">Trios</span>'
+            f'<span style="color:{c["texte"]}">Seconverter</span>')
+        colonne.addWidget(self._logo)
         colonne.addSpacing(18)
 
         for cle, libelle, marque in NAV_PRINCIPALE:
@@ -79,22 +88,28 @@ class FenetrePrincipale(QWidget):
         return barre
 
     def _creer_entree(self, cle: str, libelle: str, marque) -> QPushButton:
-        texte = libelle
-        if marque == "beta":
-            texte = f"{libelle}   bêta"
-        elif marque == "compteur":
-            texte = f"{libelle}   {self._points_a_relire}"
-        bouton = QPushButton(texte)
+        c = self._jetons["couleurs"]
+        bouton = QPushButton(f"  {libelle}")
         bouton.setObjectName(f"nav_{cle}")
         bouton.setProperty("classe", "nav")  # cible du style QSS commun aux entrées de nav
         bouton.setCheckable(True)
         bouton.setCursor(Qt.CursorShape.PointingHandCursor)
-        bouton.clicked.connect(lambda _=False, c=cle: self.aller_a(c))
+        bouton.setIconSize(QSize(TAILLE_ICONE, TAILLE_ICONE))
+        # Icône teintée : texte_secondaire au repos, rose quand l'entrée est active.
+        icone_repos = icones.charger_icone(cle, c["texte_secondaire"], TAILLE_ICONE)
+        icone_actif = icones.charger_icone(cle, c["rose_trios"], TAILLE_ICONE)
+        bouton.setIcon(icone_repos)
+        bouton.toggled.connect(
+            lambda actif, b=bouton, r=icone_repos, a=icone_actif: b.setIcon(a if actif else r))
+        bouton.clicked.connect(lambda _=False, k=cle: self.aller_a(k))
         self._groupe.addButton(bouton)
         self.boutons[cle] = bouton
+        if marque:
+            self._ajouter_pastille(bouton, marque)
 
         page = QWidget()
         page.setObjectName(f"page_{cle}")
+        page.setProperty("classe", "page")  # reçoit le fond général (QSS)
         disposition = QVBoxLayout(page)
         disposition.setContentsMargins(40, 36, 40, 36)
         titre = QLabel(libelle)
@@ -104,6 +119,22 @@ class FenetrePrincipale(QWidget):
         self.pages[cle] = page
         self._pile.addWidget(page)
         return bouton
+
+    def _ajouter_pastille(self, bouton: QPushButton, marque: str) -> None:
+        # Pastille alignée à droite de l'entrée : compteur (Relecture) ou « bêta » (Plans → DXF).
+        rangee = QHBoxLayout(bouton)
+        rangee.setContentsMargins(0, 0, 10, 0)
+        rangee.addStretch(1)
+        if marque == "compteur":
+            pastille = QLabel(str(self._points_a_relire))
+            pastille.setObjectName("pastille_compteur")
+        else:
+            pastille = QLabel("bêta")
+            pastille.setObjectName("pastille_beta")
+        pastille.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        rangee.addWidget(pastille)
+        self.pastilles = getattr(self, "pastilles", {})
+        self.pastilles[bouton.objectName()] = pastille
 
     def _carte_etat(self) -> QWidget:
         carte = QWidget()

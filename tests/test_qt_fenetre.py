@@ -34,8 +34,8 @@ def test_chaque_bouton_affiche_sa_page(fenetre):
 
 
 def test_badge_relecture_affiche_le_compteur(fenetre):
-    assert "12" in fenetre.boutons["relecture"].text()
+    assert fenetre.pastilles["nav_relecture"].text() == "12"
 
 
 def test_plans_porte_la_mention_beta(fenetre):
-    assert "bêta" in fenetre.boutons["plans"].text()
+    assert fenetre.pastilles["nav_plans"].text() == "bêta"

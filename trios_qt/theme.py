@@ -59,6 +59,13 @@ def enregistrer_polices(dossier: Path | None = None) -> list[str]:
     return sorted(familles)
 
 
+def _rgba(hexa: str, alpha: float) -> str:
+    """« #RRGGBB » + opacité -> « rgba(r, g, b, a) » (atténuation d'une couleur des jetons)."""
+    h = hexa.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r}, {g}, {b}, {alpha})"
+
+
 def construire_qss(jetons: dict) -> str:
     """Feuille QSS dérivée des jetons — aucune couleur n'est écrite en dur dans ce fichier."""
     c = jetons["couleurs"]
@@ -68,10 +75,15 @@ def construire_qss(jetons: dict) -> str:
     repli = jetons["polices"]["repli_windows"]
     return f"""
 QWidget {{
-    background-color: {c['fond']};
     color: {c['texte']};
     font-family: "{famille}", "{repli}";
     font-size: {int(t['courant'])}px;
+}}
+#fenetre, QWidget[classe="page"] {{
+    background-color: {c['fond']};
+}}
+QLabel {{
+    background-color: transparent;
 }}
 QToolTip {{
     background-color: {c['sureleve']};
@@ -85,19 +97,19 @@ QToolTip {{
     border-right: 1px solid {c['trait']};
 }}
 #logo {{
-    color: {c['texte']};
-    font-size: {int(t['titre_bloc'])}px;
-    font-weight: 700;
+    font-size: 20px;
+    font-weight: 800;
 }}
 QPushButton[classe="nav"] {{
     background-color: transparent;
     color: {c['texte_secondaire']};
     border: none;
     border-radius: {int(r['bouton'])}px;
-    padding: 9px 12px;
+    padding: 8px 10px;
+    min-height: 22px;
     text-align: left;
     font-size: {int(t['courant'])}px;
-    font-weight: 500;
+    font-weight: 400;
 }}
 QPushButton[classe="nav"]:hover {{
     background-color: {c['surface']};
@@ -107,6 +119,23 @@ QPushButton[classe="nav"]:checked {{
     background-color: {c['sureleve']};
     color: {c['texte']};
     font-weight: 600;
+}}
+#pastille_compteur {{
+    background-color: {_rgba(c['a_relire'], 0.18)};
+    color: {c['a_relire']};
+    border-radius: {int(r['puce'])}px;
+    padding: 1px 7px;
+    font-size: {int(t['aide'])}px;
+    font-weight: 600;
+}}
+#pastille_beta {{
+    background-color: transparent;
+    color: {c['texte_discret']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['puce'])}px;
+    padding: 0px 6px;
+    font-size: {int(t['aide'])}px;
+    font-weight: 500;
 }}
 #titre_ecran {{
     color: {c['texte']};
