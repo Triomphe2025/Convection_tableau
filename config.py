@@ -327,6 +327,18 @@ class Config:
     DETECTION_ENTETE_BANDE = 0.33
 
     # ========================================
+    # 🗂️ INTERFACE QT — FORMATS SOURCE (écran Convertir)
+    # ========================================
+
+    # Extensions acceptées au dépôt ; un dossier (d'images) est accepté comme source
+    # à part. Un format listé mais non reconnu par detecter_type (png/jpg) entre dans
+    # la file et attend que l'utilisateur choisisse son type (« à préciser »).
+    FORMATS_SOURCE = (
+        ".pdf", ".docx", ".xlsx", ".xlsm", ".jsonl",
+        ".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff",
+    )
+
+    # ========================================
     # 🔎 VÉRIFICATION DE CONVERSION
     # ========================================
 
