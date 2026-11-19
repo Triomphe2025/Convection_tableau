@@ -84,6 +84,28 @@ class TestPageConvertir:
         finally:
             animations.reinitialiser()
 
+    def test_fond_de_la_liste_est_la_couleur_fond(self, qtbot):
+        from PySide6.QtCore import QPoint
+        from trios_qt import animations, theme
+        from trios_qt.fenetre import FenetrePrincipale
+        app = creer_application([])
+        jetons = theme.appliquer_theme(app)
+        animations.definir_reduction(True)
+        try:
+            f = FenetrePrincipale(jetons=jetons)
+            f.resize(1360, 900)
+            qtbot.addWidget(f)
+            f.show()
+            app.processEvents()
+            app.processEvents()
+            viewport = f.page_convertir.defilement.viewport()
+            image = f.grab().toImage()
+            centre = viewport.mapTo(f, QPoint(viewport.width() // 2, viewport.height() - 8))
+            couleur = image.pixelColor(centre).name().upper()
+            assert couleur == jetons["couleurs"]["fond"].upper()
+        finally:
+            animations.reinitialiser()
+
     def test_a_preciser_est_colore_en_orange(self, qtbot):
         creer_application([])
         lanceur = LanceurAnalyse(analyser=lambda chemin, **kw: analyse.ResultatAnalyse(

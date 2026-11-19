@@ -20,7 +20,7 @@ class TestSigleFamille:
 
     def test_tableau_et_plan(self):
         assert presentation.sigle_famille("tableau") == "TAB"
-        assert presentation.sigle_famille("plan") == "PLN"
+        assert presentation.sigle_famille("plan") == "DXF"
 
     def test_famille_absente(self):
         assert presentation.sigle_famille(None) == "?"
@@ -80,3 +80,123 @@ class TestCouleurEtat:
 
     def test_erreur_est_rouge(self):
         assert presentation.couleur_etat(analyse.ERREUR, JETONS) == COULEURS['erreur']
+
+
+class TestNomFamille:
+
+    def test_familles_connues(self):
+        assert presentation.nom_famille("tableau") == "Tableau"
+        assert presentation.nom_famille("plan") == "Plan"
+        assert presentation.nom_famille("excel") == "Excel"
+
+    def test_famille_absente_est_inconnu(self):
+        assert presentation.nom_famille(None) == "Inconnu"
+
+
+class TestCouleurFamille:
+
+    def test_chaque_famille_a_sa_couleur(self):
+        assert presentation.couleur_famille("tableau", JETONS) == COULEURS['rose_trios']
+        assert presentation.couleur_famille("plan", JETONS) == COULEURS['texte_natif']
+        assert presentation.couleur_famille("excel", JETONS) == COULEURS['succes']
+        assert presentation.couleur_famille("journal", JETONS) == COULEURS['texte_discret']
+
+    def test_inconnu_est_orange(self):
+        assert presentation.couleur_famille(None, JETONS) == COULEURS['a_relire']
+
+
+class TestTextePages:
+
+    def test_detaille_scannees_et_natif(self):
+        res = _res(analyse.PRET, estimation={'pages': {
+            'total': 141, 'scan': 116, 'vectoriel': 25, 'ocr_invisible': 0, 'vide': 0}})
+        assert presentation.texte_pages(res) == "141 pages · 116 scannées · 25 en texte natif"
+
+    def test_une_seule_page_au_singulier(self):
+        res = _res(analyse.PRET, estimation={'pages': {
+            'total': 1, 'scan': 1, 'vectoriel': 0, 'ocr_invisible': 0, 'vide': 0}})
+        assert presentation.texte_pages(res) == "1 page · 1 scannée"
+
+    def test_sans_estimation_vide(self):
+        assert presentation.texte_pages(_res(analyse.ANALYSE)) == ""
+
+
+class TestTexteSortie:
+
+    def test_excel_et_dxf(self):
+        from types_documents import TYPE_PLAN
+        assert presentation.texte_sortie(_res(analyse.PRET, TYPE_PLAN)) == "→ DXF"
+        tab = _Type("Bornier standard", "tableau")
+        tab.sorties = ("excel",)
+        assert presentation.texte_sortie(_res(analyse.PRET, tab)) == "→ Excel"
+
+    def test_sans_type_vide(self):
+        assert presentation.texte_sortie(_res(analyse.INCONNU)) == ""
+
+
+class TestPreuveCourte:
+
+    def test_inconnu_dit_aucun_type(self):
+        assert presentation.preuve_courte(_res(analyse.INCONNU)) == "aucun type ne correspond"
+
+    def test_prend_la_derniere_preuve(self):
+        res = _res(analyse.PRET, _Type("X", "tableau"))
+        res.preuves = ["format 842 pt", "pied BORNIER reconnu"]
+        assert presentation.preuve_courte(res) == "pied BORNIER reconnu"
+
+
+class TestGroupesTypes:
+
+    def test_groupe_par_famille_dans_l_ordre(self):
+        from types_documents import TYPE_EXCEL, TYPE_JOURNAL, TYPE_PLAN
+        registre = {
+            "Bornier standard": _Type("Bornier standard", "tableau"),
+            "Répartiteur": _Type("Répartiteur", "tableau"),
+            "Plan": TYPE_PLAN,
+            "Excel": TYPE_EXCEL,
+            "Journal": TYPE_JOURNAL,
+        }
+        groupes = presentation.groupes_types(registre)
+        familles = [f for f, _ in groupes]
+        assert familles == ["tableau", "plan", "excel", "journal"]
+        noms_tableau = dict(groupes)["tableau"]
+        assert "Bornier standard" in noms_tableau and "Répartiteur" in noms_tableau
+
+    def test_libelle_de_groupe(self):
+        assert presentation.libelle_groupe("tableau") == "Tableaux → Excel"
+        assert presentation.libelle_groupe("plan") == "Plans → DXF"
+
+    def test_description_tableau_liste_les_modeles(self):
+        desc = presentation.description_groupe("tableau", ["Bornier standard", "Répartiteur"])
+        assert "Bornier standard" in desc and "Répartiteur" in desc
+
+    def test_description_plan_est_une_phrase(self):
+        desc = presentation.description_groupe("plan", ["Plan"])
+        assert "Plan" not in desc.split(" · ")  # pas juste le nom du type
+        assert desc  # une vraie description
+
+
+class TestLotPropose:
+
+    def test_propose_au_dela_de_100_pages_payantes(self):
+        res = _res(analyse.PRET, estimation={'pages_payantes': 141})
+        assert presentation.lot_propose(res) is True
+
+    def test_pas_propose_en_dessous(self):
+        res = _res(analyse.PRET, estimation={'pages_payantes': 76})
+        assert presentation.lot_propose(res) is False
+
+    def test_sans_estimation_non_propose(self):
+        assert presentation.lot_propose(_res(analyse.ANALYSE)) is False
+
+
+class TestProfils:
+
+    def test_trois_profils_tableau(self):
+        cles = [p.cle for p in presentation.PROFILS_TABLEAU]
+        assert cles == ["rapide", "precis", "difficile"]
+
+    def test_rapide_est_tesseract_sans_cout(self):
+        rapide = presentation.PROFILS_TABLEAU[0]
+        assert rapide.profil == "tesseract"
+        assert rapide.modele is None

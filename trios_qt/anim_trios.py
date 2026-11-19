@@ -1,7 +1,6 @@
-"""Animation « trios » du dépôt : feuille qui entre, tableau qui sort (3,6 s, en boucle)."""
+"""Logo « trios » animé (pulsation douce, 3,6 s en boucle) ; respecte réduit / écran caché."""
 from PySide6.QtCore import QAbstractAnimation, Qt, QVariantAnimation
-from PySide6.QtWidgets import (QGraphicsOpacityEffect, QLabel, QStackedLayout,
-                               QWidget)
+from PySide6.QtWidgets import QGraphicsOpacityEffect, QLabel, QVBoxLayout, QWidget
 
 from trios_qt import animations
 
@@ -9,25 +8,20 @@ DUREE_MS = 3600
 
 
 class AnimationTrios(QWidget):
-    """Fond animé décoratif ; respecte le réglage « animations réduites » et l'écran caché."""
+    """Mot-marque « trios » qui respire ; respecte le réglage « animations réduites »."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("anim_trios")
-        self._feuille = QLabel("\U0001F4C4", self)   # la feuille qui entre
-        self._tableau = QLabel("▦", self)        # le tableau qui sort
-        for etiquette in (self._feuille, self._tableau):
-            etiquette.setAlignment(Qt.AlignCenter)
-            etiquette.setObjectName("anim_trios_glyphe")
-        self._opacite_feuille = QGraphicsOpacityEffect(self._feuille)
-        self._opacite_tableau = QGraphicsOpacityEffect(self._tableau)
-        self._feuille.setGraphicsEffect(self._opacite_feuille)
-        self._tableau.setGraphicsEffect(self._opacite_tableau)
+        self._mot = QLabel("trios", self)
+        self._mot.setObjectName("anim_trios_glyphe")
+        self._mot.setAlignment(Qt.AlignCenter)
+        self._opacite = QGraphicsOpacityEffect(self._mot)
+        self._mot.setGraphicsEffect(self._opacite)
 
-        pile = QStackedLayout(self)
-        pile.setStackingMode(QStackedLayout.StackAll)
-        pile.addWidget(self._tableau)
-        pile.addWidget(self._feuille)
+        colonne = QVBoxLayout(self)
+        colonne.setContentsMargins(0, 0, 0, 0)
+        colonne.addWidget(self._mot)
 
         self._anim = QVariantAnimation(self)
         self._anim.setDuration(DUREE_MS)
@@ -38,9 +32,8 @@ class AnimationTrios(QWidget):
         self._peindre(0.0)
 
     def _peindre(self, valeur):
-        # La feuille s'efface pendant que le tableau apparaît (fondu croisé en boucle).
-        self._opacite_feuille.setOpacity(1.0 - valeur)
-        self._opacite_tableau.setOpacity(valeur)
+        # Triangle 1 → 0 → 1 : le mot respire sans saut à la reprise de boucle.
+        self._opacite.setOpacity(0.5 + 0.5 * abs(1.0 - 2.0 * valeur))
 
     def duree_ms(self):
         return self._anim.duration()

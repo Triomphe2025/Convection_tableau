@@ -1,13 +1,74 @@
 """Présentation d'une ligne (pur, sans Qt) : sigle, libellé de type, estimation, couleur d'état."""
+from dataclasses import dataclass
+from typing import Optional
+
 from trios_qt import analyse
+
+
+@dataclass(frozen=True)
+class Profil:
+    """Un profil de lecture proposé dans la ligne dépliée (tableau)."""
+    cle: str
+    titre: str
+    moteur: str
+    profil: str
+    modele: Optional[str]
+
+
+# Les trois profils d'un tableau (Rapide local, Précis/Difficile via Claude).
+PROFILS_TABLEAU = (
+    Profil("rapide", "Rapide", "Tesseract · sur ce PC", "tesseract", None),
+    Profil("precis", "Précis", "Claude Sonnet 5.5", "claude", "claude-sonnet-5-5"),
+    Profil("difficile", "Difficile", "Claude Opus 5.5", "claude", "claude-opus-5-5"),
+)
+
+# Finesses d'un plan (sans coût API, réglage de rendu).
+FINESSES_PLAN = ("Rapide", "Standard", "Précis")
 
 _SIGLES = {
     "tableau": "TAB",
-    "plan": "PLN",
+    "plan": "DXF",
     "excel": "XLS",
     "journal": "JRN",
     "mixte": "MIX",
 }
+
+_NOMS_FAMILLE = {
+    "tableau": "Tableau",
+    "plan": "Plan",
+    "excel": "Excel",
+    "journal": "Journal",
+    "mixte": "Mixte",
+}
+
+# Famille → nom du jeton de couleur du carré (atténué en QSS).
+_COULEUR_FAMILLE = {
+    "tableau": "rose_trios",
+    "plan": "texte_natif",
+    "excel": "succes",
+    "journal": "texte_discret",
+    "mixte": "page_scannee",
+}
+
+_LIBELLES_GROUPE = {
+    "tableau": "Tableaux → Excel",
+    "plan": "Plans → DXF",
+    "mixte": "Mixtes → Excel + DXF",
+    "excel": "Classeurs Excel",
+    "journal": "Journal .jsonl",
+}
+
+_ORDRE_GROUPES = ("tableau", "plan", "mixte", "excel", "journal")
+
+# Descriptions des groupes à type unique ; les tableaux listent plutôt leurs modèles.
+_DESCRIPTIONS_GROUPE = {
+    "plan": "Plans scannés en PDF ou TIFF",
+    "mixte": "Chaque page classée : tableau, plan ou légende",
+    "excel": "Mise en forme des classeurs produits par l'appli",
+    "journal": "Rejouer une conversion sans appel à Claude",
+}
+
+_NOMS_SORTIE = {"excel": "Excel", "dxf": "DXF"}
 
 # État → nom du jeton de couleur (orange « à préciser », vert « prêt », rouge « erreur »).
 _COULEUR_PAR_ETAT = {
@@ -21,6 +82,70 @@ _COULEUR_PAR_ETAT = {
 
 def sigle_famille(famille):
     return _SIGLES.get(famille, "?")
+
+
+def nom_famille(famille):
+    return _NOMS_FAMILLE.get(famille, "Inconnu")
+
+
+def couleur_famille(famille, jetons):
+    """Couleur (hex) du carré de famille, tirée des jetons ; orange si inconnue."""
+    nom = _COULEUR_FAMILLE.get(famille, "a_relire")
+    return jetons['couleurs'][nom]
+
+
+def texte_pages(resultat):
+    """« N pages · n scannées · n en texte natif » depuis l'estimation (parties nulles omises)."""
+    devis = resultat.estimation
+    if not devis:
+        return ""
+    pages = devis.get('pages') or {}
+    total = pages.get('total', 0)
+    parts = [f"{total} page{'s' if total > 1 else ''}"]
+    scan = pages.get('scan', 0)
+    if scan:
+        parts.append(f"{scan} scannée{'s' if scan > 1 else ''}")
+    natif = pages.get('vectoriel', 0)
+    if natif:
+        parts.append(f"{natif} en texte natif")
+    return " · ".join(parts)
+
+
+def texte_sortie(resultat):
+    """« → Excel » / « → DXF » depuis les sorties du type ; vide sans type."""
+    sorties = getattr(resultat.type, 'sorties', ()) or ()
+    noms = [_NOMS_SORTIE.get(s, s.upper()) for s in sorties]
+    return "→ " + " + ".join(noms) if noms else ""
+
+
+def preuve_courte(resultat):
+    """Preuve la plus parlante pour la sous-ligne ; « aucun type ne correspond » si inconnu."""
+    if resultat.etat == analyse.INCONNU:
+        return "aucun type ne correspond"
+    return resultat.preuves[-1] if resultat.preuves else ""
+
+
+def groupes_types(registre):
+    """[(famille, [noms triés])] dans l'ordre d'affichage, familles présentes seulement."""
+    par_famille = {}
+    for type_ in registre.values():
+        par_famille.setdefault(type_.famille, []).append(type_.nom)
+    groupes = []
+    for famille in _ORDRE_GROUPES:
+        if famille in par_famille:
+            groupes.append((famille, sorted(par_famille[famille])))
+    return groupes
+
+
+def libelle_groupe(famille):
+    return _LIBELLES_GROUPE.get(famille, nom_famille(famille))
+
+
+def description_groupe(famille, noms):
+    """Sous-titre d'un groupe : liste des modèles pour les tableaux, phrase fixe sinon."""
+    if famille == "tableau":
+        return " · ".join(noms)
+    return _DESCRIPTIONS_GROUPE.get(famille, " · ".join(noms))
 
 
 def texte_type(resultat):
@@ -50,6 +175,12 @@ def texte_estimation(resultat):
     prefixe = "au plus ~" if not devis.get('cache_connu', False) else "~"
     morceau_cout = f"{prefixe} {montant} $"
     return f"{morceau_cout} · {duree}" if duree else morceau_cout
+
+
+def lot_propose(resultat):
+    """Mode lot proposé d'office au-delà de 100 pages payantes (scan + couche OCR)."""
+    devis = resultat.estimation or {}
+    return devis.get('pages_payantes', 0) > 100
 
 
 def couleur_etat(etat, jetons):

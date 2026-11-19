@@ -67,8 +67,8 @@ class TestZoneDepot:
         sequences = [rc.key().toString() for rc in zone.raccourcis()]
         assert QKeySequence("Ctrl+O").toString() in sequences
 
-    def test_bouton_choisir_appelle_le_dialogue(self, zone, monkeypatch):
+    def test_lien_choisir_appelle_le_dialogue(self, zone, monkeypatch):
         appels = {}
         monkeypatch.setattr(zone, "choisir_fichiers", lambda: appels.setdefault("ok", True))
-        zone.bouton_choisir.click()
+        zone.invite.linkActivated.emit("#")
         assert appels.get("ok") is True

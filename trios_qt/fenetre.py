@@ -63,13 +63,18 @@ class FenetrePrincipale(QWidget):
         self._pile.setCurrentWidget(self.pages[premiere])
 
     def _monter_convertir(self) -> None:
-        # Remplace le remplissage de la page générique « convertir » par l'écran réel.
+        # Remplace tout le contenu de la page générique « convertir » par l'écran réel
+        # (qui porte son propre titre « Nouvelle conversion »).
         from trios_qt.page_convertir import PageConvertir
         page = self.pages["convertir"]
         disposition = page.layout()
-        dernier = disposition.takeAt(disposition.count() - 1)
-        if dernier is not None and dernier.spacerItem() is None:
-            disposition.addItem(dernier)  # ce n'était pas le ressort : on le remet
+        while disposition.count():
+            element = disposition.takeAt(0)
+            widget = element.widget()
+            if widget is not None:
+                widget.setParent(None)  # détache tout de suite (deleteLater est différé)
+                widget.deleteLater()
+        disposition.setContentsMargins(0, 0, 0, 0)
         self.page_convertir = PageConvertir(parent=page)
         disposition.addWidget(self.page_convertir, 1)
 

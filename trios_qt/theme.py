@@ -156,51 +156,65 @@ QPushButton[classe="nav"]:checked {{
     color: {c['texte_discret']};
     font-size: {int(t['aide'])}px;
 }}
+#sous_titre_ecran {{
+    color: {c['texte_secondaire']};
+    font-size: {int(t['courant'])}px;
+}}
 #zone_depot {{
     background-color: {c['surface']};
-    border: 2px dashed {c['trait']};
+    border: 1px solid {c['trait']};
     border-radius: {int(r['carte'])}px;
-    min-height: 150px;
 }}
-#depot_titre {{
+#depot_logo {{
+    border: 2px solid {c['rose_trios']};
+    border-radius: {int(r['bouton'])}px;
+    background-color: {_rgba(c['rose_trios'], 0.10)};
+}}
+#depot_invite {{
     color: {c['texte']};
     font-size: {int(t['titre_bloc'])}px;
     font-weight: 600;
 }}
-#depot_aide {{
+#depot_formats {{
     color: {c['texte_discret']};
     font-size: {int(t['aide'])}px;
 }}
-#depot_choisir, #panneau_gerer {{
-    background-color: {c['action_principale']};
-    color: {c['texte']};
+#liste_fichiers, #liste_viewport, #zone_liste {{
+    background-color: {c['fond']};
     border: none;
-    border-radius: {int(r['bouton'])}px;
-    padding: 8px 18px;
-    font-weight: 600;
-}}
-#depot_choisir:hover, #panneau_gerer:hover {{
-    background-color: {c['action_principale_survol']};
-}}
-#liste_fichiers {{
-    border: none;
-    background-color: transparent;
 }}
 #ligne_fichier {{
     background-color: {c['surface']};
     border: 1px solid {c['trait']};
     border-radius: {int(r['carte'])}px;
 }}
-#ligne_sigle {{
-    color: {c['texte_discret']};
-    font-weight: 700;
+#ligne_fichier[selectionne="true"] {{
+    border: 2px solid {c['action_principale']};
+}}
+#ligne_carre {{
+    font-size: {int(t['aide'])}px;
 }}
 #ligne_nom {{
     color: {c['texte']};
-    font-weight: 500;
+    font-family: "{jetons['polices']['codes']}", monospace;
+    font-size: {int(t['courant'])}px;
+}}
+#ligne_sousligne {{
+    color: {c['texte_discret']};
+    font-size: {int(t['aide'])}px;
+}}
+#ligne_type {{
+    font-size: {int(t['courant'])}px;
+}}
+#ligne_preuve {{
+    color: {c['texte_secondaire']};
+    font-size: {int(t['aide'])}px;
+}}
+#ligne_sortie {{
+    color: {c['texte_secondaire']};
 }}
 #ligne_estimation {{
-    color: {c['texte_secondaire']};
+    color: {c['texte_discret']};
     font-size: {int(t['aide'])}px;
 }}
 #ligne_retirer {{
@@ -208,28 +222,104 @@ QPushButton[classe="nav"]:checked {{
     color: {c['texte_discret']};
     border: none;
     font-size: {int(t['titre_bloc'])}px;
+    max-width: 22px;
 }}
 #ligne_retirer:hover {{
     color: {c['erreur']};
 }}
 #panneau_types {{
-    background-color: {c['barre_laterale']};
+    background-color: {c['surface']};
     border: 1px solid {c['trait']};
     border-radius: {int(r['carte'])}px;
-    min-width: 220px;
-    max-width: 260px;
+    min-width: 236px;
+    max-width: 276px;
 }}
 #panneau_titre {{
     color: {c['texte']};
     font-size: {int(t['titre_bloc'])}px;
     font-weight: 600;
 }}
-#panneau_type {{
+#panneau_gerer {{
+    background-color: transparent;
+    color: {c['rose_trios']};
+    border: none;
+    font-size: {int(t['aide'])}px;
+    font-weight: 600;
+}}
+#panneau_groupe_titre {{
+    color: {c['texte']};
+    font-weight: 600;
+}}
+#panneau_groupe_detail {{
+    color: {c['texte_discret']};
+    font-size: {int(t['aide'])}px;
+}}
+#carte_creer_type {{
+    background-color: transparent;
+    border: 1px dashed {c['trait']};
+    border-radius: {int(r['bouton'])}px;
+}}
+#creer_type_texte {{
+    color: {c['texte_discret']};
+    font-size: {int(t['aide'])}px;
+}}
+#resume_bas {{
     color: {c['texte_secondaire']};
-    padding: 2px 0px;
+}}
+#bouton_lancer {{
+    background-color: {c['action_principale']};
+    color: {c['texte']};
+    border: none;
+    border-radius: {int(r['bouton'])}px;
+    padding: 11px 22px;
+    font-weight: 700;
+}}
+#bouton_lancer:hover {{
+    background-color: {c['action_principale_survol']};
+}}
+#bouton_lancer:disabled {{
+    background-color: {c['tuile_attente']};
+    color: {c['texte_discret']};
+}}
+#profil_carte {{
+    background-color: {c['fond']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['bouton'])}px;
+}}
+#profil_carte[actif="true"] {{
+    border: 2px solid {c['action_principale']};
+}}
+#profil_titre {{
+    color: {c['texte']};
+    font-weight: 600;
+}}
+#profil_moteur {{
+    color: {c['texte_secondaire']};
+    font-size: {int(t['aide'])}px;
+}}
+#profil_estimation {{
+    color: {c['texte_discret']};
+    font-size: {int(t['aide'])}px;
+}}
+#case_lot, #deplie_note {{
+    color: {c['texte_secondaire']};
+    font-size: {int(t['aide'])}px;
+}}
+#finesse_bouton, #action_secondaire {{
+    background-color: {c['sureleve']};
+    color: {c['texte']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['bouton'])}px;
+    padding: 6px 14px;
+}}
+#finesse_bouton:checked {{
+    border: 1px solid {c['action_principale']};
+    color: {c['texte']};
 }}
 #anim_trios_glyphe {{
-    font-size: 54px;
+    color: {c['rose_trios']};
+    font-size: {int(t['titre_bloc'])}px;
+    font-weight: 800;
 }}
 """.strip()
 

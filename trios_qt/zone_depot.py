@@ -1,12 +1,18 @@
-"""Zone de dépôt de l'écran Convertir : glisser-déposer fichiers et dossiers, Choisir, Ctrl+O."""
+"""Bande de dépôt de l'écran Convertir : glisser-déposer fichiers et dossiers, lien, Ctrl+O."""
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (QFileDialog, QFrame, QHBoxLayout, QLabel,
-                               QPushButton, QVBoxLayout)
+                               QVBoxLayout)
 
 from config import Config
+from trios_qt import theme
+from trios_qt.anim_trios import AnimationTrios
+
+# Formats présentés à l'utilisateur (regroupés, lisibles) — la vraie liste reste FORMATS_SOURCE.
+_FORMATS_LISIBLES = ("PDF · TIFF · JPG/PNG · dossier d'images · "
+                     "Word .docx · Excel .xlsx · journal .jsonl")
 
 
 def filtrer_sources(chemins):
@@ -21,7 +27,7 @@ def filtrer_sources(chemins):
 
 
 class ZoneDepot(QFrame):
-    """Cible de dépôt : émet `sources_deposees` avec la liste des sources acceptées."""
+    """Bande de dépôt ; émet `sources_deposees` avec la liste des sources acceptées."""
 
     sources_deposees = Signal(list)
 
@@ -33,23 +39,30 @@ class ZoneDepot(QFrame):
         self._construire()
 
     def _construire(self):
-        colonne = QVBoxLayout(self)
-        colonne.setAlignment(Qt.AlignCenter)
-        self.titre = QLabel("Glissez vos fichiers ou dossiers ici", self)
-        self.titre.setObjectName("depot_titre")
-        self.titre.setAlignment(Qt.AlignCenter)
-        self.aide = QLabel("PDF, images, Word, Excel ou journal", self)
-        self.aide.setObjectName("depot_aide")
-        self.aide.setAlignment(Qt.AlignCenter)
-        rangee = QHBoxLayout()
-        rangee.setAlignment(Qt.AlignCenter)
-        self.bouton_choisir = QPushButton("Choisir", self)
-        self.bouton_choisir.setObjectName("depot_choisir")
-        self.bouton_choisir.clicked.connect(self.choisir_fichiers)
-        rangee.addWidget(self.bouton_choisir)
-        colonne.addWidget(self.titre)
-        colonne.addWidget(self.aide)
-        colonne.addLayout(rangee)
+        rangee = QHBoxLayout(self)
+        rangee.setContentsMargins(18, 10, 18, 10)
+        rangee.setSpacing(16)
+
+        self.logo = AnimationTrios(self)
+        self.logo.setObjectName("depot_logo")
+        self.logo.setFixedSize(52, 52)
+        rangee.addWidget(self.logo, 0, Qt.AlignVCenter)
+
+        colonne = QVBoxLayout()
+        colonne.setSpacing(2)
+        rose = theme.charger_jetons()["couleurs"]["rose_trios"]
+        self.invite = QLabel(self)
+        self.invite.setObjectName("depot_invite")
+        self.invite.setTextFormat(Qt.RichText)
+        self.invite.setText(
+            "Glisse des fichiers ici, ou "
+            f"<a href='#' style='text-decoration:none; color:{rose}'>choisis-les</a>")
+        self.invite.linkActivated.connect(lambda _=None: self.choisir_fichiers())
+        self.formats = QLabel(_FORMATS_LISIBLES, self)
+        self.formats.setObjectName("depot_formats")
+        colonne.addWidget(self.invite)
+        colonne.addWidget(self.formats)
+        rangee.addLayout(colonne, 1)
 
         raccourci = QShortcut(QKeySequence("Ctrl+O"), self)
         raccourci.activated.connect(self.choisir_fichiers)

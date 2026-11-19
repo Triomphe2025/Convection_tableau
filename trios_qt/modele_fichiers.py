@@ -17,6 +17,8 @@ class LigneFichier:
         self.chemin = Path(chemin)
         self.nom = self.chemin.name
         self.resultat = analyse.ResultatAnalyse(etat=analyse.ANALYSE)
+        self.profil_cle = "precis"   # profil de lecture choisi (ligne dépliée)
+        self.lot = None              # None = pas encore initialisé (défaut : lot_propose)
 
 
 class ModeleFichiers(QAbstractListModel):
