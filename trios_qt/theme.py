@@ -152,6 +152,10 @@ QPushButton[classe="nav"]:checked {{
 #etat_modele {{
     color: {c['texte_secondaire']};
 }}
+#etat_cle {{
+    color: {c['texte_discret']};
+    font-size: {int(t['aide'])}px;
+}}
 #etat_version {{
     color: {c['texte_discret']};
     font-size: {int(t['aide'])}px;
@@ -304,6 +308,16 @@ QPushButton[classe="nav"]:checked {{
 #case_lot, #deplie_note {{
     color: {c['texte_secondaire']};
     font-size: {int(t['aide'])}px;
+    spacing: 8px;
+}}
+#case_lot::indicator {{
+    width: 34px;
+    height: 18px;
+    border-radius: 9px;
+    background-color: {c['trait']};
+}}
+#case_lot::indicator:checked {{
+    background-color: {c['action_principale']};
 }}
 #finesse_bouton, #action_secondaire {{
     background-color: {c['sureleve']};

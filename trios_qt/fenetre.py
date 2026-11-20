@@ -156,16 +156,41 @@ class FenetrePrincipale(QWidget):
         self.pastilles[bouton.objectName()] = pastille
 
     def _carte_etat(self) -> QWidget:
+        import interface_helpers
+        from config import Config
+
+        c = self._jetons["couleurs"]
         carte = QWidget()
         carte.setObjectName("carte_etat")
         disposition = QVBoxLayout(carte)
         disposition.setContentsMargins(12, 10, 12, 10)
         disposition.setSpacing(2)
-        self.etiquette_modele = QLabel("Modèle : —")
+
+        modele = interface_helpers.nom_modele_lisible(
+            getattr(Config, "CLAUDE_OCR_MODEL", "")) or "—"
+        modele = modele.split(" — ")[0]   # carte étroite : sans la mention « recommandé »
+        self.etiquette_modele = QLabel(modele)
         self.etiquette_modele.setObjectName("etat_modele")
+
+        etat = interface_helpers.etat_cle_api(getattr(Config, "CLAUDE_API_KEY", ""))
+        self.couleur_cle = c["succes"] if etat == "configurée" else c["a_relire"]
+        ligne_cle = QHBoxLayout()
+        ligne_cle.setContentsMargins(0, 0, 0, 0)
+        ligne_cle.setSpacing(6)
+        self.pastille_cle = QLabel()
+        self.pastille_cle.setObjectName("etat_pastille_cle")
+        self.pastille_cle.setFixedSize(8, 8)
+        self.pastille_cle.setStyleSheet(
+            f"background-color: {self.couleur_cle}; border-radius: 4px;")
+        self.etiquette_cle = QLabel(f"clé {etat}")
+        self.etiquette_cle.setObjectName("etat_cle")
+        ligne_cle.addWidget(self.pastille_cle, 0, Qt.AlignmentFlag.AlignVCenter)
+        ligne_cle.addWidget(self.etiquette_cle, 1)
+
         self.etiquette_version = QLabel("Version 2.0 · aperçu")
         self.etiquette_version.setObjectName("etat_version")
         disposition.addWidget(self.etiquette_modele)
+        disposition.addLayout(ligne_cle)
         disposition.addWidget(self.etiquette_version)
         return carte
 

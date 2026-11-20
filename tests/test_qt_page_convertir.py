@@ -64,6 +64,16 @@ class TestPageConvertir:
         with qtbot.waitSignal(page.gerer_types, timeout=1000):
             page.bouton_gerer.click()
 
+    def test_panneau_types_ajuste_a_son_contenu(self, page):
+        from PySide6.QtWidgets import QSizePolicy
+        assert page.panneau_types.sizePolicy().verticalPolicy() == QSizePolicy.Maximum
+
+    def test_resume_colore_les_compteurs(self, page, qtbot):
+        with qtbot.waitSignal(page.lanceur.fini, timeout=2000):
+            page.ajouter_sources([r"C:\doc.pdf"])
+        couleurs = charger_jetons()["couleurs"]
+        assert couleurs["succes"] in page.resume.text()
+
     def test_retirer_enleve_la_ligne(self, page, qtbot):
         with qtbot.waitSignal(page.lanceur.fini, timeout=2000):
             page.ajouter_sources([r"C:\doc.pdf"])

@@ -1,7 +1,8 @@
 """Écran Convertir : en-tête, bande de dépôt, file des fichiers, panneau des types reconnus."""
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QCheckBox, QFrame, QHBoxLayout, QLabel,
-                               QPushButton, QScrollArea, QVBoxLayout, QWidget)
+                               QPushButton, QScrollArea, QSizePolicy, QVBoxLayout,
+                               QWidget)
 
 import estimation
 import types_documents
@@ -78,7 +79,7 @@ class PageConvertir(QWidget):
         corps = QHBoxLayout()
         corps.setSpacing(22)
         corps.addLayout(self._construire_colonne_gauche(), 1)
-        corps.addWidget(self._construire_panneau_types(), 0)
+        corps.addWidget(self._construire_panneau_types(), 0, Qt.AlignTop)
         colonne.addLayout(corps, 1)
 
     def _construire_colonne_gauche(self):
@@ -111,6 +112,7 @@ class PageConvertir(QWidget):
         rangee = QHBoxLayout()
         self.resume = QLabel("", self)
         self.resume.setObjectName("resume_bas")
+        self.resume.setTextFormat(Qt.RichText)
         rangee.addWidget(self.resume, 1, Qt.AlignVCenter)
         self.bouton_lancer = QPushButton("Lancer les 0 fichiers prêts  →", self)
         self.bouton_lancer.setObjectName("bouton_lancer")
@@ -123,6 +125,8 @@ class PageConvertir(QWidget):
     def _construire_panneau_types(self):
         panneau = QFrame(self)
         panneau.setObjectName("panneau_types")
+        panneau.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        self.panneau_types = panneau
         colonne = QVBoxLayout(panneau)
         colonne.setContentsMargins(16, 14, 16, 16)
         colonne.setSpacing(14)
@@ -142,7 +146,7 @@ class PageConvertir(QWidget):
         self._noms_types = sorted(registre.keys())
         for famille, noms in presentation.groupes_types(registre):
             colonne.addWidget(self._groupe_type(famille, noms, panneau))
-        colonne.addStretch(1)
+        colonne.addSpacing(4)
         colonne.addWidget(self._carte_creer_type(panneau))
         return panneau
 
@@ -232,10 +236,11 @@ class PageConvertir(QWidget):
                 return widget
         return None
 
-    def _estimer_ligne(self, ligne, profil, modele):
-        return self._estimer(str(ligne.chemin), type=ligne.resultat.type, profil=profil,
-                             lot=bool(ligne.lot), modele=modele,
-                             dossier_sortie=self._dossier_sortie)
+    def _estimer_ligne(self, ligne, profil):
+        return self._estimer(str(ligne.chemin), type=ligne.resultat.type,
+                             profil=profil.profil,
+                             lot=presentation.lot_effectif(profil, ligne.lot),
+                             modele=profil.modele, dossier_sortie=self._dossier_sortie)
 
     # ── Ligne dépliée ─────────────────────────────────────────────────
     def _remplir_deplie(self, widget, ligne):
@@ -266,7 +271,7 @@ class PageConvertir(QWidget):
         rangee = QHBoxLayout()
         rangee.setSpacing(10)
         for profil in presentation.PROFILS_TABLEAU:
-            devis = self._estimer_ligne(ligne, profil.profil, profil.modele)
+            devis = self._estimer_ligne(ligne, profil)
             carte = self._carte_profil(widget, ligne, profil, devis)
             widget.profil_cartes[profil.cle] = carte
             rangee.addWidget(carte, 1)
@@ -281,6 +286,9 @@ class PageConvertir(QWidget):
             lambda actif, i=ligne.ident: self.basculer_lot(i, actif))
         widget.case_lot = self.case_lot
         corps.addWidget(self.case_lot)
+
+        # La ligne (repliée) montre l'estimation du profil actif et du lot courant.
+        self.choisir_profil(ligne.ident, ligne.profil_cle)
 
     def _carte_profil(self, widget, ligne, profil, devis):
         carte = QFrame(self)
@@ -343,7 +351,7 @@ class PageConvertir(QWidget):
             return
         ligne.profil_cle = cle
         profil = next(p for p in presentation.PROFILS_TABLEAU if p.cle == cle)
-        ligne.resultat.estimation = self._estimer_ligne(ligne, profil.profil, profil.modele)
+        ligne.resultat.estimation = self._estimer_ligne(ligne, profil)
         widget = self._widget_par_ident(ident)
         if widget is not None:
             widget.mettre_a_jour(ligne)
@@ -386,10 +394,7 @@ class PageConvertir(QWidget):
                     if self.modele.ligne(r).resultat.etat == analyse.PRET)
         a_preciser = sum(1 for r in range(total) if self.modele.ligne(r).resultat.etat
                          in (analyse.A_PRECISER, analyse.INCONNU))
-        morceaux = [f"{total} fichier{'s' if total > 1 else ''}", f"{prets} prêts"]
-        if a_preciser:
-            morceaux.append(f"{a_preciser} à préciser")
-        self.resume.setText(" · ".join(morceaux))
+        self.resume.setText(presentation.texte_resume(total, prets, a_preciser, self._jetons))
         self.bouton_lancer.setText(f"Lancer les {prets} fichiers prêts  →")
         self.bouton_lancer.setEnabled(prets > 0)
 

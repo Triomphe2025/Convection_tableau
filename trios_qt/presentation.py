@@ -70,6 +70,12 @@ _DESCRIPTIONS_GROUPE = {
 
 _NOMS_SORTIE = {"excel": "Excel", "dxf": "DXF"}
 
+# Libellé du type pour les familles à type unique (évite « Excel › Excel »).
+_LIBELLE_TYPE_FAMILLE = {
+    "excel": "Mise en forme",
+    "journal": "Rejeu sans appel",
+}
+
 # État → nom du jeton de couleur (orange « à préciser », vert « prêt », rouge « erreur »).
 _COULEUR_PAR_ETAT = {
     analyse.ANALYSE: "texte_discret",
@@ -148,18 +154,29 @@ def description_groupe(famille, noms):
     return _DESCRIPTIONS_GROUPE.get(famille, " · ".join(noms))
 
 
+def _libelle_plan(resultat):
+    """« Plan vectoriel » si la couche texte domine, « Plan scanné » sinon."""
+    pages = (resultat.estimation or {}).get('pages') or {}
+    if pages.get('vectoriel', 0) > pages.get('scan', 0):
+        return "Plan vectoriel"
+    return "Plan scanné"
+
+
 def texte_type(resultat):
-    """Libellé du type pour la ligne, selon l'état de l'analyse."""
+    """Libellé du type pour la ligne, selon l'état de l'analyse (sans redondance de famille)."""
     if resultat.etat == analyse.ANALYSE:
         return "analyse…"
     if resultat.etat == analyse.ERREUR:
         return "erreur"
     if resultat.etat == analyse.INCONNU:
         return "à préciser"
-    nom = getattr(resultat.type, 'nom', '') or "à préciser"
+    famille = getattr(resultat.type, 'famille', None)
+    if famille == "plan":
+        return _libelle_plan(resultat)
+    base = _LIBELLE_TYPE_FAMILLE.get(famille) or getattr(resultat.type, 'nom', '') or "à préciser"
     if resultat.etat == analyse.A_PRECISER:
-        return f"{nom} ? (à préciser)"
-    return nom
+        return f"{base} ? (à préciser)"
+    return base
 
 
 def texte_estimation(resultat):
@@ -181,6 +198,22 @@ def lot_propose(resultat):
     """Mode lot proposé d'office au-delà de 100 pages payantes (scan + couche OCR)."""
     devis = resultat.estimation or {}
     return devis.get('pages_payantes', 0) > 100
+
+
+def lot_effectif(profil, lot):
+    """Le lot (Message Batches) ne concerne que les profils Claude, jamais Tesseract."""
+    return bool(lot) and profil.modele is not None
+
+
+def texte_resume(total, prets, a_preciser, jetons):
+    """Résumé du bas de page, compteurs colorés (prêts en succès, à préciser en orange)."""
+    c = jetons['couleurs']
+    morceaux = [f"{total} fichier{'s' if total > 1 else ''}",
+                f"<span style='color:{c['succes']}'>{prets} prêts</span>"]
+    if a_preciser:
+        morceaux.append(
+            f"<span style='color:{c['a_relire']}'>{a_preciser} à préciser</span>")
+    return " · ".join(morceaux)
 
 
 def couleur_etat(etat, jetons):

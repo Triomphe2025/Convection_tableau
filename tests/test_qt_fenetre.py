@@ -39,3 +39,27 @@ def test_badge_relecture_affiche_le_compteur(fenetre):
 
 def test_plans_porte_la_mention_beta(fenetre):
     assert fenetre.pastilles["nav_plans"].text() == "bêta"
+
+
+def test_carte_etat_cle_configuree_pastille_verte(qtbot, monkeypatch):
+    from config import Config
+    from trios_qt import theme
+    monkeypatch.setattr(Config, "CLAUDE_API_KEY", "sk-xxxx", raising=False)
+    monkeypatch.setattr(Config, "CLAUDE_OCR_MODEL", "claude-sonnet-5-5", raising=False)
+    jetons = theme.charger_jetons()
+    f = FenetrePrincipale(jetons=jetons)
+    qtbot.addWidget(f)
+    assert "Sonnet" in f.etiquette_modele.text()
+    assert "configurée" in f.etiquette_cle.text()
+    assert f.couleur_cle == jetons["couleurs"]["succes"]
+
+
+def test_carte_etat_cle_absente_pastille_orange(qtbot, monkeypatch):
+    from config import Config
+    from trios_qt import theme
+    monkeypatch.setattr(Config, "CLAUDE_API_KEY", "", raising=False)
+    jetons = theme.charger_jetons()
+    f = FenetrePrincipale(jetons=jetons)
+    qtbot.addWidget(f)
+    assert "absente" in f.etiquette_cle.text()
+    assert f.couleur_cle == jetons["couleurs"]["a_relire"]

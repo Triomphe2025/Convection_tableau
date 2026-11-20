@@ -32,6 +32,26 @@ class TestTexteType:
         res = _res(analyse.PRET, _Type("Bornier standard", "tableau"))
         assert presentation.texte_type(res) == "Bornier standard"
 
+    def test_plan_scanne_pas_redondant(self):
+        from types_documents import TYPE_PLAN
+        res = _res(analyse.PRET, TYPE_PLAN, estimation={'pages': {
+            'total': 1, 'scan': 1, 'vectoriel': 0, 'ocr_invisible': 0, 'vide': 0}})
+        assert presentation.texte_type(res) == "Plan scanné"
+
+    def test_plan_vectoriel_selon_natures(self):
+        from types_documents import TYPE_PLAN
+        res = _res(analyse.PRET, TYPE_PLAN, estimation={'pages': {
+            'total': 2, 'scan': 0, 'vectoriel': 2, 'ocr_invisible': 0, 'vide': 0}})
+        assert presentation.texte_type(res) == "Plan vectoriel"
+
+    def test_excel_est_mise_en_forme(self):
+        from types_documents import TYPE_EXCEL
+        assert presentation.texte_type(_res(analyse.PRET, TYPE_EXCEL)) == "Mise en forme"
+
+    def test_journal_est_rejeu(self):
+        from types_documents import TYPE_JOURNAL
+        assert presentation.texte_type(_res(analyse.PRET, TYPE_JOURNAL)) == "Rejeu sans appel"
+
     def test_a_preciser_est_signale(self):
         res = _res(analyse.A_PRECISER, _Type("Répartiteur", "tableau"))
         assert "à préciser" in presentation.texte_type(res)
@@ -200,3 +220,27 @@ class TestProfils:
         rapide = presentation.PROFILS_TABLEAU[0]
         assert rapide.profil == "tesseract"
         assert rapide.modele is None
+
+
+class TestLotEffectif:
+
+    def test_lot_sur_un_profil_claude(self):
+        precis = presentation.PROFILS_TABLEAU[1]
+        assert presentation.lot_effectif(precis, True) is True
+
+    def test_lot_ignore_sur_tesseract(self):
+        rapide = presentation.PROFILS_TABLEAU[0]   # Tesseract : le lot ne s'applique pas
+        assert presentation.lot_effectif(rapide, True) is False
+
+
+class TestTexteResume:
+
+    def test_colore_les_compteurs(self):
+        jetons = JETONS
+        texte = presentation.texte_resume(5, 4, 1, jetons)
+        assert COULEURS['succes'] in texte and "4 prêts" in texte
+        assert COULEURS['a_relire'] in texte and "1 à préciser" in texte
+
+    def test_sans_a_preciser_omis(self):
+        texte = presentation.texte_resume(3, 3, 0, JETONS)
+        assert "à préciser" not in texte

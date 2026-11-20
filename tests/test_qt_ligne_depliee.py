@@ -81,6 +81,34 @@ class TestLigneDepliee:
         assert p.modele.ligne(0).resultat.estimation['cout_usd'] == pytest.approx(0.10)
         assert "0,10" in p.widget_ligne(0).texte_estimation_affiche()
 
+    def test_ligne_reflete_le_profil_actif_au_depli(self, qtbot):
+        # Au dépli, la ligne montre le profil actif (Précis) + lot auto → 0,12 × 0,5 = 0,06.
+        p = _page(qtbot, [_res()])
+        _ajouter(p, qtbot, [r"C:\a.pdf"])
+        p.selectionner(p.modele.ligne(0).ident)
+        assert p.modele.ligne(0).resultat.estimation['cout_usd'] == pytest.approx(0.06)
+
+    def test_profil_tesseract_appele_sans_lot(self, qtbot):
+        # Le lot ne concerne que Claude : estimer reçoit lot=False pour le profil Tesseract.
+        appels = []
+
+        def estimer_rec(chemin, type=None, profil=None, lot=False, modele=None,
+                        dossier_sortie=None):
+            appels.append((modele, lot))
+            return _estimer(chemin, type=type, profil=profil, lot=lot, modele=modele)
+
+        creer_application([])
+        lanceur = LanceurAnalyse(analyser=lambda chemin, **kw: _res())
+        p = PageConvertir(lanceur=lanceur, estimer_fn=estimer_rec)
+        qtbot.addWidget(p)
+        with qtbot.waitSignal(p.lanceur.fini, timeout=2000):
+            p.ajouter_sources([r"C:\a.pdf"])
+        p.selectionner(p.modele.ligne(0).ident)   # lot auto True → 3 cartes estimées
+        lots_tesseract = [lot for modele, lot in appels if modele is None]
+        lots_claude = [lot for modele, lot in appels if modele is not None]
+        assert lots_tesseract and all(lot is False for lot in lots_tesseract)
+        assert any(lot is True for lot in lots_claude)
+
     def test_lot_propose_au_dela_de_100_pages(self, qtbot):
         p = _page(qtbot, [_res(payantes=141)])
         _ajouter(p, qtbot, [r"C:\a.pdf"])
