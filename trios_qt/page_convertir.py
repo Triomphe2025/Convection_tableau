@@ -1,12 +1,13 @@
 """Écran Convertir : en-tête, bande de dépôt, file des fichiers, panneau des types reconnus."""
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (QCheckBox, QFrame, QHBoxLayout, QLabel,
                                QPushButton, QScrollArea, QSizePolicy, QVBoxLayout,
                                QWidget)
 
 import estimation
 import types_documents
-from trios_qt import analyse, presentation, theme
+from trios_qt import analyse, presentation, reglages, theme
 from trios_qt.ligne_fichier_widget import MIME_IDENT, LigneFichierWidget
 from trios_qt.modele_fichiers import LanceurAnalyse, ModeleFichiers
 from trios_qt.zone_depot import ZoneDepot
@@ -50,7 +51,7 @@ class PageConvertir(QWidget):
         self._jetons = theme.charger_jetons()
         self._widgets = []
         self._ident_selectionne = None
-        self._dossier_sortie = None   # fixé au bas de page à l'étape 5
+        self._dossier_sortie = reglages.lire_dossier_sortie() or ""   # mémorisé entre sessions
 
         self.modele = ModeleFichiers()
         self.lanceur = lanceur or LanceurAnalyse()
@@ -82,6 +83,10 @@ class PageConvertir(QWidget):
         corps.addWidget(self._construire_panneau_types(), 0, Qt.AlignTop)
         colonne.addLayout(corps, 1)
 
+        for sequence in ("Ctrl+Return", "Ctrl+Enter"):
+            raccourci = QShortcut(QKeySequence(sequence), self)
+            raccourci.activated.connect(self._tenter_lancer)
+
     def _construire_colonne_gauche(self):
         gauche = QVBoxLayout()
         gauche.setSpacing(16)
@@ -109,6 +114,23 @@ class PageConvertir(QWidget):
         return gauche
 
     def _construire_bas_de_page(self):
+        colonne = QVBoxLayout()
+        colonne.setSpacing(8)
+
+        rangee_dossier = QHBoxLayout()
+        libelle = QLabel("Dossier de sortie :", self)
+        libelle.setObjectName("dossier_libelle")
+        self.etiquette_dossier = QLabel(self._dossier_sortie or "— à choisir", self)
+        self.etiquette_dossier.setObjectName("dossier_chemin")
+        bouton_dossier = QPushButton("Choisir…", self)
+        bouton_dossier.setObjectName("action_secondaire")
+        bouton_dossier.setCursor(Qt.PointingHandCursor)
+        bouton_dossier.clicked.connect(self._choisir_dossier)
+        rangee_dossier.addWidget(libelle, 0)
+        rangee_dossier.addWidget(self.etiquette_dossier, 1)
+        rangee_dossier.addWidget(bouton_dossier, 0)
+        colonne.addLayout(rangee_dossier)
+
         rangee = QHBoxLayout()
         self.resume = QLabel("", self)
         self.resume.setObjectName("resume_bas")
@@ -119,8 +141,30 @@ class PageConvertir(QWidget):
         self.bouton_lancer.setCursor(Qt.PointingHandCursor)
         self.bouton_lancer.clicked.connect(self.lancer_demande.emit)
         rangee.addWidget(self.bouton_lancer, 0, Qt.AlignRight)
+        colonne.addLayout(rangee)
+
         self._mettre_a_jour_resume()
-        return rangee
+        return colonne
+
+    def _tenter_lancer(self):
+        if self.bouton_lancer.isEnabled():
+            self.lancer_demande.emit()
+
+    def fichiers_a_lancer(self):
+        """Couples (chemin, dossier effectif) des fichiers prêts, dans l'ordre de la file."""
+        couples = []
+        for rang in range(self.modele.rowCount()):
+            ligne = self.modele.ligne(rang)
+            if ligne.resultat.etat == analyse.PRET:
+                couples.append((str(ligne.chemin), self.dossier_effectif(ligne)))
+        return couples
+
+    def _choisir_dossier(self):
+        from PySide6.QtWidgets import QFileDialog
+        chemin = QFileDialog.getExistingDirectory(self, "Dossier de sortie",
+                                                  self._dossier_sortie or "")
+        if chemin:
+            self.definir_dossier_sortie(chemin)
 
     def _construire_panneau_types(self):
         panneau = QFrame(self)
@@ -236,11 +280,41 @@ class PageConvertir(QWidget):
                 return widget
         return None
 
+    def dossier_effectif(self, ligne):
+        return ligne.dossier_sortie or self._dossier_sortie
+
     def _estimer_ligne(self, ligne, profil):
         return self._estimer(str(ligne.chemin), type=ligne.resultat.type,
                              profil=profil.profil,
                              lot=presentation.lot_effectif(profil, ligne.lot),
-                             modele=profil.modele, dossier_sortie=self._dossier_sortie)
+                             modele=profil.modele, dossier_sortie=self.dossier_effectif(ligne))
+
+    def definir_dossier_sortie(self, chemin):
+        self._dossier_sortie = chemin or ""
+        reglages.ecrire_dossier_sortie(self._dossier_sortie)
+        self._rafraichir_dossier()
+
+    def definir_dossier_fichier(self, ident, chemin):
+        _, ligne = self._ligne_par_ident(ident)
+        if ligne is not None:
+            ligne.dossier_sortie = chemin or None
+            self._rafraichir_dossier()
+
+    def _rafraichir_dossier(self):
+        if hasattr(self, "etiquette_dossier"):
+            self.etiquette_dossier.setText(self._dossier_sortie or "— à choisir")
+        if self._ident_selectionne is not None:
+            _, ligne = self._ligne_par_ident(self._ident_selectionne)
+            if ligne is not None and getattr(ligne.resultat.type, 'famille', None) == "tableau":
+                self.choisir_profil(self._ident_selectionne, ligne.profil_cle)
+        self._mettre_a_jour_resume()
+
+    def _tous_prets_ont_dossier(self):
+        for rang in range(self.modele.rowCount()):
+            ligne = self.modele.ligne(rang)
+            if ligne.resultat.etat == analyse.PRET and not self.dossier_effectif(ligne):
+                return False
+        return True
 
     # ── Ligne dépliée ─────────────────────────────────────────────────
     def _remplir_deplie(self, widget, ligne):
@@ -396,7 +470,7 @@ class PageConvertir(QWidget):
                          in (analyse.A_PRECISER, analyse.INCONNU))
         self.resume.setText(presentation.texte_resume(total, prets, a_preciser, self._jetons))
         self.bouton_lancer.setText(f"Lancer les {prets} fichiers prêts  →")
-        self.bouton_lancer.setEnabled(prets > 0)
+        self.bouton_lancer.setEnabled(prets > 0 and self._tous_prets_ont_dossier())
 
     # ── Accès pour les tests ──────────────────────────────────────────
     def widget_ligne(self, rang):

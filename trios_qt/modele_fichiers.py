@@ -19,6 +19,7 @@ class LigneFichier:
         self.resultat = analyse.ResultatAnalyse(etat=analyse.ANALYSE)
         self.profil_cle = "precis"   # profil de lecture choisi (ligne dépliée)
         self.lot = None              # None = pas encore initialisé (défaut : lot_propose)
+        self.dossier_sortie = None   # surcharge par fichier ; sinon le dossier commun
 
 
 class ModeleFichiers(QAbstractListModel):

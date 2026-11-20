@@ -20,6 +20,8 @@ def test_creer_fenetre_titre_et_pages(qtbot):
     fenetre = creer_fenetre()
     qtbot.addWidget(fenetre)
     assert fenetre.windowTitle() == TITRE_FENETRE
-    # La fenêtre porte les 6 écrans (4 principaux + Réglages + Aide).
-    assert set(fenetre.pages) == {
-        "convertir", "relecture", "mise_en_forme", "plans", "reglages", "aide"}
+    # Les 6 écrans de la barre latérale (4 principaux + Réglages + Aide)…
+    assert {"convertir", "relecture", "mise_en_forme", "plans",
+            "reglages", "aide"} <= set(fenetre.pages)
+    # … plus l'écran Traitement, hors barre latérale (atteint depuis « Lancer »).
+    assert "traitement" in fenetre.pages

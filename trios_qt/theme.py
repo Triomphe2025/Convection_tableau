@@ -270,6 +270,14 @@ QPushButton[classe="nav"]:checked {{
 #resume_bas {{
     color: {c['texte_secondaire']};
 }}
+#dossier_libelle {{
+    color: {c['texte_secondaire']};
+}}
+#dossier_chemin {{
+    color: {c['texte']};
+    font-family: "{jetons['polices']['codes']}", monospace;
+    font-size: {int(t['aide'])}px;
+}}
 #bouton_lancer {{
     background-color: {c['action_principale']};
     color: {c['texte']};
@@ -334,6 +342,31 @@ QPushButton[classe="nav"]:checked {{
     color: {c['rose_trios']};
     font-size: {int(t['titre_bloc'])}px;
     font-weight: 800;
+}}
+#traitement_fichier {{
+    color: {c['texte']};
+    font-family: "{jetons['polices']['codes']}", monospace;
+    font-size: {int(t['titre_bloc'])}px;
+}}
+#traitement_progression {{
+    color: {c['texte_secondaire']};
+}}
+#traitement_journal {{
+    background-color: {c['surface']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['bouton'])}px;
+    color: {c['texte_secondaire']};
+    font-family: "{jetons['polices']['codes']}", monospace;
+    font-size: {int(t['aide'])}px;
+    padding: 10px;
+}}
+#bouton_arreter {{
+    background-color: transparent;
+    color: {c['erreur']};
+    border: 1px solid {c['erreur']};
+    border-radius: {int(r['bouton'])}px;
+    padding: 8px 18px;
+    font-weight: 600;
 }}
 """.strip()
 

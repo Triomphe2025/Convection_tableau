@@ -6,12 +6,18 @@ animations sont réduites.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QObject, QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QButtonGroup, QHBoxLayout, QLabel, QPushButton, QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from trios_qt import animations, icones, theme
+
+
+class _PontEvenements(QObject):
+    """Fait traverser au fil de l'interface les événements émis par le fil de conversion."""
+    recu = Signal(object)
+
 
 LARGEUR_BARRE = 232  # px, comme la maquette 01_convertir
 TAILLE_ICONE = 18
@@ -34,10 +40,14 @@ NAV_BAS = (
 class FenetrePrincipale(QWidget):
     """Fenêtre racine ; expose .pages, .boutons et aller_a(clé) pour la navigation et les tests."""
 
-    def __init__(self, jetons: dict | None = None, points_a_relire: int = 0):
+    def __init__(self, jetons: dict | None = None, points_a_relire: int = 0,
+                 fabrique_service=None):
         super().__init__()
         self._jetons = jetons or theme.charger_jetons()
         self._points_a_relire = points_a_relire
+        self._fabrique_service = fabrique_service or self._fabrique_reelle
+        self._controleur = None
+        self._ponts = []
         self.setObjectName("fenetre")  # cible QSS du fond général (pas tous les QWidget)
         self.setWindowTitle(TITRE_FENETRE)
         self.resize(1360, 900)
@@ -57,10 +67,47 @@ class FenetrePrincipale(QWidget):
         racine.addWidget(self._pile, 1)
 
         self._monter_convertir()
+        self._monter_traitement()
 
         premiere = NAV_PRINCIPALE[0][0]
         self.boutons[premiere].setChecked(True)
         self._pile.setCurrentWidget(self.pages[premiere])
+
+    def _monter_traitement(self) -> None:
+        # Écran Traitement hors barre latérale : atteint depuis « Lancer ».
+        from trios_qt.page_traitement import PageTraitement
+        self.page_traitement = PageTraitement()
+        self.page_traitement.setProperty("classe", "page")
+        self.pages["traitement"] = self.page_traitement
+        self._pile.addWidget(self.page_traitement)
+        self.page_convertir.lancer_demande.connect(self._lancer_conversion)
+        self.page_traitement.arret_demande.connect(self._arreter_conversion)
+
+    def _lancer_conversion(self) -> None:
+        from trios_qt.lancement import ControleurLancement
+        couples = self.page_convertir.fichiers_a_lancer()
+        if not couples:
+            return
+        self._controleur = ControleurLancement(self._fabrique_service, self.page_traitement)
+        self.aller_a("traitement")
+        self._controleur.lancer(couples)
+
+    def _arreter_conversion(self) -> None:
+        if self._controleur is not None:
+            self._controleur.arreter()
+
+    def _fabrique_reelle(self, chemin, dossier, on_evenement):
+        from pathlib import Path
+
+        from converter import Converter
+        from service_conversion import ServiceConversion
+
+        pont = _PontEvenements()
+        pont.recu.connect(on_evenement, Qt.ConnectionType.QueuedConnection)
+        self._ponts.append(pont)   # garder la référence (sinon ramassé)
+        converter = Converter(Path(chemin), Path(dossier or "."),
+                              on_log=lambda _m: None)
+        return ServiceConversion(converter, on_evenement=pont.recu.emit)
 
     def _monter_convertir(self) -> None:
         # Remplace tout le contenu de la page générique « convertir » par l'écran réel
@@ -197,8 +244,9 @@ class FenetrePrincipale(QWidget):
     def aller_a(self, cle: str) -> None:
         page = self.pages[cle]
         self._pile.setCurrentWidget(page)
-        if not self.boutons[cle].isChecked():
-            self.boutons[cle].setChecked(True)
+        bouton = self.boutons.get(cle)   # les écrans hors nav (traitement) n'ont pas de bouton
+        if bouton is not None and not bouton.isChecked():
+            bouton.setChecked(True)
         animations.fondu_entree(page, self._duree, self._courbe)
 
     def ecran_courant(self) -> str:
