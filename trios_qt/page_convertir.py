@@ -462,13 +462,33 @@ class PageConvertir(QWidget):
                 self.modele.retirer(rang)
                 return
 
+    def _est_differe(self, ligne):
+        """Le fichier prêt est-il lu en lot (différé) : seulement un tableau en profil Claude."""
+        if getattr(ligne.resultat.type, 'famille', None) != "tableau":
+            return False
+        profil = next((p for p in presentation.PROFILS_TABLEAU
+                       if p.cle == ligne.profil_cle), None)
+        return bool(profil) and presentation.lot_effectif(profil, ligne.lot)
+
+    def _entree_cout(self, ligne):
+        devis = ligne.resultat.estimation or {}
+        return {'cout_usd': devis.get('cout_usd', 0.0),
+                'cache_connu': devis.get('cache_connu', True),
+                'differe': self._est_differe(ligne)}
+
     def _mettre_a_jour_resume(self):
         total = self.modele.rowCount()
-        prets = sum(1 for r in range(total)
-                    if self.modele.ligne(r).resultat.etat == analyse.PRET)
+        prets_lignes = [self.modele.ligne(r) for r in range(total)
+                        if self.modele.ligne(r).resultat.etat == analyse.PRET]
+        prets = len(prets_lignes)
         a_preciser = sum(1 for r in range(total) if self.modele.ligne(r).resultat.etat
                          in (analyse.A_PRECISER, analyse.INCONNU))
-        self.resume.setText(presentation.texte_resume(total, prets, a_preciser, self._jetons))
+        resume = presentation.texte_resume(total, prets, a_preciser, self._jetons)
+        cout = presentation.texte_cout_total(
+            [self._entree_cout(ligne) for ligne in prets_lignes], self._jetons)
+        if cout:
+            resume = f"{resume} · {cout}"
+        self.resume.setText(resume)
         self.bouton_lancer.setText(f"Lancer les {prets} fichiers prêts  →")
         self.bouton_lancer.setEnabled(prets > 0 and self._tous_prets_ont_dossier())
 

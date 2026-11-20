@@ -152,6 +152,21 @@ class TestLigneDepliee:
         p.deposer_reordonne(a, 130)   # b (85) au-dessus, c (145) en dessous → rang 1
         assert [p.modele.ligne(i).ident for i in range(3)] == [b, a, c]
 
+    def test_footer_cumule_cout_claude_et_differe(self, qtbot):
+        # Deux fichiers prêts : a en lot (0,06 différé), b sans lot (0,12) → total 0,18.
+        p = _page(qtbot, [_res(), _res()])
+        _ajouter(p, qtbot, [r"C:\a.pdf", r"C:\b.pdf"])
+        a = p.modele.ligne(0).ident
+        b = p.modele.ligne(1).ident
+        p.selectionner(a)
+        p.choisir_profil(a, "precis")      # lot auto (141 pages) → 0,06 différé
+        p.selectionner(b)
+        p.choisir_profil(b, "precis")
+        p.basculer_lot(b, False)           # sans lot → 0,12 immédiat
+        texte = p.resume.text()
+        assert "0,18" in texte and "Claude" in texte
+        assert "0,06" in texte and "différé" in texte
+
     def test_inconnu_deplie_offre_creer_un_type(self, qtbot):
         p = _page(qtbot, [_res(etat=analyse.INCONNU, type_=None)])
         _ajouter(p, qtbot, [r"C:\mystere.pdf"])

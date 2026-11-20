@@ -216,6 +216,32 @@ def texte_resume(total, prets, a_preciser, jetons):
     return " · ".join(morceaux)
 
 
+def _montant(cout):
+    """« 0,18 » : deux décimales, virgule française."""
+    return f"{cout:.2f}".replace('.', ',')
+
+
+def texte_cout_total(entrees, jetons):
+    """Coût Claude cumulé des fichiers prêts + part en différé ; « ~ » / « au plus » comme
+    les lignes. Vide s'il n'y a aucun coût API (fichiers Tesseract, plans, Excel seuls).
+
+    Chaque entrée : {'cout_usd', 'cache_connu', 'differe'}."""
+    c = jetons['couleurs']
+    total = sum(e.get('cout_usd', 0.0) for e in entrees)
+    if total <= 0:
+        return ""
+    differe = sum(e.get('cout_usd', 0.0) for e in entrees if e.get('differe'))
+    incertain = any(not e.get('cache_connu', True)
+                    for e in entrees if e.get('cout_usd', 0.0) > 0)
+    prefixe = "au plus ~" if incertain else "~"
+    texte = (f"<span style='color:{c['texte_secondaire']}'>"
+             f"{prefixe} {_montant(total)} $ Claude</span>")
+    if differe > 0:
+        texte += (f" · <span style='color:{c['texte_discret']}'>"
+                  f"dont {_montant(differe)} $ en différé</span>")
+    return texte
+
+
 def couleur_etat(etat, jetons):
     """Couleur (hex) de l'état, tirée des jetons du thème."""
     nom = _COULEUR_PAR_ETAT.get(etat, "texte_secondaire")

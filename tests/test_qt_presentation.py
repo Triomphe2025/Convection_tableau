@@ -244,3 +244,39 @@ class TestTexteResume:
     def test_sans_a_preciser_omis(self):
         texte = presentation.texte_resume(3, 3, 0, JETONS)
         assert "à préciser" not in texte
+
+
+class TestTexteCoutTotal:
+
+    def test_somme_les_couts_claude(self):
+        entrees = [{'cout_usd': 0.12, 'cache_connu': True, 'differe': False},
+                   {'cout_usd': 0.06, 'cache_connu': True, 'differe': True}]
+        texte = presentation.texte_cout_total(entrees, JETONS)
+        assert "0,18" in texte and "Claude" in texte
+
+    def test_part_en_differe_chiffree(self):
+        entrees = [{'cout_usd': 0.12, 'cache_connu': True, 'differe': False},
+                   {'cout_usd': 0.06, 'cache_connu': True, 'differe': True}]
+        texte = presentation.texte_cout_total(entrees, JETONS)
+        assert "dont 0,06" in texte and "différé" in texte
+
+    def test_sans_differe_aucune_mention(self):
+        entrees = [{'cout_usd': 0.12, 'cache_connu': True, 'differe': False}]
+        texte = presentation.texte_cout_total(entrees, JETONS)
+        assert "différé" not in texte
+        assert "0,12" in texte
+
+    def test_cache_inconnu_affiche_au_plus(self):
+        entrees = [{'cout_usd': 0.12, 'cache_connu': False, 'differe': False}]
+        assert "au plus" in presentation.texte_cout_total(entrees, JETONS)
+
+    def test_cache_connu_sans_au_plus(self):
+        entrees = [{'cout_usd': 0.12, 'cache_connu': True, 'differe': False}]
+        assert "au plus" not in presentation.texte_cout_total(entrees, JETONS)
+
+    def test_aucun_cout_claude_vide(self):
+        entrees = [{'cout_usd': 0.0, 'cache_connu': True, 'differe': False}]
+        assert presentation.texte_cout_total(entrees, JETONS) == ""
+
+    def test_liste_vide_vide(self):
+        assert presentation.texte_cout_total([], JETONS) == ""
