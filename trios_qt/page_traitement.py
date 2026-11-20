@@ -7,6 +7,14 @@ import evenements as ev
 
 _MAX_LIGNES = 5
 
+# Libellés lisibles des phases (jamais le nom brut « phase » / l'état technique à l'écran).
+_LIBELLES_PHASE = {
+    'analyse': "Analyse du document",
+    'lecture': "Lecture des pages",
+    'controles': "Contrôles qualité",
+    'excel': "Génération du classeur",
+}
+
 
 class PageTraitement(QWidget):
     """Suit une conversion en cours : fichier, « page n / total », 5 dernières lignes, Arrêter."""
@@ -47,7 +55,7 @@ class PageTraitement(QWidget):
         self.bouton_arreter = QPushButton("Arrêter", self)
         self.bouton_arreter.setObjectName("bouton_arreter")
         self.bouton_arreter.setCursor(Qt.PointingHandCursor)
-        self.bouton_arreter.clicked.connect(self.arret_demande.emit)
+        self.bouton_arreter.clicked.connect(self._demander_arret)
         self.bouton_ouvrir_excel = QPushButton("Ouvrir l'Excel", self)
         self.bouton_ouvrir_excel.setObjectName("action_secondaire")
         self.bouton_ouvrir_excel.clicked.connect(self._ouvrir_excel)
@@ -70,10 +78,18 @@ class PageTraitement(QWidget):
         self.bouton_ouvrir_excel.setVisible(False)
         self.bouton_ouvrir_dossier.setVisible(False)
         self.bouton_arreter.setVisible(True)
+        self.bouton_arreter.setEnabled(True)
+
+    def _demander_arret(self):
+        # Retour immédiat : l'arrêt est coopératif (vu à la fin de la page en cours), on le dit.
+        self.etiquette_progression.setText("Arrêt demandé — fin de la page en cours…")
+        self.bouton_arreter.setEnabled(False)
+        self.arret_demande.emit()
 
     def sur_evenement(self, e):
-        if e.type in (ev.PAGE_DEBUT, ev.PAGE_LUE) and e.rang and e.total:
-            self.etiquette_progression.setText(f"page {e.rang} / {e.total}")
+        progression = self._texte_progression(e)
+        if progression:
+            self.etiquette_progression.setText(progression)
         ligne = self._ligne_evenement(e)
         if ligne:
             self._journal.append(ligne)
@@ -81,11 +97,24 @@ class PageTraitement(QWidget):
             self.journal.setText("\n".join(self._journal))
 
     @staticmethod
+    def _texte_progression(e):
+        """« Lecture page n / total » depuis les événements réellement émis (ANALYSE par page en
+        mode Tesseract, PAGE_DEBUT/PAGE_LUE en vision) ; libellé de phase sinon. None sinon."""
+        if e.type in (ev.PAGE_DEBUT, ev.PAGE_LUE, ev.ANALYSE) and e.total:
+            numero = e.rang or e.page
+            if numero:
+                return f"Lecture page {numero} / {e.total}"
+        if e.type == ev.PHASE and e.etat in _LIBELLES_PHASE:
+            return _LIBELLES_PHASE[e.etat]
+        return None
+
+    @staticmethod
     def _ligne_evenement(e):
         if e.type in (ev.PAGE_DEBUT, ev.PAGE_LUE) and e.rang and e.total:
-            return f"page {e.rang} / {e.total}"
+            return f"Lecture page {e.rang} / {e.total}"
         if e.type == ev.PHASE:
-            return e.message or "phase"
+            # Jamais le nom technique « phase » ni l'état brut : un libellé lisible.
+            return _LIBELLES_PHASE.get(e.etat, "Traitement en cours…")
         if e.type == ev.PAGE_ALERTE and e.alertes:
             return "⚠ " + " ; ".join(e.alertes)
         if e.type == ev.ERREUR:

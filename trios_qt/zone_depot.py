@@ -36,6 +36,8 @@ class ZoneDepot(QFrame):
         self.setObjectName("zone_depot")
         self.setAcceptDrops(True)
         self._raccourcis = []
+        # Fonction de dialogue injectable (tests) ; en vrai, le sélecteur de fichiers natif.
+        self._dialogue_fichiers = QFileDialog.getOpenFileNames
         self._construire()
 
     def _construire(self):
@@ -90,8 +92,14 @@ class ZoneDepot(QFrame):
     # ── Choix par dialogue ────────────────────────────────────────────
     def choisir_fichiers(self):
         motifs = " ".join("*" + ext for ext in Config.FORMATS_SOURCE)
-        chemins, _ = QFileDialog.getOpenFileNames(
-            self, "Choisir des fichiers", "", f"Sources ({motifs})")
+        # Parent = la fenêtre de plus haut niveau (pas la bande) : sinon la boîte native s'ouvre
+        # hors écran. On la ramène au premier plan pour que la boîte se place dessus.
+        fenetre = self.window()
+        if fenetre is not None and fenetre is not self:
+            fenetre.raise_()
+            fenetre.activateWindow()
+        chemins, _ = self._dialogue_fichiers(
+            fenetre, "Choisir des fichiers", "", f"Sources ({motifs})")
         sources = filtrer_sources(chemins)
         if sources:
             self.sources_deposees.emit(sources)

@@ -37,9 +37,36 @@ class TestPageTraitement:
         assert "7" in lignes[-1]        # la plus récente
         assert all("1 / 20" not in ligne for ligne in lignes)  # la 1re a disparu
 
+    def test_analyse_met_a_jour_la_progression(self, page):
+        # En mode Tesseract, seuls les événements ANALYSE (page/total) arrivent : ils doivent
+        # alimenter la progression (sinon l'écran reste figé sur « — »).
+        page.demarrer_fichier("a.pdf")
+        page.sur_evenement(ev.Evenement(type=ev.ANALYSE, page=12, total=55, nature='scan'))
+        assert page.etiquette_progression.text() == "Lecture page 12 / 55"
+
+    def test_phase_affiche_un_libelle_lisible_jamais_phase(self, page):
+        page.demarrer_fichier("a.pdf")
+        page.sur_evenement(ev.Evenement(type=ev.PHASE, etat='analyse'))
+        page.sur_evenement(ev.Evenement(type=ev.PHASE, etat='lecture'))
+        lignes = page.lignes_journal()
+        assert "Analyse du document" in lignes
+        assert "Lecture des pages" in lignes
+        assert all(ligne != "phase" for ligne in lignes)
+
+    def test_phase_inconnue_reste_lisible(self, page):
+        page.demarrer_fichier("a.pdf")
+        page.sur_evenement(ev.Evenement(type=ev.PHASE, etat='mystere'))
+        assert page.lignes_journal() == ["Traitement en cours…"]
+
     def test_arreter_emet_le_signal(self, page, qtbot):
         with qtbot.waitSignal(page.arret_demande, timeout=1000):
             page.bouton_arreter.click()
+
+    def test_arreter_donne_un_retour_immediat(self, page):
+        page.demarrer_fichier("a.pdf")
+        page.bouton_arreter.click()
+        assert "Arrêt demandé" in page.etiquette_progression.text()
+        assert not page.bouton_arreter.isEnabled()
 
     def test_fin_montre_les_boutons_d_ouverture(self, page):
         page.demarrer_fichier("a.pdf")

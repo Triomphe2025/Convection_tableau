@@ -30,6 +30,9 @@ DATAS = (
     + [
         ("docs/maquettes/jetons.json", "docs/maquettes"),
         ("icon.ico", "."),
+        # Modèles livrés : le registre les lit via chemin_ressource (_MEIPASS). Sans ce fichier,
+        # l'exe n'affiche que les modèles codés (REPARTITEUR / REPARTITEUR 2 manquaient).
+        ("templates.json", "."),
     ]
 )
 

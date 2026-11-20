@@ -72,3 +72,22 @@ class TestZoneDepot:
         monkeypatch.setattr(zone, "choisir_fichiers", lambda: appels.setdefault("ok", True))
         zone.invite.linkActivated.emit("#")
         assert appels.get("ok") is True
+
+    def test_dialogue_parente_a_la_fenetre_principale(self, qtbot):
+        # La boîte de choix s'ouvrait invisible : elle doit avoir la fenêtre de plus haut niveau
+        # comme parent (pas la zone de dépôt), pour être placée et au premier plan.
+        from PySide6.QtWidgets import QVBoxLayout, QWidget
+        creer_application([])
+        fenetre = QWidget()
+        QVBoxLayout(fenetre).addWidget(ZoneDepot())
+        qtbot.addWidget(fenetre)
+        z = fenetre.findChild(ZoneDepot)
+        vus = {}
+
+        def faux_dialogue(parent, *a, **k):
+            vus["parent"] = parent
+            return [], ""
+
+        z._dialogue_fichiers = faux_dialogue
+        z.choisir_fichiers()
+        assert vus["parent"] is fenetre and vus["parent"] is not z

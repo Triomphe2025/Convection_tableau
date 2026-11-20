@@ -8,7 +8,7 @@ import sys
 
 from PySide6.QtWidgets import QMessageBox
 
-from trios_qt.application import creer_application, creer_fenetre
+from trios_qt.application import creer_application, creer_fenetre, prechauffer
 from trios_qt.theme import appliquer_theme
 
 TITRE_LICENCE = "TriosSeconverter — licence"
@@ -35,9 +35,13 @@ def _afficher_preavis(message: str) -> None:
 def main(argv=None) -> int:
     app = creer_application(argv if argv is not None else sys.argv)
     appliquer_theme(app)
+    # Clé API et réglages chargés comme l'appli actuelle AVANT la fenêtre (la carte d'état la lit).
+    from trios_qt import reglages
+    reglages.charger_cle_api_demarrage()
     preavis = verifier_licence(_afficher_erreur)
     fenetre = creer_fenetre()
     fenetre.show()
+    prechauffer()   # importe les modules lourds en arrière-plan : « Lancer » ne gèle plus l'UI
     if preavis:
         _afficher_preavis(preavis)
     return app.exec()

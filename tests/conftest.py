@@ -37,6 +37,14 @@ Config.CLAUDE_CACHE_LECTURES = False
 Config.ESTIMATION_JOURNAUX_DOSSIER = Path(_CACHE_TESTS.name) / 'journaux'
 Config.ESTIMATION_STATS_FICHIER = Path(_CACHE_TESTS.name) / 'statistiques_lecture.jsonl'
 
+# Réglages Qt (dossier de sortie…) : .ini isolé dans le dossier des tests, JAMAIS le vrai store
+# de l'appli (une valeur de test « C:\sortie » y avait fuité). Sans PySide6, rien à isoler.
+try:
+    from trios_qt import reglages as _reglages
+    _reglages.configurer_pour_tests(Path(_CACHE_TESTS.name))
+except Exception:
+    pass
+
 import hashlib  # noqa: E402
 import shutil  # noqa: E402
 
