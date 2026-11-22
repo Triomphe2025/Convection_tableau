@@ -15,7 +15,7 @@ block_cipher = None
 # (liste calculee en suivant les imports depuis interface.py).
 MODULES_PROJET = [
     'agent_ocr', 'audit_claude', 'cache_claude', 'cache_lectures', 'claude_lot',
-    'claude_ocr', 'compte_lignes', 'config',
+    'claude_ocr', 'compte_lignes', 'config', 'fiabiliser_tesseract',
     'evenements', 'service_conversion',
     'interface_helpers',
     'ligne_de_commande',

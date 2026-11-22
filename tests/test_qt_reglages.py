@@ -37,6 +37,19 @@ class TestChargerCleApi:
         reglages.charger_cle_api_demarrage()
         assert Config.CLAUDE_API_KEY == "sk-deja-la"
 
+    def test_cle_enregistree_prioritaire_sur_env(self, cle_vierge, monkeypatch, tmp_path):
+        # Une clé saisie dans l'aperçu (persistée) prime sur ANTHROPIC_API_KEY.
+        reglages.configurer_pour_tests(tmp_path)
+        reglages.ecrire_cle_api("sk-enregistree")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env")
+        reglages.charger_cle_api_demarrage()
+        assert Config.CLAUDE_API_KEY == "sk-enregistree"
+
+    def test_cle_api_persiste_entre_sessions(self, tmp_path):
+        reglages.configurer_pour_tests(tmp_path)
+        reglages.ecrire_cle_api("sk-persistee")
+        assert reglages.lire_cle_api() == "sk-persistee"
+
 
 class TestIsolationReglages:
 

@@ -7219,6 +7219,8 @@ if __name__ == '__main__':
         # Exe lancé avec des arguments : ligne de commande, sans fenêtre (essais, lots).
         from ligne_de_commande import main as ligne_de_commande
         raise SystemExit(ligne_de_commande(sys.argv[1:]))
+    from config import appliquer_env_ocr
+    appliquer_env_ocr()   # fiabilise tesseract.exe (OpenMP) avant toute conversion
     _activer_dpi()   # avant toute fenêtre Tk, sinon la mise à l'échelle n'est pas prise en compte
     _preavis_licence = _controler_licence_graphique()
     app = TriosSeconverterApp()

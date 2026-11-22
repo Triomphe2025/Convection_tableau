@@ -33,6 +33,8 @@ def _afficher_preavis(message: str) -> None:
 
 
 def main(argv=None) -> int:
+    from config import appliquer_env_ocr
+    appliquer_env_ocr()   # fiabilise tesseract.exe (OpenMP) avant toute conversion (exe windowed)
     app = creer_application(argv if argv is not None else sys.argv)
     appliquer_theme(app)
     # Clé API et réglages chargés comme l'appli actuelle AVANT la fenêtre (la carte d'état la lit).

@@ -1182,9 +1182,17 @@ class Converter:
                     'relire': lambda image, feedback: _retry_extractor.extract(
                         Path(image), feedback=feedback),
                     'moteur': _retry_label, 'page_pdf': None})
+            # Événement de page (phase 1A) : comme en mode vision, pour que l'écran d'attente
+            # distingue « lecture page n / total » de l'analyse (le mode Tesseract n'en émettait
+            # aucun → l'écran restait figé).
+            self._emettre(ev.PAGE_LUE, page=done, rang=done, total=total, lignes=rows)
+
+        def _page_debut(num: int, total: int) -> None:
+            self._emettre(ev.PAGE_DEBUT, page=num, rang=num, total=total)
 
         results, extractor = pdf_ext.extract_all(
-            self.word_file, on_page_done=_page_callback, cancel_check=self._est_annule
+            self.word_file, on_page_done=_page_callback, cancel_check=self._est_annule,
+            on_page_start=_page_debut,
         )
 
         ok = sum(1 for r in results if r.get('success'))

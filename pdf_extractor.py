@@ -526,7 +526,7 @@ class PdfTableExtractor:
     # -- Point d'entree --------------------------------------------------
 
     def extract_all(
-        self, pdf_path: Path, on_page_done=None, cancel_check=None
+        self, pdf_path: Path, on_page_done=None, cancel_check=None, on_page_start=None
     ) -> Tuple[List[Dict], 'PdfTableExtractor']:
         """
         Extrait tous les tableaux du PDF.
@@ -549,6 +549,8 @@ class PdfTableExtractor:
         for page_num in range(len(doc)):
             if cancel_check and cancel_check():
                 break
+            if on_page_start:
+                on_page_start(page_num + 1, len(doc))
             page = doc[page_num]
             result = self._extract_page(page, page_num)
             results.append(result)

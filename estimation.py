@@ -207,17 +207,18 @@ def _pages_faites(chemin, modele, dossier_sortie):
 def _duree_par_page(profil, modele):
     """Secondes par page lue : horodatages des journaux si le profil est API, sinon la
     constante du moteur (Tesseract ou le modèle)."""
+    defaut = Config.ESTIMATION_SECONDES_PAR_PAGE_DEFAUT
     if profil in _PROFILS_API:
         mesure = moyennes_modele(modele)['secondes']
+        plancher = Config.ESTIMATION_SECONDES_PAR_PAGE.get(modele, defaut)
         if mesure is not None:
-            return mesure
-        moteur = modele
-    elif profil == 'tesseract':
-        moteur = 'tesseract'
-    else:
-        moteur = profil
-    return Config.ESTIMATION_SECONDES_PAR_PAGE.get(
-        moteur, Config.ESTIMATION_SECONDES_PAR_PAGE_DEFAUT)
+            # Bornée au plancher de la constante du modèle : des journaux bruités ne doivent
+            # pas afficher Difficile (Opus) plus rapide que Précis (Sonnet) — l'ordre des
+            # constantes est garanti, l'estimation ne sous-estime jamais un modèle plus lent.
+            return max(mesure, plancher)
+        return plancher
+    moteur = 'tesseract' if profil == 'tesseract' else profil
+    return Config.ESTIMATION_SECONDES_PAR_PAGE.get(moteur, defaut)
 
 
 def estimer(chemin, type=None, profil=None, lot=False, modele=None, dossier_sortie=None):

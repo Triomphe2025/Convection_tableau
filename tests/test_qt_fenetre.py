@@ -63,3 +63,18 @@ def test_carte_etat_cle_absente_pastille_orange(qtbot, monkeypatch):
     qtbot.addWidget(f)
     assert "absente" in f.etiquette_cle.text()
     assert f.couleur_cle == jetons["couleurs"]["a_relire"]
+
+
+def test_definir_cle_api_met_a_jour_la_carte_et_persiste(qtbot, monkeypatch, tmp_path):
+    from config import Config
+    from trios_qt import reglages, theme
+    monkeypatch.setattr(Config, "CLAUDE_API_KEY", "", raising=False)
+    reglages.configurer_pour_tests(tmp_path)
+    jetons = theme.charger_jetons()
+    f = FenetrePrincipale(jetons=jetons)
+    qtbot.addWidget(f)
+    assert "absente" in f.etiquette_cle.text()        # au départ, aucune clé
+    f.definir_cle_api("sk-saisie-dans-apercu")
+    assert "configurée" in f.etiquette_cle.text()
+    assert f.couleur_cle == jetons["couleurs"]["succes"]
+    assert reglages.lire_cle_api() == "sk-saisie-dans-apercu"   # persistée entre sessions

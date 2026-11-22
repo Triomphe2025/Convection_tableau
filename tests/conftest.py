@@ -97,3 +97,18 @@ def dictionnaire_temporaire(tmp_path_factory):
 def empreintes_dictionnaire():
     """(empreinte avant la suite, fonction qui relit l'empreinte des vrais fichiers)."""
     return EMPREINTE_AVANT_TESTS, empreinte_dictionnaires
+
+
+@pytest.fixture(autouse=True)
+def _reglages_qt_isoles(tmp_path):
+    """Chaque test part d'un .ini de réglages Qt vierge (dossier/clé API), et l'état global est
+    restauré : un test qui persiste une clé ne la fait pas lire par le test suivant."""
+    try:
+        from trios_qt import reglages
+    except Exception:
+        yield
+        return
+    ancien = reglages._fichier_test
+    reglages.configurer_pour_tests(tmp_path)
+    yield
+    reglages._fichier_test = ancien

@@ -43,6 +43,7 @@ a = Analysis(
     datas=DATAS,
     hiddenimports=[
         'PySide6.QtCore', 'PySide6.QtGui', 'PySide6.QtWidgets', 'PySide6.QtSvg',
+        'fiabiliser_tesseract',   # importé paresseusement par config.appliquer_env_ocr
     ] + collect_submodules('trios_qt'),
     hookspath=[],
     hooksconfig={},

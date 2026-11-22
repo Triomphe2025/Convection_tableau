@@ -206,7 +206,6 @@ class FenetrePrincipale(QWidget):
         import interface_helpers
         from config import Config
 
-        c = self._jetons["couleurs"]
         carte = QWidget()
         carte.setObjectName("carte_etat")
         disposition = QVBoxLayout(carte)
@@ -219,17 +218,13 @@ class FenetrePrincipale(QWidget):
         self.etiquette_modele = QLabel(modele)
         self.etiquette_modele.setObjectName("etat_modele")
 
-        etat = interface_helpers.etat_cle_api(getattr(Config, "CLAUDE_API_KEY", ""))
-        self.couleur_cle = c["succes"] if etat == "configurée" else c["a_relire"]
         ligne_cle = QHBoxLayout()
         ligne_cle.setContentsMargins(0, 0, 0, 0)
         ligne_cle.setSpacing(6)
         self.pastille_cle = QLabel()
         self.pastille_cle.setObjectName("etat_pastille_cle")
         self.pastille_cle.setFixedSize(8, 8)
-        self.pastille_cle.setStyleSheet(
-            f"background-color: {self.couleur_cle}; border-radius: 4px;")
-        self.etiquette_cle = QLabel(f"clé {etat}")
+        self.etiquette_cle = QLabel()
         self.etiquette_cle.setObjectName("etat_cle")
         ligne_cle.addWidget(self.pastille_cle, 0, Qt.AlignmentFlag.AlignVCenter)
         ligne_cle.addWidget(self.etiquette_cle, 1)
@@ -239,7 +234,39 @@ class FenetrePrincipale(QWidget):
         disposition.addWidget(self.etiquette_modele)
         disposition.addLayout(ligne_cle)
         disposition.addWidget(self.etiquette_version)
+        # Carte cliquable : saisir / coller la clé API (persistée entre sessions).
+        carte.setCursor(Qt.CursorShape.PointingHandCursor)
+        carte.mousePressEvent = lambda _e: self._saisir_cle_api()
+        self._rafraichir_carte_cle()
         return carte
+
+    def _rafraichir_carte_cle(self) -> None:
+        import interface_helpers
+        from config import Config
+        c = self._jetons["couleurs"]
+        etat = interface_helpers.etat_cle_api(getattr(Config, "CLAUDE_API_KEY", ""))
+        self.couleur_cle = c["succes"] if etat == "configurée" else c["a_relire"]
+        self.pastille_cle.setStyleSheet(
+            f"background-color: {self.couleur_cle}; border-radius: 4px;")
+        self.etiquette_cle.setText(f"clé {etat}")
+
+    def definir_cle_api(self, cle: str) -> None:
+        """Enregistre la clé (persistée), la pose dans Config et rafraîchit la carte d'état."""
+        from config import Config
+        from trios_qt import reglages
+        cle = (cle or "").strip()
+        reglages.ecrire_cle_api(cle)
+        Config.CLAUDE_API_KEY = cle
+        self._rafraichir_carte_cle()
+
+    def _saisir_cle_api(self) -> None:
+        from PySide6.QtWidgets import QInputDialog, QLineEdit
+        from config import Config
+        texte, ok = QInputDialog.getText(
+            self, "Clé API Anthropic", "Colle ta clé API (sk-…) :",
+            QLineEdit.EchoMode.Password, getattr(Config, "CLAUDE_API_KEY", ""))
+        if ok:
+            self.definir_cle_api(texte)
 
     def aller_a(self, cle: str) -> None:
         page = self.pages[cle]

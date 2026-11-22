@@ -98,6 +98,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     d.add_argument('sortie', help="Dossier de sortie")
     args = parser.parse_args(argv)
     log = _ecrivain(args.journal)
+    from config import appliquer_env_ocr
+    appliquer_env_ocr()   # fiabilise tesseract.exe (OpenMP) avant toute conversion
     import licence
     try:
         preavis = licence.exiger()

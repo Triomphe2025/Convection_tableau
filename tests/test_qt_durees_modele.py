@@ -28,3 +28,11 @@ class TestEstimationDuree:
         precis = estimation.estimer(pdf, profil='claude', modele='claude-sonnet-5-5')
         difficile = estimation.estimer(pdf, profil='claude', modele='claude-opus-5-5')
         assert difficile['duree']['secondes'] >= precis['duree']['secondes'] > 0
+
+    def test_mesure_basse_bornee_au_plancher_du_modele(self, monkeypatch):
+        # Un journal bruité donnant Opus très rapide (2 s) ne doit pas passer sous sa constante :
+        # la durée mesurée est bornée au plancher du modèle (garde Opus >= Sonnet).
+        monkeypatch.setitem(estimation._moyennes_cache, 'claude-opus-5-5',
+                            {'tokens': (1, 1), 'secondes': 2.0, 'source': 'test', 'n': 1})
+        duree = estimation._duree_par_page('claude', 'claude-opus-5-5')
+        assert duree == Config.ESTIMATION_SECONDES_PAR_PAGE['claude-opus-5-5']

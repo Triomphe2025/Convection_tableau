@@ -127,6 +127,12 @@ class Config:
                       or _TESSERACT_CONFIGURE)
     TESSERACT_TROUVE = Path(TESSERACT_PATH).is_file()
 
+    # Limite de fils OpenMP de tesseract.exe. Dans un exe SANS console (interface Qt windowed),
+    # le sous-processus tesseract.exe se bloquait (OpenMP) et ne rendait jamais la main
+    # (pytesseract.communicate figé) : la lecture de la 1re page scannée ne finissait pas.
+    # 1 = tesseract mono-fil, fiable ; appliqué par appliquer_env_ocr() au démarrage.
+    TESSERACT_OMP_THREAD_LIMIT = 1
+
     # Langue pour l'OCR
     OCR_LANGUAGE = "fra"
 
@@ -1105,6 +1111,22 @@ class ConfigProd(Config):
     LOG_LEVEL = "INFO"
     VERBOSE = False
     CONTINUE_ON_ERROR = True
+
+
+def appliquer_env_ocr():
+    """Pose les variables d'environnement qui fiabilisent Tesseract, à appeler au démarrage de
+    chaque point d'entrée AVANT toute conversion. setdefault : un réglage de l'utilisateur prime.
+
+    OMP_THREAD_LIMIT évite le blocage du sous-processus tesseract.exe (OpenMP) dans un exe sans
+    console, qui figeait la lecture de la 1re page scannée (symptôme « conversion bloquée »).
+    CREATE_NO_WINDOW empêche l'allocation d'une console au sous-processus tesseract.exe (même but).
+    """
+    os.environ.setdefault('OMP_THREAD_LIMIT', str(Config.TESSERACT_OMP_THREAD_LIMIT))
+    try:
+        import fiabiliser_tesseract
+        fiabiliser_tesseract.appliquer()
+    except Exception:
+        pass
 
 
 # Utilisation:
