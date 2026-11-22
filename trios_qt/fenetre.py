@@ -74,27 +74,88 @@ class FenetrePrincipale(QWidget):
         self._pile.setCurrentWidget(self.pages[premiere])
 
     def _monter_traitement(self) -> None:
-        # Écran Traitement hors barre latérale : atteint depuis « Lancer ».
+        # Écrans de traitement hors barre latérale : atteints depuis « Lancer ». L'écran dépend
+        # du fichier (mode économique → attente lot, sinon tableau), pas de Config.CLAUDE_MODE_LOT.
+        from trios_qt.mini_fenetre import MiniFenetre
+        from trios_qt.page_attente_lot import PageAttenteLot
         from trios_qt.page_traitement import PageTraitement
         self.page_traitement = PageTraitement()
         self.page_traitement.setProperty("classe", "page")
         self.pages["traitement"] = self.page_traitement
         self._pile.addWidget(self.page_traitement)
+        self.page_attente_lot = PageAttenteLot()
+        self.page_attente_lot.setProperty("classe", "page")
+        self.pages["attente_lot"] = self.page_attente_lot
+        self._pile.addWidget(self.page_attente_lot)
+
         self.page_convertir.lancer_demande.connect(self._lancer_conversion)
-        self.page_traitement.arret_demande.connect(self._arreter_conversion)
+        for ecran in (self.page_traitement, self.page_attente_lot):
+            ecran.arret_demande.connect(self._arreter_conversion)
+            ecran.voir_resume.connect(lambda: self.aller_a("convertir"))
+        self.page_traitement.pause_demande.connect(self._pause_conversion)
+        self.page_traitement.reprendre_demande.connect(self._reprendre_conversion)
+
+        self.mini = MiniFenetre(parent=self)   # parentée : nettoyée avec la fenêtre (pas de fuite)
+        self.mini.pause_demande.connect(self._pause_conversion)
+        self.mini.reprendre_demande.connect(self._reprendre_conversion)
+        self.mini.agrandir_demande.connect(self._agrandir_depuis_mini)
+        self.tray = self._creer_tray()
+
+    def _creer_tray(self):
+        from PySide6.QtGui import QGuiApplication
+        from PySide6.QtWidgets import QSystemTrayIcon
+        # Pas de zone de notification sous la plateforme offscreen (tests) : elle provoque une
+        # violation d'accès native. On n'en crée une que sur un vrai bureau.
+        if QGuiApplication.platformName() == "offscreen":
+            return None
+        try:
+            if not QSystemTrayIcon.isSystemTrayAvailable():
+                return None
+            tray = QSystemTrayIcon(self)
+            tray.setToolTip(TITRE_FENETRE)
+            tray.setVisible(True)
+            return tray
+        except Exception:
+            return None
+
+    def _ecran_pour(self, chemin):
+        cle = "attente_lot" if self.page_convertir.est_differe_chemin(chemin) else "traitement"
+        self.aller_a(cle)
+        return self.pages[cle]
 
     def _lancer_conversion(self) -> None:
         from trios_qt.lancement import ControleurLancement
         couples = self.page_convertir.fichiers_a_lancer()
         if not couples:
             return
-        self._controleur = ControleurLancement(self._fabrique_service, self.page_traitement)
-        self.aller_a("traitement")
+        self._controleur = ControleurLancement(self._fabrique_service, self._ecran_pour)
         self._controleur.lancer(couples)
 
     def _arreter_conversion(self) -> None:
         if self._controleur is not None:
             self._controleur.arreter()
+
+    def _pause_conversion(self) -> None:
+        if self._controleur is not None:
+            self._controleur.pause()
+
+    def _reprendre_conversion(self) -> None:
+        if self._controleur is not None:
+            self._controleur.reprendre()
+
+    def _agrandir_depuis_mini(self) -> None:
+        self.mini.hide()
+        self.showNormal()
+        self.activateWindow()
+
+    def changeEvent(self, event):
+        # Fenêtre réduite pendant une conversion : on montre la mini-fenêtre toujours visible.
+        from PySide6.QtCore import QEvent
+        if (event.type() == QEvent.Type.WindowStateChange
+                and self.isMinimized()
+                and self._controleur is not None and self._controleur.en_cours()):
+            self.mini.show()
+        super().changeEvent(event)
 
     def _fabrique_reelle(self, chemin, dossier, on_evenement):
         from pathlib import Path
@@ -104,6 +165,9 @@ class FenetrePrincipale(QWidget):
 
         pont = _PontEvenements()
         pont.recu.connect(on_evenement, Qt.ConnectionType.QueuedConnection)
+        # La mini-fenêtre reflète les mêmes événements que l'écran principal.
+        if getattr(self, "mini", None) is not None:
+            pont.recu.connect(self.mini.sur_evenement, Qt.ConnectionType.QueuedConnection)
         self._ponts.append(pont)   # garder la référence (sinon ramassé)
         converter = Converter(Path(chemin), Path(dossier or "."),
                               on_log=lambda _m: None)

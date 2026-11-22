@@ -159,6 +159,14 @@ class PageConvertir(QWidget):
                 couples.append((str(ligne.chemin), self.dossier_effectif(ligne)))
         return couples
 
+    def est_differe_chemin(self, chemin):
+        """Le fichier prêt de ce chemin part-il en lot (mode économique) : route l'écran."""
+        for rang in range(self.modele.rowCount()):
+            ligne = self.modele.ligne(rang)
+            if str(ligne.chemin) == str(chemin) and ligne.resultat.etat == analyse.PRET:
+                return self._est_differe(ligne)
+        return False
+
     def _choisir_dossier(self):
         from PySide6.QtWidgets import QFileDialog
         chemin = QFileDialog.getExistingDirectory(self, "Dossier de sortie",
