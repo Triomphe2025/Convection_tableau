@@ -392,6 +392,30 @@ QPushButton[classe="nav"]:checked {{
     color: {c['texte_secondaire']};
     font-size: {int(t['courant'])}px;
 }}
+#lecture_vue {{
+    background-color: {c['fond']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['bouton'])}px;
+}}
+#lecture_loupe {{
+    background-color: {c['sureleve']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['bouton'])}px;
+}}
+#lecture_puces {{
+    color: {c['texte_secondaire']};
+    font-family: "{jetons['polices']['codes']}", monospace;
+    font-size: {int(t['aide'])}px;
+}}
+#lecture_table {{
+    background-color: {c['surface']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['bouton'])}px;
+    gridline-color: {c['trait']};
+    color: {c['texte']};
+    font-family: "{jetons['polices']['codes']}", monospace;
+    font-size: {int(t['aide'])}px;
+}}
 """.strip()
 
 
