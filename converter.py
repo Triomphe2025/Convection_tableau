@@ -1191,7 +1191,7 @@ class Converter:
             # distingue « lecture page n / total » de l'analyse (le mode Tesseract n'en émettait
             # aucun → l'écran restait figé).
             self._emettre(ev.PAGE_LUE, page=done, rang=done, total=total, lignes=rows,
-                          image=result.get('image_path') or None,
+                          image=result.get('image_path_fichier') or None,
                           cellules=_cellules_donnees(result))
 
         def _page_debut(num: int, total: int) -> None:
@@ -1605,7 +1605,7 @@ class Converter:
                 page_imprimee=numero_page(result),
                 bornier=(result.get('metadata') or {}).get('BORNIER'),
                 zones=zones, cout=result.get('api_usage'),
-                image=result.get('image_path') or str(img),
+                image=result.get('image_path_fichier') or str(img),
                 cellules=_cellules_donnees(result))
             results.append(result)
 

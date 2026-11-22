@@ -934,6 +934,8 @@ class PdfTableExtractor:
 
         ocr_result['page_num'] = page_num + 1
         ocr_result['image_path'] = f'page_{page_num + 1}'
+        # Chemin réel du PNG rendu (celui que Tesseract a lu) : la lecture en direct l'affiche.
+        ocr_result['image_path_fichier'] = str(img_path)
         ocr_result['detection_method'] = 'pdf_ocr'
         return ocr_result
 
