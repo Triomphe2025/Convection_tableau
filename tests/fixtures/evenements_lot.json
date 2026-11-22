@@ -1,0 +1,8 @@
+[
+  {"type": "lot_cree", "lot": "batch_1", "compteurs": {"requetes": 2, "taille_mo": 5.0}},
+  {"type": "lot_etat", "lot": "batch_1", "compteurs": {"lues": 1, "en_attente": 1, "a_reprendre": 0, "total": 2, "delai": 30}},
+  {"type": "lot_recupere", "lot": "batch_1", "compteurs": {"lues": 2, "total": 2}},
+  {"type": "lot_cree", "lot": "batch_2", "compteurs": {"requetes": 2, "taille_mo": 4.0}},
+  {"type": "lot_etat", "lot": "batch_2", "compteurs": {"lues": 2, "en_attente": 0, "a_reprendre": 0, "total": 2, "delai": 30}},
+  {"type": "lot_recupere", "lot": "batch_2", "compteurs": {"lues": 2, "total": 2}}
+]
