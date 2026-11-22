@@ -64,15 +64,37 @@ class RailEtapes(QWidget):
         c = self._jetons["couleurs"]
         return QColor({"fait": c["succes"], "en_cours": c["rose_trios"]}.get(etat, c["trait"]))
 
+    _MARGE = 24
+
+    def _geometrie(self):
+        n = len(self.CLES)
+        largeur = max(1, self.width() - 2 * self._MARGE)
+        return self._MARGE, self.height() * 0.42, largeur, largeur / (n - 1)
+
+    def rectangles_libelles(self):
+        """Pour chaque étape : (rectangle du libellé, alignement). Les extrémités sont alignées
+        sur le bord (gauche pour la 1re, droite pour la dernière) pour ne jamais dépasser."""
+        marge, y, _largeur, pas = self._geometrie()
+        yb, h = y + 10, 18.0
+        bord = 2.0
+        rectangles = []
+        dernier = len(self.CLES) - 1
+        for i in range(len(self.CLES)):
+            x = marge + i * pas
+            if i == 0:
+                rectangles.append((QRectF(bord, yb, pas, h), Qt.AlignmentFlag.AlignLeft))
+            elif i == dernier:
+                rectangles.append((QRectF(self.width() - bord - pas, yb, pas, h),
+                                   Qt.AlignmentFlag.AlignRight))
+            else:
+                rectangles.append((QRectF(x - pas / 2, yb, pas, h), Qt.AlignmentFlag.AlignHCenter))
+        return rectangles
+
     def paintEvent(self, _evenement):
         c = self._jetons["couleurs"]
         peintre = QPainter(self)
         peintre.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        n = len(self.CLES)
-        marge = 24
-        y = self.height() * 0.42
-        largeur = max(1, self.width() - 2 * marge)
-        pas = largeur / (n - 1)
+        marge, y, largeur, pas = self._geometrie()
 
         peintre.setPen(QPen(QColor(c["trait"]), 3))
         peintre.drawLine(int(marge), int(y), int(marge + largeur), int(y))
@@ -80,6 +102,7 @@ class RailEtapes(QWidget):
             peintre.setPen(QPen(QColor(c["succes"]), 3))
             peintre.drawLine(int(marge), int(y), int(marge + largeur * self.fraction()), int(y))
 
+        rectangles = self.rectangles_libelles()
         for i, cle in enumerate(self.CLES):
             x = marge + i * pas
             etat = self.etat_etape(cle)
@@ -89,6 +112,6 @@ class RailEtapes(QWidget):
             peintre.drawEllipse(QRectF(x - rayon, y - rayon, 2 * rayon, 2 * rayon))
             couleur_texte = c["texte"] if etat != "a_faire" else c["texte_discret"]
             peintre.setPen(QColor(couleur_texte))
-            boite = QRectF(x - pas / 2, y + 10, pas, 18)
-            peintre.drawText(boite, Qt.AlignmentFlag.AlignCenter, self.libelle(cle))
+            boite, alignement = rectangles[i]
+            peintre.drawText(boite, alignement | Qt.AlignmentFlag.AlignVCenter, self.libelle(cle))
         peintre.end()

@@ -5,7 +5,7 @@ cours l'arc est rose (jeton rose_trios) ; à la fin il devient vert (succes) et 
 une coche dessinée au lieu du pourcentage. Toutes les couleurs viennent des jetons.
 """
 from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import QWidget
 
 from trios_qt import theme
@@ -22,6 +22,7 @@ class Anneau(QWidget):
         self._valeur = 0.0
         self._termine = False
         self._reussi = True
+        self._sous_libelle = ""
 
     def definir_valeur(self, v) -> None:
         self._valeur = max(0.0, min(1.0, float(v)))
@@ -59,6 +60,16 @@ class Anneau(QWidget):
         c = self._jetons["couleurs"]
         return QColor(c["succes"] if self._termine else c["rose_trios"])
 
+    def definir_sous_libelle(self, texte: str) -> None:
+        self._sous_libelle = texte or ""
+        self.update()
+
+    def sous_libelle(self) -> str:
+        return self._sous_libelle
+
+    def taille_pourcentage(self) -> int:
+        return int(self._jetons["tailles_texte_px"]["titre_ecran"])
+
     def paintEvent(self, _evenement) -> None:
         c = self._jetons["couleurs"]
         peintre = QPainter(self)
@@ -84,9 +95,29 @@ class Anneau(QWidget):
         if self._termine and self._reussi:
             self._peindre_coche(peintre, boite)
         else:
-            peintre.setPen(QColor(c["texte"]))
-            peintre.drawText(boite, Qt.AlignmentFlag.AlignCenter, self.pourcentage_texte())
+            self._peindre_texte(peintre, boite)
         peintre.end()
+
+    def _peindre_texte(self, peintre: QPainter, boite: QRectF) -> None:
+        c = self._jetons["couleurs"]
+        famille = self._jetons["polices"]["interface"]
+        grande = QFont(famille, self.taille_pourcentage())
+        grande.setBold(True)
+        a_sous = bool(self._sous_libelle)
+        # Pourcentage légèrement remonté quand un sous-libellé prend la ligne du dessous.
+        decalage = boite.height() * 0.12 if a_sous else 0.0
+        rect_pc = QRectF(boite.left(), boite.top() - decalage, boite.width(), boite.height())
+        peintre.setFont(grande)
+        peintre.setPen(QColor(c["texte"]))
+        peintre.drawText(rect_pc, Qt.AlignmentFlag.AlignCenter, self.pourcentage_texte())
+        if a_sous:
+            petite = QFont(famille, int(self._jetons["tailles_texte_px"]["aide"]))
+            peintre.setFont(petite)
+            peintre.setPen(QColor(c["texte_secondaire"]))
+            haut = boite.center().y() + self.taille_pourcentage() * 0.5 - decalage
+            rect_sous = QRectF(boite.left(), haut, boite.width(), boite.bottom() - haut)
+            peintre.drawText(rect_sous, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
+                             self._sous_libelle)
 
     def _peindre_coche(self, peintre: QPainter, boite: QRectF) -> None:
         from PySide6.QtGui import QPainterPath

@@ -63,3 +63,15 @@ class TestRailLibelles:
         rail.definir_phase("controles")
         rail.resize(400, 60)
         assert not rail.grab().isNull()
+
+    def test_libelles_ne_depassent_pas_le_widget(self, rail):
+        # Retouche 1 : les libellés d'extrémité (Analyse, Classeur) ne doivent pas être coupés.
+        from PySide6.QtGui import QFontMetricsF
+        rail.resize(460, 64)
+        fm = QFontMetricsF(rail.font())
+        rectangles = rail.rectangles_libelles()
+        assert len(rectangles) == len(RailEtapes.CLES)
+        for cle, (rect, _align) in zip(RailEtapes.CLES, rectangles):
+            assert rect.left() >= 0
+            assert rect.right() <= rail.width()
+            assert fm.horizontalAdvance(rail.libelle(cle)) <= rect.width() + 0.5

@@ -104,6 +104,26 @@ class TestAnneauCouleur:
         assert anneau.couleur_progression().name().lower() == attendu
 
 
+class TestAnneauSousLibelle:
+
+    def test_sous_libelle_vide_par_defaut(self, anneau):
+        assert anneau.sous_libelle() == ""
+
+    def test_definir_sous_libelle(self, anneau):
+        anneau.definir_sous_libelle("12 / 48 pages")
+        assert anneau.sous_libelle() == "12 / 48 pages"
+
+    def test_taille_pourcentage_est_titre_ecran(self, anneau, jetons):
+        attendu = int(jetons["tailles_texte_px"]["titre_ecran"])
+        assert anneau.taille_pourcentage() == attendu
+
+    def test_peint_avec_sous_libelle(self, anneau):
+        anneau.resize(160, 160)
+        anneau.definir_valeur(0.5)
+        anneau.definir_sous_libelle("24 / 48 pages")
+        assert not anneau.grab().isNull()
+
+
 class TestAnneauRendu:
 
     def test_peint_sans_erreur_en_cours(self, anneau):
