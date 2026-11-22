@@ -42,7 +42,7 @@ class TestConversionReelle:
 
         def on_e(e):
             page.sur_evenement(e)
-            etat['progressions'].append(page.etiquette_progression.text())
+            etat['progressions'].append(page.journal_resume.text())
             if e.type == ev.FIN:
                 etat['fin'] = True
 
