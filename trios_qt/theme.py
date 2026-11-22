@@ -368,6 +368,30 @@ QPushButton[classe="nav"]:checked {{
     padding: 8px 18px;
     font-weight: 600;
 }}
+#carte_message {{
+    background-color: {c['sureleve']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['carte'])}px;
+}}
+#message_texte {{
+    color: {c['texte']};
+    font-size: {int(t['courant'])}px;
+    font-weight: 500;
+}}
+#carte_astuce {{
+    background-color: {c['surface']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['carte'])}px;
+}}
+#astuce_titre {{
+    color: {c['a_relire']};
+    font-size: {int(t['aide'])}px;
+    font-weight: 700;
+}}
+#astuce_texte {{
+    color: {c['texte_secondaire']};
+    font-size: {int(t['courant'])}px;
+}}
 """.strip()
 
 

@@ -30,9 +30,12 @@ def test_spec_embarque_pyside6():
 
 def test_ressources_embarquees_existent():
     polices = list((RACINE / "trios_qt" / "polices").glob("*.ttf"))
-    icones = list((RACINE / "trios_qt" / "icones").glob("*.svg"))
+    dossier_icones = RACINE / "trios_qt" / "icones"
+    icones = {p.stem for p in dossier_icones.glob("*.svg")}
     assert len(polices) == 6
-    assert len(icones) == 6
+    # 6 icônes de nav + ampoule (carte astuce) et info (carte message d'étape), 2C retouches 3-4.
+    assert len(icones) == 8
+    assert {"ampoule", "info"} <= icones
     assert (RACINE / "docs" / "maquettes" / "jetons.json").is_file()
 
 

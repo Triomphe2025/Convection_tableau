@@ -7,7 +7,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from trios_qt import theme  # noqa: E402
+from trios_qt import animations, theme  # noqa: E402
 from trios_qt.application import creer_application  # noqa: E402
 from trios_qt.messages_etape import MessagesEtape  # noqa: E402
 
@@ -15,9 +15,11 @@ from trios_qt.messages_etape import MessagesEtape  # noqa: E402
 @pytest.fixture
 def messages(qtbot):
     creer_application([])
+    animations.definir_reduction(False)   # déterministe : le glissement peut démarrer
     m = MessagesEtape()
     qtbot.addWidget(m)
-    return m
+    yield m
+    animations.reinitialiser()
 
 
 class TestMessagesEtape:
@@ -55,3 +57,26 @@ class TestMessagesEtape:
         messages.hide()
         assert messages.est_visible() is False
         assert messages.minuteur_actif() is False
+
+
+class TestMessagesCarte:
+
+    def test_est_une_carte_avec_icone(self, messages):
+        assert messages.carte.objectName() == "carte_message"
+        assert not messages.icone_pixmap().isNull()
+
+    def test_duree_glissement_est_le_jeton(self, messages):
+        attendu = int(theme.charger_jetons()["mouvement_ms"]["passage_ecran"])
+        assert messages.duree_glissement_ms() == attendu
+
+    def test_glisse_quand_anime(self, messages):
+        messages.resize(400, 300)
+        messages.afficher("Plus que 10 pages")
+        assert messages.en_glissement() is True
+
+    def test_apparait_sans_glissement_si_reduit(self, messages):
+        animations.definir_reduction(True)
+        messages.resize(400, 300)
+        messages.afficher("Plus que 10 pages")
+        assert messages.en_glissement() is False
+        assert messages.est_visible() is True

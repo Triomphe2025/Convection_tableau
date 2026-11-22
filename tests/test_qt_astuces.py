@@ -38,7 +38,25 @@ class TestAstucesRotation:
 
     def test_label_suit_le_texte(self, astuces):
         astuces.avancer()
-        assert astuces.text() == "Astuce B"
+        assert astuces.texte_affiche() == "Astuce B"
+
+
+class TestAstucesCarte:
+
+    def test_est_une_carte_avec_titre_et_icone(self, astuces):
+        assert astuces.carte.objectName() == "carte_astuce"
+        assert "Astuce" in astuces.titre_texte()
+        assert not astuces.icone_pixmap().isNull()
+
+    def test_fondu_au_changement(self, astuces):
+        astuces.avancer()
+        assert astuces.en_fondu() is True
+
+    def test_pas_de_fondu_si_reduit(self, astuces):
+        animations.definir_reduction(True)
+        astuces.avancer()
+        assert astuces.en_fondu() is False
+        assert astuces.texte_affiche() == "Astuce B"
 
 
 class TestAstucesMinuteur:

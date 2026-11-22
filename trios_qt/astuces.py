@@ -1,12 +1,14 @@
-"""Astuces qui tournent (étape 2C-4) : une astuce change toutes les 7 s (jeton astuce_rotation).
+"""Astuces qui tournent (étape 2C-4, retouche 4) : carte avec icône ampoule et petit titre
+« Astuce » ; une astuce change toutes les 7 s (jeton astuce_rotation), en fondu.
 
-Minuteur unique ; respecte « animations réduites » et s'arrête quand l'écran est caché. Avec une
-seule astuce il n'y a pas de rotation. Le texte est de la copie d'interface (conseils d'usage).
+Minuteur unique de rotation ; le fondu et la rotation respectent « animations réduites » et
+s'arrêtent quand l'écran est caché. Avec une seule astuce il n'y a pas de rotation. Le texte est
+de la copie d'interface (conseils d'usage).
 """
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
-from trios_qt import animations, theme
+from trios_qt import animations, icones, theme
 
 _ASTUCES_DEFAUT = (
     "Vérifie les cases orange : ce sont les points à relire après la conversion.",
@@ -17,8 +19,8 @@ _ASTUCES_DEFAUT = (
 )
 
 
-class Astuces(QLabel):
-    """Label qui fait défiler des astuces ; demarrer/arreter liés à l'affichage de l'écran."""
+class Astuces(QWidget):
+    """Carte d'astuces qui défilent en fondu ; demarrer/arreter liés à l'affichage de l'écran."""
 
     def __init__(self, astuces=None, jetons: dict | None = None, parent=None):
         super().__init__(parent)
@@ -26,23 +28,67 @@ class Astuces(QLabel):
         self._astuces = list(astuces) if astuces is not None else list(_ASTUCES_DEFAUT)
         self._i = 0
         self._intervalle = int(self._jetons["mouvement_ms"]["astuce_rotation"])
-        self.setWordWrap(True)
-        self.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+
+        self.carte = _carte(self)
+        colonne = QVBoxLayout(self.carte)
+        colonne.setContentsMargins(14, 11, 14, 12)
+        colonne.setSpacing(5)
+        entete = QHBoxLayout()
+        entete.setSpacing(7)
+        taille = int(self._jetons["tailles_texte_px"]["aide"]) + 2
+        self._pixmap = icones.charger_icone(
+            "ampoule", self._jetons["couleurs"]["a_relire"], taille).pixmap(taille, taille)
+        self._icone = QLabel(self.carte)
+        self._icone.setPixmap(self._pixmap)
+        self._titre = QLabel("Astuce", self.carte)
+        self._titre.setObjectName("astuce_titre")
+        entete.addWidget(self._icone, 0, Qt.AlignmentFlag.AlignVCenter)
+        entete.addWidget(self._titre, 0, Qt.AlignmentFlag.AlignVCenter)
+        entete.addStretch(1)
+        self._texte = QLabel(self.carte)
+        self._texte.setObjectName("astuce_texte")
+        self._texte.setWordWrap(True)
+        colonne.addLayout(entete)
+        colonne.addWidget(self._texte)
+
+        racine = QVBoxLayout(self)
+        racine.setContentsMargins(0, 0, 0, 0)
+        racine.addWidget(self.carte)
+
+        self._effet, self._fondu = animations.effet_opacite(self._texte)
         self._minuteur = QTimer(self)
         self._minuteur.setInterval(self._intervalle)
         self._minuteur.timeout.connect(self.avancer)
         if self._astuces:
-            self.setText(self._astuces[0])
+            self._texte.setText(self._astuces[0])
 
     def texte_courant(self) -> str:
         return self._astuces[self._i] if self._astuces else ""
+
+    def texte_affiche(self) -> str:
+        return self._texte.text()
+
+    def titre_texte(self) -> str:
+        return self._titre.text()
+
+    def icone_pixmap(self):
+        return self._pixmap
 
     def avancer(self) -> str:
         if not self._astuces:
             return ""
         self._i = (self._i + 1) % len(self._astuces)
-        self.setText(self._astuces[self._i])
+        self._texte.setText(self._astuces[self._i])
+        if not animations.animations_reduites():
+            self._fondu.stop()
+            self._fondu.setStartValue(0.0)
+            self._fondu.setEndValue(1.0)
+            self._fondu.start()
         return self._astuces[self._i]
+
+    def en_fondu(self) -> bool:
+        from PySide6.QtCore import QAbstractAnimation
+        return self._fondu.state() == QAbstractAnimation.State.Running
 
     def intervalle_ms(self) -> int:
         return self._intervalle
@@ -66,3 +112,11 @@ class Astuces(QLabel):
     def hideEvent(self, event):
         super().hideEvent(event)
         self.arreter()
+        self._fondu.stop()
+
+
+def _carte(parent):
+    from PySide6.QtWidgets import QFrame
+    cadre = QFrame(parent)
+    cadre.setObjectName("carte_astuce")
+    return cadre

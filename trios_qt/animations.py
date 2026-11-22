@@ -64,6 +64,29 @@ def courbe_depuis_jetons(texte: str) -> QEasingCurve:
     return courbe
 
 
+def effet_opacite(widget, duree_ms: int | None = None, jetons: dict | None = None):
+    """Pose un QGraphicsOpacityEffect et rend (effet, animation d'opacité réutilisable).
+
+    L'animation (durée = jeton changement_etat par défaut) sert aux fondus répétés (ex. astuces) :
+    l'appelant pose startValue / endValue puis start(). Le fondu reste à la charge de l'appelant
+    quant au respect de « animations réduites ».
+    """
+    jetons = jetons or charger_jetons_mouvement()
+    if duree_ms is None:
+        duree_ms = int(jetons["changement_etat"])
+    effet = QGraphicsOpacityEffect(widget)
+    widget.setGraphicsEffect(effet)
+    anim = QPropertyAnimation(effet, b"opacity", widget)
+    anim.setDuration(int(duree_ms))
+    return effet, anim
+
+
+def charger_jetons_mouvement() -> dict:
+    """Durées de mouvement des jetons (sous-dict mouvement_ms), pour les helpers d'animation."""
+    from trios_qt import theme
+    return theme.charger_jetons()["mouvement_ms"]
+
+
 def fondu_entree(widget, duree_ms: int, courbe: QEasingCurve | None = None):
     """Fait apparaître le widget en fondu. Rend None si les animations sont réduites."""
     if animations_reduites():
