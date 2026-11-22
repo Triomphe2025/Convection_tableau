@@ -64,6 +64,11 @@ def taux_divergence(result: Dict) -> float:
     return (controle.get('taux') or 0.0) if controle.get('degradee') else 0.0
 
 
+def _cellules_donnees(result: Dict) -> List[list]:
+    """Cellules des lignes de données (format pivot) d'une page, pour la lecture en direct."""
+    return [r.get('cells') for r in (result.get('rows') or []) if r.get('type') == 'data']
+
+
 class Converter:
     """
     Pipeline complet avec callbacks de progression.
@@ -1185,7 +1190,9 @@ class Converter:
             # Événement de page (phase 1A) : comme en mode vision, pour que l'écran d'attente
             # distingue « lecture page n / total » de l'analyse (le mode Tesseract n'en émettait
             # aucun → l'écran restait figé).
-            self._emettre(ev.PAGE_LUE, page=done, rang=done, total=total, lignes=rows)
+            self._emettre(ev.PAGE_LUE, page=done, rang=done, total=total, lignes=rows,
+                          image=result.get('image_path') or None,
+                          cellules=_cellules_donnees(result))
 
         def _page_debut(num: int, total: int) -> None:
             self._emettre(ev.PAGE_DEBUT, page=num, rang=num, total=total)
@@ -1597,7 +1604,9 @@ class Converter:
                 ev.PAGE_LUE, page=page_pdf, rang=i + 1, total=total, lignes=lignes,
                 page_imprimee=numero_page(result),
                 bornier=(result.get('metadata') or {}).get('BORNIER'),
-                zones=zones, cout=result.get('api_usage'))
+                zones=zones, cout=result.get('api_usage'),
+                image=result.get('image_path') or str(img),
+                cellules=_cellules_donnees(result))
             results.append(result)
 
         if pages_cache:

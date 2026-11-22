@@ -48,3 +48,5 @@ class Evenement:
     compteurs: Optional[dict] = None
     message: Optional[str] = None
     points: Optional[str] = None   # FIN : chemin du <nom>_points.json écrit (ou None)
+    image: Optional[str] = None    # PAGE_LUE : chemin de l'image de la page lue (lecture directe)
+    cellules: Optional[List[list]] = None  # PAGE_LUE : cellules des lignes de données extraites

@@ -17,7 +17,7 @@ class TestEvenement(unittest.TestCase):
         self.assertEqual(e.type, ev.PAGE_DEBUT)
         for champ in ('page', 'rang', 'total', 'page_imprimee', 'nature', 'etat', 'bornier',
                       'lignes', 'zones', 'alertes', 'cout', 'lot', 'compteurs', 'message',
-                      'points'):
+                      'points', 'image', 'cellules'):
             self.assertIsNone(getattr(e, champ), champ)
 
     def test_horodatage_rempli_automatiquement(self):
@@ -32,6 +32,14 @@ class TestEvenement(unittest.TestCase):
         self.assertEqual((e.page, e.rang, e.total, e.page_imprimee, e.lignes, e.bornier),
                          (3, 2, 10, '122a', 12, 'PA'))
         self.assertEqual(e.zones, [{'ligne': 0, 'boite': (0.1, 0.2, 0.3, 0.4)}])
+
+    def test_image_et_cellules_portees(self):
+        # Étape 2C-6 : PAGE_LUE peut porter l'image de la page et les cellules extraites
+        # (lecture en direct). Additif : l'Excel ne change pas.
+        e = ev.Evenement(type=ev.PAGE_LUE, image=r'C:\travail\images_pdf\page_003.png',
+                         cellules=[['01', 'ROUGE'], ['02', 'BLANC']])
+        self.assertEqual(e.image, r'C:\travail\images_pdf\page_003.png')
+        self.assertEqual(e.cellules, [['01', 'ROUGE'], ['02', 'BLANC']])
 
     def test_compteurs_porte_le_detail_du_lot(self):
         e = ev.Evenement(type=ev.LOT_ETAT, lot='batch_x',

@@ -64,6 +64,16 @@ class TestEvenementsVision(_Base):
         self.assertTrue(all(isinstance(e.lignes, int) for e in lues))
         self.assertTrue(all(e.total == 3 for e in lues))
 
+    def test_page_lue_porte_image_et_cellules(self):
+        # Étape 2C-6 (lecture en direct) : chaque PAGE_LUE porte l'image de la page et les
+        # cellules extraites, sans rien changer à l'Excel (vérifié par l'équivalence plus bas).
+        col = self._lancer(self._images(2), mode_lot=False)
+        lues = col.du_type(ev.PAGE_LUE)
+        self.assertEqual(len(lues), 2)
+        for e in lues:
+            self.assertTrue(e.image and str(e.image).lower().endswith('.png'), e.image)
+            self.assertIsInstance(e.cellules, list)
+
     def test_evenements_lot(self):
         col = self._lancer(self._images(3), mode_lot=True, etats=('in_progress', 'ended'))
         t = col.types()
