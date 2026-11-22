@@ -13,7 +13,10 @@ from PySide6.QtCore import QSettings
 _ORG = "TriosSeconverter"
 _APP = "apercu"
 _CLE_DOSSIER = "convertir/dossier_sortie"
+# _CLE_API : ancien emplacement (clair), lu puis migré, jamais réécrit.
+# _CLE_API_PROTEGEE : blob DPAPI base64 (jamais la clé en clair).
 _CLE_API = "ocr/cle_api"
+_CLE_API_PROTEGEE = "ocr/cle_api_protegee"
 
 # Défini par les tests (configurer_pour_tests) → réglages dans un .ini isolé, jamais le vrai store.
 _fichier_test = None
@@ -40,13 +43,36 @@ def ecrire_dossier_sortie(chemin):
 
 
 def lire_cle_api():
-    """Clé API enregistrée par l'aperçu Qt (QSettings), ou '' si aucune."""
-    return _settings().value(_CLE_API, "", type=str)
+    """Clé API enregistrée par l'aperçu Qt (déchiffrée DPAPI), ou '' si aucune.
+
+    Migre une ancienne clé en clair (`_CLE_API`) vers le blob chiffré, puis l'efface.
+    """
+    import chiffrement_dpapi
+    s = _settings()
+    protege = s.value(_CLE_API_PROTEGEE, "", type=str)
+    if protege:
+        return chiffrement_dpapi.deproteger(protege)
+    ancienne = (s.value(_CLE_API, "", type=str) or "").strip()
+    if ancienne:
+        ecrire_cle_api(ancienne)   # ré-enregistre chiffrée et efface le clair
+        return ancienne
+    return ""
 
 
 def ecrire_cle_api(cle):
-    """Enregistre la clé API dans les réglages de l'aperçu Qt (persistée entre sessions)."""
-    _settings().setValue(_CLE_API, (cle or "").strip())
+    """Enregistre la clé API chiffrée (DPAPI), jamais en clair ; vide = efface la clé stockée."""
+    import chiffrement_dpapi
+    s = _settings()
+    s.remove(_CLE_API)   # ne jamais laisser de clé en clair derrière soi
+    cle = (cle or "").strip()
+    if not cle:
+        s.remove(_CLE_API_PROTEGEE)
+        return
+    try:
+        s.setValue(_CLE_API_PROTEGEE, chiffrement_dpapi.proteger(cle))
+    except OSError:
+        # DPAPI indisponible : on préfère ne rien persister plutôt qu'écrire la clé en clair.
+        s.remove(_CLE_API_PROTEGEE)
 
 
 def charger_cle_api_demarrage():

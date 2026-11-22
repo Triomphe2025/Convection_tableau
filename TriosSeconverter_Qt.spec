@@ -44,6 +44,7 @@ a = Analysis(
     hiddenimports=[
         'PySide6.QtCore', 'PySide6.QtGui', 'PySide6.QtWidgets', 'PySide6.QtSvg',
         'fiabiliser_tesseract',   # importé paresseusement par config.appliquer_env_ocr
+        'chiffrement_dpapi',      # importé paresseusement par trios_qt.reglages (clé API chiffrée)
     ] + collect_submodules('trios_qt'),
     hookspath=[],
     hooksconfig={},
