@@ -53,13 +53,14 @@ class BarreReperes(QWidget):
         peintre.setPen(Qt.PenStyle.NoPen)
         peintre.setBrush(QColor(c["trait"]))
         peintre.drawRoundedRect(QRectF(0, 0, w, h), h / 2, h / 2)
-        peintre.setBrush(QColor(c["succes"]))
+        peintre.setBrush(QColor(c["rose_trios"]))   # barre en rose (comme 10_mini_fenetre)
         peintre.drawRoundedRect(QRectF(0, 0, w * self._fraction, h), h / 2, h / 2)
         if self._total:
+            # Repères des pages à relire : traits fins verticaux (pas des ronds).
             peintre.setBrush(QColor(c["a_relire"]))
             for index in self._reperes:
                 x = w * (index + 0.5) / self._total
-                peintre.drawEllipse(QRectF(x - h / 2, 0, h, h))
+                peintre.drawRect(QRectF(x - 1, 0, 2, h))
         peintre.end()
 
 
@@ -116,6 +117,7 @@ class MiniFenetre(QWidget):
         corps.setSpacing(12)
         self.anneau = Anneau(self._jetons, self)
         self.anneau.setFixedSize(92, 92)
+        self.anneau.definir_taille_pourcentage(20)   # « 97% » tient dans l'anneau
         corps.addWidget(self.anneau, 0)
 
         colonne = QVBoxLayout()
@@ -184,7 +186,7 @@ class MiniFenetre(QWidget):
             self._done = done
             fraction = done / self._total
             self.anneau.definir_valeur(fraction)
-            self.anneau.definir_sous_libelle(f"{done} / {self._total}")
+            # Pas de « n / N » dans l'anneau : il est déjà sur la ligne de droite.
             self.etiquette_pages.setText(f"{done} / {self._total} pages")
             self.barre.definir_avancement(fraction, self._total)
             notification.definir_progression_barre(self._hwnd(), fraction)
