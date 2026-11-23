@@ -22,6 +22,7 @@ from trios_qt.mosaique import Mosaique
 from trios_qt.rail_etapes import RailEtapes
 
 _MAX_LIGNES = 200
+_NATURES_NATIVES = {'vectoriel', 'texte', 'natif'}
 _RAIL_CLES = ("preparation", "envoi", "lecture", "recuperation")
 _RAIL_LIBELLES = {
     "preparation": "Préparation", "envoi": "Envoi",
@@ -41,7 +42,11 @@ class DiagrammeLots(QWidget):
         super().__init__(parent)
         self._jetons = jetons
         self._lots: list[dict] = []
-        self.setMinimumHeight(170)
+        self.setMinimumHeight(210)
+        from trios_qt import icones
+        couleur = jetons["couleurs"]["texte_secondaire"]
+        self._pix_poste = icones.charger_icone("poste", couleur, 22).pixmap(22, 22)
+        self._pix_nuage = icones.charger_icone("nuage", couleur, 22).pixmap(22, 22)
 
     def definir_lots(self, lots) -> None:
         self._lots = list(lots)
@@ -54,6 +59,16 @@ class DiagrammeLots(QWidget):
         d = self._lots[i]
         return (d.get("lues", 0) / d["total"]) if d.get("total") else 0.0
 
+    def position_fraction(self, i: int) -> float:
+        """Position de la pastille sur sa piste selon l'ÉTAPE du lot, pas la part lue :
+        rapatrié = revenu à gauche (PC) ; envoi = en route ; chez Anthropic = à droite."""
+        phase = self._lots[i].get("phase")
+        if phase == PageAttenteLot.RAPATRIE:
+            return 0.0
+        if phase == PageAttenteLot.ENVOI:
+            return 0.4
+        return 0.85   # chez Anthropic
+
     def couleur_lot(self, i: int) -> QColor:
         c = self._jetons["couleurs"]
         rapatrie = self._lots[i].get("phase") == PageAttenteLot.RAPATRIE
@@ -63,8 +78,9 @@ class DiagrammeLots(QWidget):
         c = self._jetons["couleurs"]
         peintre = QPainter(self)
         peintre.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        self._noeud(peintre, 0, "Ce PC", "prépare, puis récupère")
-        self._noeud(peintre, self.width() - 86, "Anthropic", "lit les pages du lot")
+        self._noeud(peintre, 0, "Ce PC", "prépare, puis récupère", self._pix_poste)
+        self._noeud(peintre, self.width() - 86, "Anthropic", "lit les pages du lot",
+                    self._pix_nuage)
         if not self._lots:
             peintre.end()
             return
@@ -77,8 +93,7 @@ class DiagrammeLots(QWidget):
             stylo.setStyle(Qt.PenStyle.DashLine)
             peintre.setPen(stylo)
             peintre.drawLine(int(x0), int(y), int(x1), int(y))
-            frac = self.fraction_lot(i)
-            px = x0 + frac * (x1 - x0 - larg_pastille)
+            px = x0 + self.position_fraction(i) * (x1 - x0 - larg_pastille)
             boite = QRectF(px, y - 13, larg_pastille, 26)
             peintre.setPen(Qt.PenStyle.NoPen)
             fond = QColor(self.couleur_lot(i))
@@ -99,17 +114,20 @@ class DiagrammeLots(QWidget):
             peintre.drawText(boite_d, Qt.AlignmentFlag.AlignRight, droite)
         peintre.end()
 
-    def _noeud(self, peintre, x, titre, sous):
+    def _noeud(self, peintre, x, titre, sous, pixmap):
         c = self._jetons["couleurs"]
-        boite = QRectF(x, self.height() / 2 - 26, 86, 52)
+        cx = x + 43
+        cy = self.height() / 2
+        tuile = QRectF(cx - 22, cy - 44, 44, 44)
         peintre.setPen(Qt.PenStyle.NoPen)
         peintre.setBrush(QColor(c["sureleve"]))
-        peintre.drawRoundedRect(boite, 10, 10)
+        peintre.drawRoundedRect(tuile, 10, 10)
+        peintre.drawPixmap(int(cx - 11), int(cy - 33), pixmap)
+        bx = max(0.0, min(x - 7, self.width() - 100.0))   # boîte de texte toujours à l'écran
         peintre.setPen(QColor(c["texte"]))
-        peintre.drawText(QRectF(x, self.height() / 2 - 22, 86, 20),
-                         Qt.AlignmentFlag.AlignCenter, titre)
+        peintre.drawText(QRectF(bx, cy + 4, 100, 18), Qt.AlignmentFlag.AlignHCenter, titre)
         peintre.setPen(QColor(c["texte_discret"]))
-        peintre.drawText(QRectF(x - 10, self.height() / 2 + 28, 106, 28),
+        peintre.drawText(QRectF(bx, cy + 22, 100, 34),
                          Qt.AlignmentFlag.AlignHCenter | Qt.TextFlag.TextWordWrap, sous)
 
 
@@ -135,6 +153,9 @@ class PageAttenteLot(QWidget):
         self._excel = None
         self._dossier = None
         self._lots: dict[str, dict] = {}
+        self._natures: dict[int, str] = {}
+        self._total = 0
+        self._pages_vues = 0
         self._derniere_verif = None
         self._delai = 0
         self._construire()
@@ -234,7 +255,8 @@ class PageAttenteLot(QWidget):
         v.setSpacing(6)
         rangee = QHBoxLayout()
         self.anneau = Anneau(self._jetons, carte)
-        self.anneau.setFixedSize(92, 92)
+        self.anneau.setFixedSize(96, 96)
+        self.anneau.definir_taille_pourcentage(22)   # « 52 » tient dans l'anneau
         rangee.addWidget(self.anneau, 0)
         droite = QVBoxLayout()
         titre = QLabel("pages lues par Anthropic", carte)
@@ -344,7 +366,9 @@ class PageAttenteLot(QWidget):
 
     # ── Événements ───────────────────────────────────────────────────
     def sur_evenement(self, e) -> None:
-        if e.type == ev.LOT_CREE:
+        if e.type == ev.ANALYSE:
+            self._analyse(e)
+        elif e.type == ev.LOT_CREE:
             self._lot_cree(e)
         elif e.type == ev.LOT_ETAT:
             self._lot_etat(e)
@@ -356,6 +380,41 @@ class PageAttenteLot(QWidget):
         if ligne:
             self._ajouter_journal(ligne)
 
+    def _amorcer_pages(self, total) -> None:
+        if total and self.mosaique.nombre_pages() == 0:
+            self._total = total
+            self.mosaique.definir_pages(total)
+            self.titre_pages.setText(f"Les {total} pages")
+            self.mosaique.setFixedHeight(self.mosaique.hauteur_rangees(10))
+
+    def _analyse(self, e) -> None:
+        if e.page and e.nature:
+            self._natures[e.page] = e.nature
+        self._amorcer_pages(e.total)
+        self._repeindre_mosaique()
+
+    def _repeindre_mosaique(self) -> None:
+        # Cases dès l'attente : natif, « dans un lot », « lue pas rapatriée », « rapatriée ».
+        if self.mosaique.nombre_pages() == 0 or not self._total:
+            return
+        en_cours = [d for d in self._lots.values() if d.get("phase") != self.RAPATRIE]
+        rapatries = [d for d in self._lots.values() if d.get("phase") == self.RAPATRIE]
+        rapatriees = max(sum(d.get("total", 0) for d in rapatries), self._pages_vues)
+        lues = max(rapatriees, sum(d.get("lues", 0) for d in en_cours) + rapatriees)
+        rang = 0
+        for p in range(1, self._total + 1):
+            if self._natures.get(p) in _NATURES_NATIVES:
+                self.mosaique.definir_etat(p - 1, Mosaique.NATIF)
+            else:
+                if rang < rapatriees:
+                    etat = Mosaique.LUE
+                elif rang < lues:
+                    etat = Mosaique.LECTURE
+                else:
+                    etat = Mosaique.DANS_LOT
+                self.mosaique.definir_etat(p - 1, etat)
+                rang += 1
+
     def _lot(self, lot: str, taille_mo: float = 0.0) -> dict:
         if lot not in self._lots:
             self._lots[lot] = {"lot": lot, "taille_mo": taille_mo, "lues": 0, "total": 0,
@@ -366,6 +425,21 @@ class PageAttenteLot(QWidget):
         self.rail.definir_phase("lecture")
         self.diagramme.definir_lots(list(self._lots.values()))
         self._maj_anneau()
+        self._maj_rail_comptes()
+        self._repeindre_mosaique()
+
+    def _maj_rail_comptes(self) -> None:
+        lots = list(self._lots.values())
+        n = len(lots)
+        pages = sum(d.get("total", 0) for d in lots)
+        mo = sum(d.get("taille_mo", 0.0) for d in lots)
+        lues = sum(d.get("lues", 0) for d in lots)
+        total = sum(d.get("total", 0) for d in lots)
+        rapatries = sum(1 for d in lots if d.get("phase") == self.RAPATRIE)
+        self.rail.definir_compte("preparation", f"{pages} p. · {mo:.0f} Mo · {n} lots")
+        self.rail.definir_compte("envoi", f"{n} / {n} lots")
+        self.rail.definir_compte("lecture", f"{lues} / {total}")
+        self.rail.definir_compte("recuperation", f"{rapatries} / {n} lots")
 
     def _lot_cree(self, e) -> None:
         comp = e.compteurs or {}
@@ -394,12 +468,9 @@ class PageAttenteLot(QWidget):
         self._rafraichir_diagramme()
 
     def _page_lue(self, e) -> None:
-        if e.total and self.mosaique.nombre_pages() == 0:
-            self.mosaique.definir_pages(e.total)
-            self.titre_pages.setText(f"Les {e.total} pages")
-            self.mosaique.setFixedHeight(self.mosaique.hauteur_rangees(10))
-        idx = (e.rang or e.page or 1) - 1
-        self.mosaique.definir_etat(idx, Mosaique.LUE, infobulle=f"page {e.page} — rapatriée")
+        self._amorcer_pages(e.total)
+        self._pages_vues += 1
+        self._repeindre_mosaique()
 
     # ── Affichage dérivé ─────────────────────────────────────────────
     def _maj_anneau(self) -> None:
@@ -407,7 +478,7 @@ class PageAttenteLot(QWidget):
         total = sum(d.get("total", 0) for d in self._lots.values())
         if total:
             self.anneau.definir_valeur(lues / total)
-            self.anneau.definir_sous_libelle(f"{lues} sur {total}")
+            self.anneau.definir_centre(str(lues), f"sur {total}")   # « 52 » + « sur 116 »
 
     def _maj_verification(self) -> None:
         if self._derniere_verif is None:

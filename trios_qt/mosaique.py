@@ -20,6 +20,7 @@ class Mosaique(QWidget):
     LUE = "lue"
     NATIF = "natif"
     A_RELIRE = "a_relire"
+    DANS_LOT = "dans_lot"   # écran lot : page envoyée dans un lot, pas encore lue
     TAILLE_TUILE = 14   # px, côté d'une case
     ECART = 4           # px, blanc entre deux cases
 
@@ -91,6 +92,7 @@ class Mosaique(QWidget):
         table = {
             self.ATTENTE: c["tuile_attente"], self.LECTURE: c["rose_trios"],
             self.LUE: c["tuile_lue"], self.NATIF: c["texte_natif"], self.A_RELIRE: c["a_relire"],
+            self.DANS_LOT: c["lot_en_cours"],
         }
         return QColor(table.get(etat, c["tuile_attente"]))
 

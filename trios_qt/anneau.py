@@ -23,6 +23,9 @@ class Anneau(QWidget):
         self._termine = False
         self._reussi = True
         self._sous_libelle = ""
+        self._centre_grand = None   # texte central personnalisé (ex. « 52 » au lieu du %)
+        self._centre_sous = ""
+        self._taille_pc = None      # taille du grand texte (px) ; défaut = titre_ecran
 
     def definir_valeur(self, v) -> None:
         self._valeur = max(0.0, min(1.0, float(v)))
@@ -36,6 +39,16 @@ class Anneau(QWidget):
 
     def pourcentage_texte(self) -> str:
         return f"{self.pourcentage()} %"
+
+    def definir_centre(self, grand, sous: str = "") -> None:
+        """Texte central personnalisé (ex. « 52 » + « sur 116 ») au lieu du pourcentage."""
+        self._centre_grand = grand
+        self._centre_sous = sous or ""
+        self.update()
+
+    def definir_taille_pourcentage(self, px: int) -> None:
+        self._taille_pc = int(px)
+        self.update()
 
     def angle_balayage_16(self) -> int:
         # drawArc attend des 1/16 de degré : 360° = un tour complet pour valeur = 1.
@@ -68,7 +81,7 @@ class Anneau(QWidget):
         return self._sous_libelle
 
     def taille_pourcentage(self) -> int:
-        return int(self._jetons["tailles_texte_px"]["titre_ecran"])
+        return self._taille_pc or int(self._jetons["tailles_texte_px"]["titre_ecran"])
 
     def paintEvent(self, _evenement) -> None:
         c = self._jetons["couleurs"]
@@ -101,15 +114,17 @@ class Anneau(QWidget):
     def _peindre_texte(self, peintre: QPainter, boite: QRectF) -> None:
         c = self._jetons["couleurs"]
         famille = self._jetons["polices"]["interface"]
+        # Texte central : personnalisé (« 52 » / « sur 116 ») ou pourcentage / sous-libellé.
+        grand = self._centre_grand if self._centre_grand is not None else self.pourcentage_texte()
+        sous = self._centre_sous if self._centre_grand is not None else self._sous_libelle
         grande = QFont(famille, self.taille_pourcentage())
         grande.setBold(True)
-        a_sous = bool(self._sous_libelle)
-        # Pourcentage légèrement remonté quand un sous-libellé prend la ligne du dessous.
+        a_sous = bool(sous)
         decalage = boite.height() * 0.12 if a_sous else 0.0
         rect_pc = QRectF(boite.left(), boite.top() - decalage, boite.width(), boite.height())
         peintre.setFont(grande)
         peintre.setPen(QColor(c["texte"]))
-        peintre.drawText(rect_pc, Qt.AlignmentFlag.AlignCenter, self.pourcentage_texte())
+        peintre.drawText(rect_pc, Qt.AlignmentFlag.AlignCenter, grand)
         if a_sous:
             petite = QFont(famille, int(self._jetons["tailles_texte_px"]["aide"]))
             peintre.setFont(petite)
@@ -117,7 +132,7 @@ class Anneau(QWidget):
             haut = boite.center().y() + self.taille_pourcentage() * 0.5 - decalage
             rect_sous = QRectF(boite.left(), haut, boite.width(), boite.bottom() - haut)
             peintre.drawText(rect_sous, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
-                             self._sous_libelle)
+                             sous)
 
     def _peindre_coche(self, peintre: QPainter, boite: QRectF) -> None:
         from PySide6.QtGui import QPainterPath

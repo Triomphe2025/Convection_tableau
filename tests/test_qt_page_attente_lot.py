@@ -92,6 +92,37 @@ class TestMosaique:
         page.sur_evenement(ev.Evenement(type=ev.PAGE_LUE, page=1, rang=1, total=2, lignes=3))
         assert page.mosaique.etat(0) == Mosaique.LUE
 
+    def test_mosaique_remplie_des_analyse(self, page):
+        # Retouche 1 : cases dès ANALYSE / LOT_CREE (plus de mosaïque vide pendant l'attente).
+        natures = [(1, 'vectoriel'), (2, 'scan'), (3, 'scan'), (4, 'scan'), (5, 'vectoriel')]
+        for p, nat in natures:
+            page.sur_evenement(ev.Evenement(type=ev.ANALYSE, page=p, total=5, nature=nat))
+        page.sur_evenement(ev.Evenement(type=ev.LOT_CREE, lot="b1",
+                                        compteurs={"requetes": 3, "taille_mo": 5.0}))
+        assert page.mosaique.nombre_pages() == 5
+        assert page.mosaique.etat(0) == Mosaique.NATIF       # page 1 native → texte natif
+        assert page.mosaique.etat(1) == Mosaique.DANS_LOT    # page 2 scan → dans un lot
+        page.sur_evenement(ev.Evenement(type=ev.LOT_ETAT, lot="b1",
+                                        compteurs={"lues": 1, "total": 3, "delai": 30}))
+        assert Mosaique.LECTURE in [page.mosaique.etat(i) for i in range(5)]
+        page.sur_evenement(ev.Evenement(type=ev.LOT_RECUPERE, lot="b1",
+                                        compteurs={"lues": 3, "total": 3}))
+        assert Mosaique.LUE in [page.mosaique.etat(i) for i in range(5)]
+
+
+class TestPastilles:
+
+    def test_position_par_phase_pas_par_fraction(self, page):
+        # Retouche 2 : un lot chez Anthropic à 2/22 lues est côté Anthropic (droite), pas à gauche.
+        page.sur_evenement(ev.Evenement(type=ev.LOT_CREE, lot="b1",
+                                        compteurs={"requetes": 22, "taille_mo": 5.0}))
+        page.sur_evenement(ev.Evenement(type=ev.LOT_ETAT, lot="b1",
+                                        compteurs={"lues": 2, "total": 22, "delai": 30}))
+        assert page.diagramme.position_fraction(0) >= 0.5
+        page.sur_evenement(ev.Evenement(type=ev.LOT_RECUPERE, lot="b1",
+                                        compteurs={"lues": 22, "total": 22}))
+        assert page.diagramme.position_fraction(0) <= 0.1   # rapatrié : revenu à gauche
+
 
 class TestSansPause:
 
