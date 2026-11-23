@@ -122,3 +122,7 @@ class TestMini:
         fenetre.mini.show()
         fenetre.mini.agrandir_demande.emit()
         assert not fenetre.mini.isVisible()
+
+    def test_bouton_mini_fenetre_ouvre_la_mini(self, fenetre):
+        fenetre.page_traitement.mini_demande.emit()
+        assert fenetre.mini.isVisible()

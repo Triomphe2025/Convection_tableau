@@ -442,6 +442,14 @@ QPushButton[classe="nav"]:checked {{
     font-size: {int(t['aide'])}px;
     font-weight: 700;
 }}
+#pastille_lot {{
+    background-color: {_rgba(c['lot_en_cours'], 0.30)};
+    color: {c['texte']};
+    border-radius: {int(HAUTEUR_PASTILLE / 2)}px;
+    padding: 2px 10px;
+    font-size: {int(t['aide'])}px;
+    font-weight: 700;
+}}
 #pill_info {{
     background-color: {c['surface']};
     color: {c['texte_secondaire']};

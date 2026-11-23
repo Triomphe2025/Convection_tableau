@@ -12,7 +12,7 @@ import pytest
 pytest.importorskip("PySide6")
 
 import evenements as ev  # noqa: E402
-from trios_qt import animations  # noqa: E402
+from trios_qt import animations, theme  # noqa: E402
 from trios_qt.application import creer_application  # noqa: E402
 from trios_qt.mosaique import Mosaique  # noqa: E402
 from trios_qt.page_attente_lot import PageAttenteLot  # noqa: E402
@@ -31,6 +31,11 @@ def page(qtbot):
     animations.reinitialiser()
 
 
+@pytest.fixture(scope="module")
+def jetons():
+    return theme.charger_jetons()
+
+
 def _ev(d):
     return ev.Evenement(**d)
 
@@ -41,7 +46,7 @@ class TestPistes:
         page.sur_evenement(ev.Evenement(type=ev.LOT_CREE, lot="batch_1",
                                         compteurs={"requetes": 30, "taille_mo": 12.5}))
         assert page.nombre_pistes() == 1
-        assert "12.5" in page.piste("batch_1").text() or "12" in page.piste("batch_1").text()
+        assert "12.5" in page.lot_texte("batch_1")
 
     def test_lot_etat_avance(self, page):
         page.sur_evenement(ev.Evenement(type=ev.LOT_CREE, lot="batch_1",
@@ -49,7 +54,7 @@ class TestPistes:
         page.sur_evenement(ev.Evenement(type=ev.LOT_ETAT, lot="batch_1", compteurs={
             "lues": 12, "en_attente": 18, "a_reprendre": 0, "total": 30, "delai": 30}))
         assert page.anneau.valeur() == pytest.approx(12 / 30)
-        assert "12" in page.piste("batch_1").text()
+        assert "12" in page.lot_texte("batch_1")
 
     def test_lot_recupere_marque_rapatrie(self, page):
         page.sur_evenement(ev.Evenement(type=ev.LOT_CREE, lot="batch_1",
@@ -57,6 +62,26 @@ class TestPistes:
         page.sur_evenement(ev.Evenement(type=ev.LOT_RECUPERE, lot="batch_1",
                                         compteurs={"lues": 30, "total": 30}))
         assert page.phase_piste("batch_1") == PageAttenteLot.RAPATRIE
+
+
+class TestDiagramme:
+
+    def test_diagramme_reflete_les_lots(self, page):
+        page.sur_evenement(ev.Evenement(type=ev.LOT_CREE, lot="b1",
+                                        compteurs={"requetes": 24, "taille_mo": 46.0}))
+        page.sur_evenement(ev.Evenement(type=ev.LOT_ETAT, lot="b1", compteurs={
+            "lues": 12, "en_attente": 12, "a_reprendre": 0, "total": 24, "delai": 30}))
+        assert page.diagramme.nombre_lots() == 1
+        assert page.diagramme.fraction_lot(0) == pytest.approx(0.5)
+
+    def test_couleur_rapatrie_vs_en_cours(self, page, jetons):
+        c = jetons["couleurs"]
+        page.sur_evenement(ev.Evenement(type=ev.LOT_CREE, lot="b1",
+                                        compteurs={"requetes": 24, "taille_mo": 46.0}))
+        assert page.diagramme.couleur_lot(0).name().lower() == c["lot_en_cours"].lower()
+        page.sur_evenement(ev.Evenement(type=ev.LOT_RECUPERE, lot="b1",
+                                        compteurs={"lues": 24, "total": 24}))
+        assert page.diagramme.couleur_lot(0).name().lower() == c["tuile_lue"].lower()
 
 
 class TestMosaique:

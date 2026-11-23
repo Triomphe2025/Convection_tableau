@@ -22,23 +22,30 @@ class RailEtapes(QWidget):
 
     CLES = ("analyse", "lecture", "controles", "excel")
 
-    def __init__(self, jetons: dict | None = None, parent=None):
+    def __init__(self, jetons: dict | None = None, parent=None, cles=None, libelles=None):
         super().__init__(parent)
         self._jetons = jetons or theme.charger_jetons()
+        # Clés et libellés personnalisables (l'écran lot a d'autres étapes que l'écran tableau).
+        self._cles = tuple(cles) if cles else self.CLES
+        self._libelles = libelles or _LIBELLES
         self._courante: str | None = None
         self._termine = False
         self._comptes: dict[str, str] = {}
         self.setMinimumHeight(44)
 
+    @property
+    def cles(self):
+        return self._cles
+
     def definir_phase(self, etat: str) -> None:
-        if etat not in self.CLES:
+        if etat not in self._cles:
             return
         self._courante = etat
         self._termine = False
         self.update()
 
     def definir_compte(self, cle: str, texte: str) -> None:
-        if cle in self.CLES:
+        if cle in self._cles:
             self._comptes[cle] = texte or ""
             self.update()
 
@@ -49,27 +56,27 @@ class RailEtapes(QWidget):
         return None if self._termine else self._courante
 
     def _index_courant(self) -> int:
-        return self.CLES.index(self._courante) if self._courante in self.CLES else -1
+        return self._cles.index(self._courante) if self._courante in self._cles else -1
 
     def etat_etape(self, cle: str) -> str:
         if self._termine:
             return "fait"
-        i = self.CLES.index(cle)
+        i = self._cles.index(cle)
         courant = self._index_courant()
         if courant < 0 or i > courant:
             return "a_faire"
         return "en_cours" if i == courant else "fait"
 
     def fraction(self) -> float:
-        faites = sum(1 for c in self.CLES if self.etat_etape(c) == "fait")
-        return faites / len(self.CLES)
+        faites = sum(1 for c in self._cles if self.etat_etape(c) == "fait")
+        return faites / len(self._cles)
 
     def terminer(self) -> None:
         self._termine = True
         self.update()
 
     def libelle(self, cle: str) -> str:
-        return _LIBELLES.get(cle, cle)
+        return self._libelles.get(cle, cle)
 
     def couleur_segment(self, cle: str) -> QColor:
         """Barre du segment : vert (fait), rose (en cours), gris (à faire)."""
@@ -79,7 +86,7 @@ class RailEtapes(QWidget):
 
     def rectangles_segments(self):
         """Rectangle de chaque segment (tests de disposition) ; toujours dans le widget."""
-        n = len(self.CLES)
+        n = len(self._cles)
         largeur_seg = self.width() / n
         return [QRectF(i * largeur_seg, 0, largeur_seg, self.height()) for i in range(n)]
 
@@ -87,10 +94,10 @@ class RailEtapes(QWidget):
         c = self._jetons["couleurs"]
         peintre = QPainter(self)
         peintre.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        n = len(self.CLES)
+        n = len(self._cles)
         largeur_seg = self.width() / n
         y_barre = self.height() - 10
-        for i, cle in enumerate(self.CLES):
+        for i, cle in enumerate(self._cles):
             x0 = i * largeur_seg
             etat = self.etat_etape(cle)
             actif = etat in ("fait", "en_cours")

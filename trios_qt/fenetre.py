@@ -92,6 +92,7 @@ class FenetrePrincipale(QWidget):
         for ecran in (self.page_traitement, self.page_attente_lot):
             ecran.arret_demande.connect(self._arreter_conversion)
             ecran.voir_resume.connect(lambda: self.aller_a("convertir"))
+            ecran.mini_demande.connect(self._montrer_mini)
         self.page_traitement.pause_demande.connect(self._pause_conversion)
         self.page_traitement.reprendre_demande.connect(self._reprendre_conversion)
 
@@ -146,6 +147,12 @@ class FenetrePrincipale(QWidget):
     def _reprendre_conversion(self) -> None:
         if self._controleur is not None:
             self._controleur.reprendre()
+
+    def _montrer_mini(self) -> None:
+        # Bouton « Mini-fenêtre » : ouvre la mini (toujours au premier plan) et réduit la fenêtre.
+        self.mini.show()
+        self.mini.raise_()
+        self.showMinimized()
 
     def _agrandir_depuis_mini(self) -> None:
         self.mini.hide()
