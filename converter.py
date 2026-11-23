@@ -69,6 +69,11 @@ def _cellules_donnees(result: Dict) -> List[list]:
     return [r.get('cells') for r in (result.get('rows') or []) if r.get('type') == 'data']
 
 
+def _noop_evenement(_e):
+    """Puits d'événements par défaut (aucun écouteur) ; sert de sentinelle repérable."""
+    return None
+
+
 class Converter:
     """
     Pipeline complet avec callbacks de progression.
@@ -131,7 +136,9 @@ class Converter:
         self._on_log = on_log or (lambda m: None)
         # Événements structurés (étape 2) : émis EN PLUS de on_progress / on_log, pour une
         # interface qui suit le détail. Absent par défaut → rien ne change pour l'existant.
-        self._on_evenement = on_evenement or (lambda e: None)
+        # Sentinelle repérable : permet de savoir si un écouteur réel est branché (aperçu de page
+        # au PAGE_DEBUT seulement alors ; aucun coût en ligne de commande / campagne).
+        self._on_evenement = on_evenement if on_evenement is not None else _noop_evenement
         self._on_validation = on_validation  # None = pas de validation interactive
         self._on_column_mapping = on_column_mapping  # None = mapping auto standard
         self._on_wide_template_confirm = on_wide_template_confirm  # None = pas de confirmation
@@ -194,6 +201,10 @@ class Converter:
             self._on_evenement(ev.Evenement(type=type_, **champs))
         except Exception:
             logging.exception("écouteur d'événement ignoré")
+
+    def _a_apercu(self) -> bool:
+        """Un écouteur d'événements réel est-il branché ? Sinon, pas d'aperçu de page."""
+        return self._on_evenement is not _noop_evenement
 
     def _emettre_alertes_pages(self, resultats: List[Dict]) -> None:
         """Un événement page_alerte par page portant des alertes (resultat['a_verifier'])."""
@@ -960,9 +971,9 @@ class Converter:
                 'ligne': None, 'colonne': None, 'type': 'nombre de lignes',
                 'message': d['message'], 'lecture': None, 'lignes': True})
 
-    def _image_page_pdf(self, page: int, result: Dict) -> str:
+    def _image_page_pdf(self, page: int, result: Dict, quiet: bool = False) -> str:
         """Image de la page pour la relecture : celle du moteur, sinon rendue depuis le PDF."""
-        chemin = result.get('image_path', '')
+        chemin = result.get('image_path_fichier') or ''
         if chemin and Path(chemin).exists():
             return chemin
         try:
@@ -972,7 +983,8 @@ class Converter:
                     return ''
                 image = dossier_travail(self.word_file, 'relecture') / f"page_{page}.png"
                 doc[page - 1].get_pixmap(matrix=fitz.Matrix(2, 2)).save(str(image))
-            self._log(f"  → Image PDF rendue pour retry : {image.name}")
+            if not quiet:
+                self._log(f"  → Image PDF rendue pour retry : {image.name}")
             return str(image)
         except Exception as exc:
             self._log(f"  ⚠ Rendu image PDF impossible : {exc}")
@@ -1195,7 +1207,10 @@ class Converter:
                           cellules=_cellules_donnees(result))
 
         def _page_debut(num: int, total: int) -> None:
-            self._emettre(ev.PAGE_DEBUT, page=num, rang=num, total=total)
+            # Comportement A : image de la page dès le début de lecture, mais uniquement si une
+            # interface écoute (rendu d'aperçu : jamais en ligne de commande / campagne).
+            image = self._image_page_pdf(num, {}, quiet=True) or None if self._a_apercu() else None
+            self._emettre(ev.PAGE_DEBUT, page=num, rang=num, total=total, image=image)
 
         results, extractor = pdf_ext.extract_all(
             self.word_file, on_page_done=_page_callback, cancel_check=self._est_annule,
@@ -1545,7 +1560,8 @@ class Converter:
             pct = 0.28 + (i / total) * 0.37   # 28 % → 65 %
             self._progress(pct, f"OCR {i + 1}/{total} : {img.name}")
             self._log(f"  OCR {i + 1}/{total} : {img.name}")
-            self._emettre(ev.PAGE_DEBUT, page=_num(img), rang=i + 1, total=total)
+            # Comportement A : l'image est déjà rendue (img) → on la joint dès PAGE_DEBUT.
+            self._emettre(ev.PAGE_DEBUT, page=_num(img), rang=i + 1, total=total, image=str(img))
 
             if vision_extractor is not None:
                 # Page déjà lue par le lot ; sinon (cache, repli du lot, hors lot) appel normal.

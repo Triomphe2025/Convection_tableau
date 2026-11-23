@@ -9,7 +9,7 @@ pas). Sans zones (mode Tesseract), seules la bande et le tableau s'animent. La b
 """
 from pathlib import Path
 
-from PySide6.QtCore import QAbstractAnimation, QRectF, Qt, QVariantAnimation
+from PySide6.QtCore import QAbstractAnimation, QRectF, Qt, QTimer, QVariantAnimation
 from PySide6.QtGui import (
     QBrush, QColor, QPen, QPixmap, QStandardItem, QStandardItemModel,
 )
@@ -29,6 +29,8 @@ class LectureDirecte(QWidget):
     ETAT_COURANTE = "courante"
     ETAT_DOUTE = "doute"
     MAX_LIGNES_TABLE = 9
+    REVEAL_MS = 120          # cadence de révélation d'une ligne (bornée, voir cadence_ms)
+    REVEAL_BUDGET_MS = 2400  # durée totale maximale d'une révélation (plafond pour finir à temps)
 
     def __init__(self, jetons: dict | None = None, parent=None):
         super().__init__(parent)
@@ -36,6 +38,10 @@ class LectureDirecte(QWidget):
         self._taille_image = (1, 1)
         self._zones_items: list[QGraphicsRectItem] = []
         self._etats_zones: list[str] = []
+        self._cellules_page: list = []
+        self._zones_page: list = []
+        self._index_reveal = 0
+        self._ligne_loupe = -1
         self._construire()
         self._anim_bande = QVariantAnimation(self)
         self._anim_bande.setDuration(int(self._jetons["mouvement_ms"]["balayage_scan"]))
@@ -43,16 +49,35 @@ class LectureDirecte(QWidget):
         self._anim_bande.setEndValue(1.0)
         self._anim_bande.setLoopCount(-1)
         self._anim_bande.valueChanged.connect(self._placer_bande)
+        self._timer_reveal = QTimer(self)
+        self._timer_reveal.timeout.connect(self._pas_reveler)
 
     def _construire(self) -> None:
+        from PySide6.QtWidgets import QAbstractItemView, QHeaderView
         c = self._jetons["couleurs"]
-        rangee = QHBoxLayout(self)
-        rangee.setContentsMargins(0, 0, 0, 0)
-        rangee.setSpacing(12)
+        self._puces_valeurs: list[str] = []
+        racine = QVBoxLayout(self)
+        racine.setContentsMargins(0, 0, 0, 0)
+        racine.setSpacing(10)
 
+        # En-tête de carte : « Lecture en direct · page n » + « Résultat reçu · x / y lignes ».
+        entete = QHBoxLayout()
+        self.titre = QLabel("Lecture en direct", self)
+        self.titre.setObjectName("lecture_titre")
+        self.etat_lecture = QLabel("", self)
+        self.etat_lecture.setObjectName("lecture_resultat")
+        entete.addWidget(self.titre)
+        entete.addStretch(1)
+        entete.addWidget(self.etat_lecture)
+        racine.addLayout(entete)
+
+        # Haut : vignette de la page (bornée) à gauche, tableau extrait à droite.
+        haut = QHBoxLayout()
+        haut.setSpacing(14)
         self._scene = QGraphicsScene(self)
         self._vue = QGraphicsView(self._scene, self)
         self._vue.setObjectName("lecture_vue")
+        self._vue.setFixedSize(360, 250)
         from PySide6.QtGui import QPainter
         self._vue.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
         self._pixmap_item = QGraphicsPixmapItem()
@@ -63,35 +88,43 @@ class LectureDirecte(QWidget):
         self._bande.setPen(QPen(Qt.PenStyle.NoPen))
         self._bande.setVisible(False)
         self._scene.addItem(self._bande)
-        rangee.addWidget(self._vue, 1)
+        haut.addWidget(self._vue, 0)
 
-        # Panneau de droite à largeur bornée : la loupe (ligne agrandie) ne doit pas étirer
-        # la colonne et écraser la vue de la page.
-        panneau = QWidget(self)
-        panneau.setObjectName("lecture_panneau")
-        panneau.setMinimumWidth(240)
-        panneau.setMaximumWidth(360)
-        colonne = QVBoxLayout(panneau)
-        colonne.setContentsMargins(0, 0, 0, 0)
-        colonne.setSpacing(8)
-        self.loupe = QLabel(panneau)
-        self.loupe.setObjectName("lecture_loupe")
-        self.loupe.setFixedHeight(54)
-        self.loupe.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.puces = QLabel(panneau)
-        self.puces.setObjectName("lecture_puces")
-        self.puces.setWordWrap(True)
-        self.table = QTableView(panneau)
+        self.table = QTableView(self)
         self.table.setObjectName("lecture_table")
         self._modele = QStandardItemModel(self)
         self.table.setModel(self._modele)
-        self.table.horizontalHeader().setVisible(False)
         self.table.verticalHeader().setVisible(False)
+        self.table.horizontalHeader().setVisible(False)
+        self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setStretchLastSection(True)
-        colonne.addWidget(self.loupe)
-        colonne.addWidget(self.puces)
-        colonne.addWidget(self.table, 1)
-        rangee.addWidget(panneau, 0)
+        haut.addWidget(self.table, 1)
+        racine.addLayout(haut, 1)
+
+        # Loupe pleine largeur (bande agrandie lisible de la ligne courante).
+        titre_loupe = QLabel("Loupe sur la ligne lue", self)
+        titre_loupe.setObjectName("lecture_loupe_titre")
+        racine.addWidget(titre_loupe)
+        self.loupe = QLabel(self)
+        self.loupe.setObjectName("lecture_loupe")
+        self.loupe.setFixedHeight(56)
+        self.loupe.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        racine.addWidget(self.loupe)
+
+        # Puces « Lu : » en vraies pastilles.
+        rangee_puces = QHBoxLayout()
+        rangee_puces.setSpacing(6)
+        libelle_lu = QLabel("Lu :", self)
+        libelle_lu.setObjectName("lecture_lu")
+        rangee_puces.addWidget(libelle_lu, 0)
+        self._puces_boite = QHBoxLayout()
+        self._puces_boite.setSpacing(6)
+        rangee_puces.addLayout(self._puces_boite)
+        rangee_puces.addStretch(1)
+        racine.addLayout(rangee_puces)
 
     # ── Image ────────────────────────────────────────────────────────
     def charger_image(self, chemin) -> bool:
@@ -172,6 +205,15 @@ class LectureDirecte(QWidget):
         for ligne in dernieres:
             self._modele.appendRow([QStandardItem(str(v)) for v in (ligne or [])])
 
+    def cadence_ms(self, nombre_lignes: int) -> int:
+        """Cadence de révélation d'une ligne : ~120 ms, bornée pour tenir le budget total."""
+        if nombre_lignes <= 0:
+            return self.REVEAL_MS
+        return max(1, min(self.REVEAL_MS, self.REVEAL_BUDGET_MS // nombre_lignes))
+
+    def ligne_loupe(self) -> int:
+        return self._ligne_loupe
+
     def lignes_table(self) -> int:
         return self._modele.rowCount()
 
@@ -182,10 +224,30 @@ class LectureDirecte(QWidget):
     # ── Puces ────────────────────────────────────────────────────────
     def definir_puces(self, cellules_ligne) -> None:
         valeurs = [str(v) for v in (cellules_ligne or []) if str(v).strip()]
-        self.puces.setText("  •  ".join(valeurs))
+        self._puces_valeurs = valeurs
+        while self._puces_boite.count():
+            el = self._puces_boite.takeAt(0)
+            w = el.widget()
+            if w is not None:
+                w.setParent(None)   # détacher tout de suite (deleteLater est différé)
+                w.deleteLater()
+        for v in valeurs:
+            pastille = QLabel(v, self)
+            pastille.setObjectName("lecture_puce")
+            self._puces_boite.addWidget(pastille)
 
     def puces_texte(self) -> str:
-        return self.puces.text()
+        return "  ".join(self._puces_valeurs)
+
+    def definir_titre(self, page) -> None:
+        self.titre.setText(f"Lecture en direct · page {page}" if page else "Lecture en direct")
+
+    def definir_resultat(self, texte: str) -> None:
+        self.etat_lecture.setText(texte or "")
+
+    def definir_colonnes(self, noms) -> None:
+        self._modele.setHorizontalHeaderLabels(list(noms) if noms else [])
+        self.table.horizontalHeader().setVisible(bool(noms))
 
     # ── Bande de lecture ─────────────────────────────────────────────
     def _placer_bande(self, valeur) -> None:
@@ -205,19 +267,71 @@ class LectureDirecte(QWidget):
     def bande_active(self) -> bool:
         return self._anim_bande.state() == QAbstractAnimation.State.Running
 
+    # ── Révélation ligne par ligne (après PAGE_LUE) ──────────────────
+    def demarrer_reveler(self, zones, cellules) -> None:
+        """Révèle les lignes une à une (zone courante, loupe, tableau, puces) ; instantané si
+        les animations sont réduites. Sans cellules, affiche simplement les zones."""
+        self._timer_reveal.stop()
+        self._zones_page = list(zones or [])
+        self._cellules_page = list(cellules or [])
+        self._index_reveal = 0
+        self._ligne_loupe = -1
+        if self._modele.rowCount():
+            self._modele.removeRows(0, self._modele.rowCount())
+        self.definir_zones([])
+        total = len(self._cellules_page) or len(self._zones_page)
+        if total == 0:
+            return
+        if animations.animations_reduites():
+            while self._index_reveal < total:
+                self._pas_reveler()
+        else:
+            self._timer_reveal.start(self.cadence_ms(total))
+
+    def _pas_reveler(self) -> None:
+        total = len(self._cellules_page) or len(self._zones_page)
+        i = self._index_reveal
+        if i >= total:
+            self._timer_reveal.stop()
+            return
+        if self._zones_page:
+            self.definir_zones(self._zones_page[:i + 1], index_courant=i)
+        if i < len(self._cellules_page):
+            ligne = self._cellules_page[i]
+            self._modele.appendRow([QStandardItem(str(v)) for v in (ligne or [])])
+            while self._modele.rowCount() > self.MAX_LIGNES_TABLE:
+                self._modele.removeRow(0)
+            self._surligner_derniere()
+            self.definir_puces(ligne)
+        if i < len(self._zones_page):
+            self._mettre_a_jour_loupe(self._zones_page[i])
+            self._ligne_loupe = i
+        self._index_reveal += 1
+        self.definir_resultat(f"Résultat reçu · {self._index_reveal} / {total} lignes")
+
+    def _surligner_derniere(self) -> None:
+        from PySide6.QtGui import QBrush, QColor
+        fond = QColor(self._jetons["couleurs"]["rose_trios"])
+        fond.setAlphaF(0.18)
+        for r in range(self._modele.rowCount()):
+            couleur = fond if r == self._modele.rowCount() - 1 else QBrush()
+            for cc in range(self._modele.columnCount()):
+                item = self._modele.item(r, cc)
+                if item is not None:
+                    item.setBackground(couleur)
+
     # ── Événements ───────────────────────────────────────────────────
     def sur_evenement(self, e) -> None:
         import evenements as ev
         if e.type == ev.PAGE_DEBUT:
+            if e.image:
+                self.charger_image(e.image)   # bande rose sur la page en cours de lecture
             self.definir_bande_active(True)
         elif e.type == ev.PAGE_LUE:
             self.definir_bande_active(False)
             if e.image:
                 self.charger_image(e.image)
-            self.definir_zones(e.zones)
-            self.remplir_table(e.cellules)
-            if e.cellules:
-                self.definir_puces(e.cellules[-1])
+            self.demarrer_reveler(e.zones, e.cellules)
         elif e.type == ev.PAGE_ZONES:
             self.definir_zones(e.zones)
 
@@ -237,3 +351,4 @@ class LectureDirecte(QWidget):
     def hideEvent(self, event):
         super().hideEvent(event)
         self.definir_bande_active(False)
+        self._timer_reveal.stop()

@@ -139,7 +139,15 @@ class TestEvenements:
         vue.sur_evenement(ev.Evenement(type=ev.PAGE_DEBUT, page=1, rang=1, total=3))
         assert vue.bande_active() is True
 
+    def test_page_debut_charge_l_image(self, vue, image_png):
+        # Comportement A : l'image est chargée dès PAGE_DEBUT (page en cours de lecture).
+        vue.sur_evenement(ev.Evenement(type=ev.PAGE_DEBUT, page=1, rang=1, total=3,
+                                       image=image_png))
+        assert vue.a_image() is True
+        assert vue.bande_active() is True
+
     def test_page_lue_charge_tout_et_arrete_la_bande(self, vue, image_png):
+        animations.definir_reduction(True)   # révélation instantanée pour vérifier l'état final
         vue.sur_evenement(ev.Evenement(type=ev.PAGE_DEBUT, page=1, rang=1, total=3))
         vue.sur_evenement(ev.Evenement(
             type=ev.PAGE_LUE, page=1, rang=1, total=3, lignes=3,
@@ -151,11 +159,44 @@ class TestEvenements:
 
     def test_page_lue_sans_zones_remplit_la_table(self, vue, image_png):
         # Mode Tesseract : zones None, mais le tableau extrait s'anime quand même.
+        animations.definir_reduction(True)
         vue.sur_evenement(ev.Evenement(
             type=ev.PAGE_LUE, page=1, rang=1, total=1, lignes=2,
             image=image_png, zones=None, cellules=[["01", "A"], ["02", "B"]]))
         assert vue.nombre_zones() == 0
         assert vue.lignes_table() == 2
+
+
+class TestRevelation:
+
+    def test_revelation_pas_a_pas(self, vue, image_png):
+        # Comportement B : après N pas, N lignes dans le tableau et la loupe sur la ligne N.
+        vue.charger_image(image_png)
+        vue.sur_evenement(ev.Evenement(
+            type=ev.PAGE_LUE, page=1, rang=1, total=3, lignes=3,
+            image=image_png, zones=_ZONES, cellules=_CELLULES))
+        assert vue.lignes_table() == 0        # rien révélé tout de suite (animations non réduites)
+        vue._pas_reveler()
+        assert vue.lignes_table() == 1
+        assert vue.ligne_loupe() == 0
+        vue._pas_reveler()
+        assert vue.lignes_table() == 2
+        assert vue.ligne_loupe() == 1
+        vue._pas_reveler()
+        assert vue.lignes_table() == 3
+        assert vue.ligne_loupe() == 2
+        assert vue.nombre_zones() == 3        # la dernière zone est courante
+
+    def test_revelation_instantanee_si_reduit(self, vue, image_png):
+        animations.definir_reduction(True)
+        vue.sur_evenement(ev.Evenement(
+            type=ev.PAGE_LUE, page=1, rang=1, total=3, lignes=3,
+            image=image_png, zones=_ZONES, cellules=_CELLULES))
+        assert vue.lignes_table() == 3        # tout révélé d'un coup
+
+    def test_cadence_bornee(self, vue):
+        assert vue.cadence_ms(3) == LectureDirecte.REVEAL_MS      # peu de lignes : ~120 ms
+        assert vue.cadence_ms(100) < LectureDirecte.REVEAL_MS     # beaucoup : cadence réduite
 
 
 class TestRendu:

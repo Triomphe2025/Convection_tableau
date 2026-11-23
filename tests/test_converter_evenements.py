@@ -64,6 +64,23 @@ class TestEvenementsVision(_Base):
         self.assertTrue(all(isinstance(e.lignes, int) for e in lues))
         self.assertTrue(all(e.total == 3 for e in lues))
 
+    def test_page_debut_porte_image(self):
+        # Comportement A : l'image de la page est jointe dès PAGE_DEBUT (vision : img déjà rendue).
+        col = self._lancer(self._images(2), mode_lot=False)
+        debuts = col.du_type(ev.PAGE_DEBUT)
+        self.assertEqual(len(debuts), 2)
+        for e in debuts:
+            self.assertTrue(e.image and str(e.image).lower().endswith('.png'), e.image)
+
+    def test_a_apercu_selon_ecouteur(self):
+        conv_sans = Converter(word_file=self.tmp, output_dir=self.tmp / 'o1',
+                              template=self.template, on_log=lambda m: None)
+        self.assertFalse(conv_sans._a_apercu())   # CLI : pas d'aperçu, aucun rendu
+        conv_avec = Converter(word_file=self.tmp, output_dir=self.tmp / 'o2',
+                              template=self.template, on_log=lambda m: None,
+                              on_evenement=lambda e: None)
+        self.assertTrue(conv_avec._a_apercu())
+
     def test_page_lue_porte_image_et_cellules(self):
         # Étape 2C-6 (lecture en direct) : chaque PAGE_LUE porte l'image de la page et les
         # cellules extraites, sans rien changer à l'Excel (vérifié par l'équivalence plus bas).
