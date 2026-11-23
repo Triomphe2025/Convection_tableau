@@ -167,6 +167,22 @@ class PageConvertir(QWidget):
                 return self._est_differe(ligne)
         return False
 
+    def colonnes_chemin(self, chemin):
+        """Colonnes du modèle de tableau du fichier (titres de la table de lecture) ; [] sinon."""
+        from template import TemplateManager
+        for rang in range(self.modele.rowCount()):
+            ligne = self.modele.ligne(rang)
+            if str(ligne.chemin) != str(chemin):
+                continue
+            modele = getattr(ligne.resultat.type, 'modele', None)
+            if not modele:
+                return []
+            try:
+                return list(TemplateManager().get(modele).columns)
+            except Exception:
+                return []
+        return []
+
     def _choisir_dossier(self):
         from PySide6.QtWidgets import QFileDialog
         chemin = QFileDialog.getExistingDirectory(self, "Dossier de sortie",

@@ -74,6 +74,20 @@ class TestMosaiqueGeometrie:
         from PySide6.QtCore import QPoint
         assert mosaique.index_a(QPoint(99999, 99999)) == -1
 
+    def test_hauteur_une_rangee_pour_15_pages(self, mosaique):
+        pas = Mosaique.TAILLE_TUILE + Mosaique.ECART
+        mosaique.resize(20 * pas, 200)          # 20 colonnes disponibles
+        mosaique.definir_pages(15)
+        assert mosaique.rangees() == 1
+        assert mosaique.hauteur_rangees(10) == pas
+
+    def test_hauteur_plafonnee_a_10_rangees(self, mosaique):
+        pas = Mosaique.TAILLE_TUILE + Mosaique.ECART
+        mosaique.resize(20 * pas, 200)
+        mosaique.definir_pages(500)             # 25 rangées → plafonné à 10
+        assert mosaique.rangees() == 25
+        assert mosaique.hauteur_rangees(10) == 10 * pas
+
 
 class TestMosaiqueCouleur:
 

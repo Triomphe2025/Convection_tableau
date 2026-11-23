@@ -71,6 +71,12 @@ class RailEtapes(QWidget):
     def libelle(self, cle: str) -> str:
         return _LIBELLES.get(cle, cle)
 
+    def couleur_segment(self, cle: str) -> QColor:
+        """Barre du segment : vert (fait), rose (en cours), gris (à faire)."""
+        c = self._jetons["couleurs"]
+        etat = self.etat_etape(cle)
+        return QColor({"fait": c["succes"], "en_cours": c["rose_trios"]}.get(etat, c["trait"]))
+
     def rectangles_segments(self):
         """Rectangle de chaque segment (tests de disposition) ; toujours dans le widget."""
         n = len(self.CLES)
@@ -97,6 +103,6 @@ class RailEtapes(QWidget):
                              Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
                              self.compte(cle))
             peintre.setPen(Qt.PenStyle.NoPen)
-            peintre.setBrush(QColor(c["rose_trios"] if actif else c["trait"]))
+            peintre.setBrush(self.couleur_segment(cle))
             peintre.drawRoundedRect(QRectF(x0, y_barre, largeur_seg - 12, 3), 1.5, 1.5)
         peintre.end()

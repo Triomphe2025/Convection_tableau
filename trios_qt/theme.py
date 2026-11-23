@@ -416,6 +416,16 @@ QPushButton[classe="nav"]:checked {{
     font-family: "{jetons['polices']['codes']}", monospace;
     font-size: {int(t['aide'])}px;
 }}
+#lecture_table QHeaderView::section {{
+    background-color: {c['sureleve']};
+    color: {c['texte_secondaire']};
+    border: none;
+    border-bottom: 1px solid {c['trait']};
+    padding: 4px 6px;
+    font-family: "{jetons['polices']['interface']}", sans-serif;
+    font-size: {int(t['aide'])}px;
+    font-weight: 600;
+}}
 #pastille_encours {{
     background-color: {_rgba(c['rose_trios'], 0.18)};
     color: {c['rose_trios']};

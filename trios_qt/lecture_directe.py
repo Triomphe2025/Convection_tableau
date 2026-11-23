@@ -288,6 +288,13 @@ class LectureDirecte(QWidget):
         else:
             self._timer_reveal.start(self.cadence_ms(total))
 
+    def terminer_reveler(self) -> None:
+        """Termine la révélation en cours d'un coup (appelé à FIN) : plus de « 6 / 9 lignes »."""
+        self._timer_reveal.stop()
+        total = len(self._cellules_page) or len(self._zones_page)
+        while self._index_reveal < total:
+            self._pas_reveler()
+
     def _pas_reveler(self) -> None:
         total = len(self._cellules_page) or len(self._zones_page)
         i = self._index_reveal

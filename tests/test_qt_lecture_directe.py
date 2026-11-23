@@ -198,6 +198,18 @@ class TestRevelation:
         assert vue.cadence_ms(3) == LectureDirecte.REVEAL_MS      # peu de lignes : ~120 ms
         assert vue.cadence_ms(100) < LectureDirecte.REVEAL_MS     # beaucoup : cadence réduite
 
+    def test_terminer_reveler_finit_d_un_coup(self, vue, image_png):
+        # Retouche 2 : à FIN, la révélation en cours se termine d'un coup (plus de « 6 / 9 »).
+        vue.charger_image(image_png)
+        vue.sur_evenement(ev.Evenement(
+            type=ev.PAGE_LUE, page=1, rang=1, total=3, lignes=3,
+            image=image_png, zones=_ZONES, cellules=_CELLULES))
+        vue._pas_reveler()
+        assert vue.lignes_table() == 1          # révélation partielle en cours
+        vue.terminer_reveler()
+        assert vue.lignes_table() == 3          # tout révélé
+        assert "3 / 3" in vue.etat_lecture.text()
+
 
 class TestRendu:
 

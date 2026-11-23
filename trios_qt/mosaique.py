@@ -65,6 +65,16 @@ class Mosaique(QWidget):
         pas = self.TAILLE_TUILE + self.ECART
         return max(1, (self.width() + self.ECART) // pas)
 
+    def rangees(self) -> int:
+        import math
+        return math.ceil(len(self._etats) / self.colonnes()) if self._etats else 0
+
+    def hauteur_rangees(self, max_rangees: int = 10) -> int:
+        """Hauteur juste nécessaire pour les pages (1 rangée pour 15 pages), plafonnée."""
+        pas = self.TAILLE_TUILE + self.ECART
+        r = min(max(1, self.rangees()), max_rangees)
+        return int(r * pas)
+
     def index_a(self, point) -> int:
         pas = self.TAILLE_TUILE + self.ECART
         x, y = point.x(), point.y()

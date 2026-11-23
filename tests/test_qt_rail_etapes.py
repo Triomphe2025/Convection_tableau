@@ -75,6 +75,27 @@ class TestRailLibelles:
             assert rect.right() <= rail.width() + 0.01
 
 
+class TestRailCouleurs:
+
+    @pytest.fixture(scope="class")
+    def jetons(self):
+        from trios_qt import theme
+        return theme.charger_jetons()
+
+    def test_fait_vert_courant_rose(self, rail, jetons):
+        rail.definir_phase("lecture")
+        c = jetons["couleurs"]
+        assert rail.couleur_segment("analyse").name().lower() == c["succes"].lower()
+        assert rail.couleur_segment("lecture").name().lower() == c["rose_trios"].lower()
+        assert rail.couleur_segment("controles").name().lower() == c["trait"].lower()
+
+    def test_fin_tout_vert(self, rail, jetons):
+        rail.definir_phase("lecture")
+        rail.terminer()
+        succes = jetons["couleurs"]["succes"].lower()
+        assert all(rail.couleur_segment(c).name().lower() == succes for c in RailEtapes.CLES)
+
+
 class TestRailComptes:
 
     def test_compte_par_segment(self, rail):

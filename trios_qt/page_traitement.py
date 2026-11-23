@@ -155,12 +155,12 @@ class PageTraitement(QWidget):
 
     def _carte_droite(self) -> QFrame:
         carte = self._carte("carte_droite")
-        carte.setFixedWidth(248)
+        carte.setFixedWidth(300)
         v = QVBoxLayout(carte)
-        v.setContentsMargins(16, 16, 16, 16)
+        v.setContentsMargins(18, 18, 18, 18)
         v.setSpacing(12)
         self.anneau = Anneau(self._jetons, carte)
-        self.anneau.setMinimumHeight(170)
+        self.anneau.setMinimumHeight(200)
         v.addWidget(self.anneau)
         self.etiquette_restantes = QLabel("", carte)
         self.etiquette_restantes.setObjectName("restantes")
@@ -214,7 +214,7 @@ class PageTraitement(QWidget):
         lib = QLabel(libelle, tuile)
         lib.setObjectName("tuile_libelle")
         lib.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lib.setWordWrap(True)
+        lib.setWordWrap(False)   # libellé sur une ligne (carte élargie, retouche 4)
         tv.addWidget(val)
         tv.addWidget(lib)
         return val, tuile
@@ -232,7 +232,7 @@ class PageTraitement(QWidget):
         entete.addLayout(self._legende())
         v.addLayout(entete)
         self.mosaique = Mosaique(self._jetons, carte)
-        self.mosaique.setMinimumHeight(130)
+        self.mosaique.setFixedHeight(Mosaique.TAILLE_TUILE + Mosaique.ECART)  # ajusté aux rangées
         v.addWidget(self.mosaique)
         return carte
 
@@ -284,9 +284,12 @@ class PageTraitement(QWidget):
             self.pill_sortie.setText(f"→ {sortie}")
 
     # ── Cycle de vie ─────────────────────────────────────────────────
-    def demarrer_fichier(self, nom, type_doc=None, modele=None, sortie=None) -> None:
+    def demarrer_fichier(self, nom, type_doc=None, modele=None, sortie=None,
+                         colonnes=None) -> None:
         self.etiquette_fichier.setText(str(nom))
         self.definir_infos(type_doc, modele, sortie)
+        if colonnes:
+            self.lecture.definir_colonnes(colonnes)
         self._journal = []
         self._total = 0
         self._done = 0
@@ -327,11 +330,15 @@ class PageTraitement(QWidget):
         self.rail.terminer()
         self.mosaique.arreter()
         self.lecture.definir_bande_active(False)
+        self.lecture.terminer_reveler()          # finir la révélation d'un coup (retouche 2)
         self.lecture.definir_resultat("Terminé")
         self.pastille_etat.setText("Terminé")
         self.pastille_etat.setObjectName("pastille_termine")
         self._rafraichir_style(self.pastille_etat)
+        # Comme 02_c : coche dans l'anneau, « Terminé » puis « écoulé … », SANS fin estimée.
         self.etiquette_restantes.setText("Terminé")
+        ecoule = (time.monotonic() - self._t0) if self._t0 is not None else 0.0
+        self.etiquette_temps_detail.setText(f"écoulé {interface_helpers.format_duree(ecoule)}")
         self.bouton_arreter.setVisible(False)
         self.bouton_pause.setVisible(False)
         self.bouton_resume.setVisible(True)
@@ -381,6 +388,11 @@ class PageTraitement(QWidget):
         if self._total and self.mosaique.nombre_pages() == 0:
             self.mosaique.definir_pages(self._total)
             self.titre_pages.setText(f"Les {self._total} pages")
+            self._ajuster_mosaique()
+
+    def _ajuster_mosaique(self) -> None:
+        if self.mosaique.nombre_pages():
+            self.mosaique.setFixedHeight(self.mosaique.hauteur_rangees(10))
 
     def _page_debut(self, e) -> None:
         self._amorcer_total(e)
@@ -529,3 +541,5 @@ class PageTraitement(QWidget):
         super().resizeEvent(event)
         if hasattr(self, "messages"):
             self.messages.setGeometry(self.rect())
+        if hasattr(self, "mosaique"):
+            self._ajuster_mosaique()

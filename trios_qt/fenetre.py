@@ -120,6 +120,10 @@ class FenetrePrincipale(QWidget):
 
     def _ecran_pour(self, chemin):
         cle = "attente_lot" if self.page_convertir.est_differe_chemin(chemin) else "traitement"
+        if cle == "traitement":
+            # Titres de colonnes de la table de lecture depuis le modèle du fichier (retouche 6).
+            self.page_traitement.lecture.definir_colonnes(
+                self.page_convertir.colonnes_chemin(chemin))
         self.aller_a(cle)
         return self.pages[cle]
 
