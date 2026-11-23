@@ -490,6 +490,34 @@ QPushButton[classe="nav"]:checked {{
 #tuile_valeur {{
     font-size: {int(t['titre_bloc'])}px;
 }}
+#mini_fenetre {{
+    background-color: {c['surface']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['carte'])}px;
+}}
+#mini_logo {{
+    font-size: {int(t['courant'])}px;
+}}
+#mini_discret {{
+    color: {c['texte_discret']};
+    font-size: {int(t['aide'])}px;
+}}
+#mini_info {{
+    color: {c['texte_secondaire']};
+    font-size: {int(t['aide'])}px;
+}}
+#mini_relire {{
+    color: {c['a_relire']};
+    font-size: {int(t['aide'])}px;
+    font-weight: 600;
+}}
+#mini_icone {{
+    background-color: {c['sureleve']};
+    color: {c['texte']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['bouton'])}px;
+    font-size: {int(t['titre_bloc'])}px;
+}}
 """.strip()
 
 

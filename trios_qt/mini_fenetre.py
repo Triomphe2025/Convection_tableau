@@ -75,11 +75,12 @@ class MiniFenetre(QWidget):
         self._jetons = jetons or theme.charger_jetons()
         self.setObjectName("mini_fenetre")
         self.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
-        self.setFixedSize(440, 150)
+        self.setFixedSize(460, 164)
         self._total = 0
         self._done = 0
         self._t_premiere_page = None
         self._en_pause = False
+        self._a_relire = 0
         self._construire()
         self._chrono = QTimer(self)
         self._chrono.setInterval(1000)
@@ -87,47 +88,91 @@ class MiniFenetre(QWidget):
         self._chrono.start()
 
     def _construire(self) -> None:
-        rangee = QHBoxLayout(self)
-        rangee.setContentsMargins(14, 12, 14, 12)
-        rangee.setSpacing(14)
-        self.anneau = Anneau(self._jetons, self)
-        self.anneau.setFixedSize(118, 118)
-        rangee.addWidget(self.anneau, 0)
+        c = self._jetons["couleurs"]
+        racine = QVBoxLayout(self)
+        racine.setContentsMargins(14, 11, 14, 11)
+        racine.setSpacing(8)
 
-        colonne = QVBoxLayout()
-        colonne.setSpacing(6)
-        self.etiquette_pages = QLabel("0 / 0 pages", self)
-        self.etiquette_pages.setObjectName("traitement_fichier")
-        self.etiquette_temps = QLabel("restant —", self)
-        self.etiquette_temps.setObjectName("traitement_progression")
-        self.barre = BarreReperes(self._jetons, self)
-        colonne.addWidget(self.etiquette_pages)
-        colonne.addWidget(self.etiquette_temps)
-        colonne.addWidget(self.barre)
-        boutons = QHBoxLayout()
-        self.bouton_pause = QPushButton("Pause", self)
-        self.bouton_pause.setObjectName("action_secondaire")
-        self.bouton_pause.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.bouton_pause.clicked.connect(self._basculer_pause)
-        self.bouton_agrandir = QPushButton("Agrandir", self)
-        self.bouton_agrandir.setObjectName("action_secondaire")
+        entete = QHBoxLayout()
+        logo = QLabel(self)
+        logo.setObjectName("mini_logo")
+        logo.setTextFormat(Qt.TextFormat.RichText)
+        logo.setText(f'<b><span style="color:{c["rose_trios"]}">Trios</span>'
+                     f'<span style="color:{c["texte"]}">Seconverter</span></b>')
+        premier_plan = QLabel("⬚ au premier plan", self)
+        premier_plan.setObjectName("mini_discret")
+        self.bouton_agrandir = QPushButton("⤢", self)
+        self.bouton_agrandir.setObjectName("mini_icone")
+        self.bouton_agrandir.setFixedSize(26, 22)
         self.bouton_agrandir.setCursor(Qt.CursorShape.PointingHandCursor)
         self.bouton_agrandir.clicked.connect(self.agrandir_demande.emit)
-        boutons.addWidget(self.bouton_pause)
-        boutons.addWidget(self.bouton_agrandir)
-        boutons.addStretch(1)
-        colonne.addLayout(boutons)
-        rangee.addLayout(colonne, 1)
+        entete.addWidget(logo, 0)
+        entete.addWidget(premier_plan, 0)
+        entete.addStretch(1)
+        entete.addWidget(self.bouton_agrandir, 0)
+        racine.addLayout(entete)
+
+        corps = QHBoxLayout()
+        corps.setSpacing(12)
+        self.anneau = Anneau(self._jetons, self)
+        self.anneau.setFixedSize(92, 92)
+        corps.addWidget(self.anneau, 0)
+
+        colonne = QVBoxLayout()
+        colonne.setSpacing(4)
+        self.etiquette_fichier = QLabel("—", self)
+        self.etiquette_fichier.setObjectName("traitement_fichier")
+        colonne.addWidget(self.etiquette_fichier)
+
+        info = QHBoxLayout()
+        info.setSpacing(6)
+        self.etiquette_pages = QLabel("0 / 0 pages", self)
+        self.etiquette_pages.setObjectName("mini_info")
+        self.etiquette_temps = QLabel("", self)
+        self.etiquette_temps.setObjectName("mini_info")
+        self.etiquette_relire = QLabel("", self)
+        self.etiquette_relire.setObjectName("mini_relire")
+        info.addWidget(self.etiquette_pages, 0)
+        info.addWidget(QLabel("·", self), 0)
+        info.addWidget(self.etiquette_temps, 0)
+        info.addWidget(QLabel("·", self), 0)
+        info.addWidget(self.etiquette_relire, 0)
+        info.addStretch(1)
+        colonne.addLayout(info)
+
+        rangee_barre = QHBoxLayout()
+        rangee_barre.setSpacing(8)
+        self.barre = BarreReperes(self._jetons, self)
+        self.bouton_pause = QPushButton("⏸", self)
+        self.bouton_pause.setObjectName("mini_icone")
+        self.bouton_pause.setFixedSize(30, 22)
+        self.bouton_pause.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.bouton_pause.clicked.connect(self._basculer_pause)
+        rangee_barre.addWidget(self.barre, 1)
+        rangee_barre.addWidget(self.bouton_pause, 0)
+        colonne.addLayout(rangee_barre)
+
+        self.etiquette_etat = QLabel("", self)
+        self.etiquette_etat.setObjectName("mini_discret")
+        colonne.addWidget(self.etiquette_etat)
+        corps.addLayout(colonne, 1)
+        racine.addLayout(corps)
 
     # ── Événements ───────────────────────────────────────────────────
+    def definir_fichier(self, nom) -> None:
+        self.etiquette_fichier.setText(str(nom))
+
     def sur_evenement(self, e) -> None:
         if e.type in (ev.PAGE_DEBUT, ev.PAGE_LUE, ev.ANALYSE):
             self._maj_avancement(e)
+        if e.type == ev.PAGE_DEBUT and e.page:
+            self.etiquette_etat.setText(f"Page {e.page} · lecture de la page…")
         elif e.type == ev.PAGE_ALERTE:
             self._ajouter_repere(e)
         elif e.type == ev.FIN:
             self.anneau.terminer()
             self.barre.definir_avancement(1.0, self._total)
+            self.etiquette_etat.setText("Conversion terminée")
 
     def _maj_avancement(self, e) -> None:
         if e.total:
@@ -147,10 +192,13 @@ class MiniFenetre(QWidget):
     def _ajouter_repere(self, e) -> None:
         if e.page:
             self.barre.ajouter_repere(e.page - 1)
+        self._a_relire += 1
+        self.etiquette_relire.setText(f"{self._a_relire} à relire")
 
     def definir_temps(self, restant_s) -> None:
-        self.etiquette_temps.setText(
-            f"restant ~ {interface_helpers.format_duree(restant_s)}")
+        # Format maquette : « ≈ N min » (au moins 1 min dès qu'il reste du temps).
+        minutes = max(1, int(round((restant_s or 0) / 60)))
+        self.etiquette_temps.setText(f"≈ {minutes} min")
 
     def _tic(self) -> None:
         if self._t_premiere_page is None:

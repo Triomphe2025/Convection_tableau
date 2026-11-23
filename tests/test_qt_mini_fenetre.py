@@ -45,7 +45,13 @@ class TestAvancement:
 
     def test_temps_formate(self, mini):
         mini.definir_temps(125)
-        assert "2:05" in mini.etiquette_temps.text()
+        assert "2 min" in mini.etiquette_temps.text()   # format maquette « ≈ 2 min »
+
+    def test_fichier_et_etat(self, mini):
+        mini.definir_fichier("6A23111PE203_TP2.pdf")
+        assert "6A23111PE203_TP2.pdf" in mini.etiquette_fichier.text()
+        mini.sur_evenement(ev.Evenement(type=ev.PAGE_DEBUT, page=703, rang=703, total=720))
+        assert "703" in mini.etiquette_etat.text()
 
 
 class TestReperes:
@@ -55,6 +61,12 @@ class TestReperes:
         mini.sur_evenement(ev.Evenement(type=ev.PAGE_ALERTE, page=7, page_imprimee='7',
                                         alertes=['scan dégradé']))
         assert mini.barre.nombre_reperes() == 1
+
+    def test_alerte_compte_a_relire(self, mini):
+        mini.sur_evenement(ev.Evenement(type=ev.PAGE_LUE, page=7, rang=7, total=20, lignes=4))
+        mini.sur_evenement(ev.Evenement(type=ev.PAGE_ALERTE, page=7, page_imprimee='7',
+                                        alertes=['scan dégradé']))
+        assert "1" in mini.etiquette_relire.text()
 
 
 class TestBoutons:
