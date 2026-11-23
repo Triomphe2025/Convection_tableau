@@ -57,21 +57,32 @@ class TestRailLibelles:
         textes = [rail.libelle(c) for c in RailEtapes.CLES]
         assert "analyse" not in textes          # jamais la clé technique brute
         assert any("Analyse" in t for t in textes)
-        assert any("Classeur" in t or "classeur" in t for t in textes)
+        assert any("Lecture" in t for t in textes)
+        assert "Excel" in textes
 
     def test_peint_sans_erreur(self, rail):
         rail.definir_phase("controles")
         rail.resize(400, 60)
         assert not rail.grab().isNull()
 
-    def test_libelles_ne_depassent_pas_le_widget(self, rail):
-        # Retouche 1 : les libellés d'extrémité (Analyse, Classeur) ne doivent pas être coupés.
-        from PySide6.QtGui import QFontMetricsF
-        rail.resize(460, 64)
-        fm = QFontMetricsF(rail.font())
-        rectangles = rail.rectangles_libelles()
-        assert len(rectangles) == len(RailEtapes.CLES)
-        for cle, (rect, _align) in zip(RailEtapes.CLES, rectangles):
-            assert rect.left() >= 0
-            assert rect.right() <= rail.width()
-            assert fm.horizontalAdvance(rail.libelle(cle)) <= rect.width() + 0.5
+    def test_segments_dans_le_widget(self, rail):
+        # Refonte : 4 segments côte à côte, chacun dans les bornes du widget.
+        rail.resize(1120, 60)
+        segments = rail.rectangles_segments()
+        assert len(segments) == len(RailEtapes.CLES)
+        for rect in segments:
+            assert rect.left() >= -0.01
+            assert rect.right() <= rail.width() + 0.01
+
+
+class TestRailComptes:
+
+    def test_compte_par_segment(self, rail):
+        rail.definir_compte("analyse", "720 p.")
+        rail.definir_compte("lecture", "700 / 720")
+        assert rail.compte("analyse") == "720 p."
+        assert rail.compte("lecture") == "700 / 720"
+
+    def test_compte_cle_inconnue_ignoree(self, rail):
+        rail.definir_compte("mystere", "x")
+        assert rail.compte("mystere") == ""

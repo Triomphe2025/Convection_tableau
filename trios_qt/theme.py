@@ -416,6 +416,70 @@ QPushButton[classe="nav"]:checked {{
     font-family: "{jetons['polices']['codes']}", monospace;
     font-size: {int(t['aide'])}px;
 }}
+#pastille_encours {{
+    background-color: {_rgba(c['rose_trios'], 0.18)};
+    color: {c['rose_trios']};
+    border-radius: {int(HAUTEUR_PASTILLE / 2)}px;
+    padding: 2px 10px;
+    font-size: {int(t['aide'])}px;
+    font-weight: 700;
+}}
+#pastille_termine {{
+    background-color: {_rgba(c['succes'], 0.18)};
+    color: {c['succes']};
+    border-radius: {int(HAUTEUR_PASTILLE / 2)}px;
+    padding: 2px 10px;
+    font-size: {int(t['aide'])}px;
+    font-weight: 700;
+}}
+#pill_info {{
+    background-color: {c['surface']};
+    color: {c['texte_secondaire']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['bouton'])}px;
+    padding: 3px 10px;
+    font-size: {int(t['aide'])}px;
+}}
+#carte_lecture, #carte_droite, #carte_pages {{
+    background-color: {c['surface']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['carte'])}px;
+}}
+#lecture_titre {{
+    color: {c['texte']};
+    font-size: {int(t['titre_bloc'])}px;
+    font-weight: 600;
+}}
+#lecture_resultat {{
+    color: {c['succes']};
+    font-size: {int(t['aide'])}px;
+}}
+#lecture_loupe_titre, #lecture_lu, #legende_texte, #temps_detail, #tuile_libelle {{
+    color: {c['texte_discret']};
+    font-size: {int(t['aide'])}px;
+}}
+#lecture_puce {{
+    background-color: {c['sureleve']};
+    color: {c['texte']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['bouton'])}px;
+    padding: 2px 8px;
+    font-family: "{jetons['polices']['codes']}", monospace;
+    font-size: {int(t['aide'])}px;
+}}
+#restantes {{
+    color: {c['texte']};
+    font-size: {int(t['titre_bloc'])}px;
+    font-weight: 700;
+}}
+#tuile {{
+    background-color: {c['fond']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['bouton'])}px;
+}}
+#tuile_valeur {{
+    font-size: {int(t['titre_bloc'])}px;
+}}
 """.strip()
 
 

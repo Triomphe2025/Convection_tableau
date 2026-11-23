@@ -1,18 +1,19 @@
-"""Écran Traitement (étape 2C-7) : assemble le rail des 4 étapes, la « Lecture en direct »,
-l'anneau d'avancement, la mosaïque des pages, les astuces, les messages d'étape, le journal
-replié et les boutons Pause / Reprendre / Arrêter. Remplace l'écran provisoire de la 2B.
+"""Écran Traitement (étape 2C-7, refonte 2C d'après docs/maquettes/02_traitement_tableau_*).
 
-Tout est piloté par les événements du converter (sur_evenement) ; aucun travail lourd ici.
-À la fin : anneau vert + coche, un seul bouton « Voir le résumé », notification Windows si la
-fenêtre n'a pas le focus, plus « Ouvrir l'Excel / le dossier ». L'API publique (demarrer_fichier,
-sur_evenement, terminer, arret_demande, lignes_journal) reste celle attendue par lancement.py.
+Assemble l'en-tête (fichier + pastille d'état + pills type · modèle · sortie + Mini-fenêtre /
+Pause / Arrêter), le rail des 4 étapes à comptes, la carte « Lecture en direct · page n », la
+carte de droite (grand anneau, temps restant, écoulé / fin estimée, 3 tuiles, astuce), la carte
+« Les N pages » (légende + mosaïque) et le journal replié. Tout est piloté par les événements
+du converter ; aucun travail lourd ici. API publique conservée (demarrer_fichier / sur_evenement /
+terminer / arret_demande / lignes_journal) pour lancement.py et fenetre.py.
 """
 import time
+from datetime import datetime, timedelta
 
 from PySide6.QtCore import QTimer, QUrl, Qt, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
+    QFrame, QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
 )
 
 import evenements as ev
@@ -32,15 +33,21 @@ _LIBELLES_PHASE = {
     'analyse': "Analyse du document", 'lecture': "Lecture des pages",
     'controles': "Contrôles qualité", 'excel': "Génération du classeur",
 }
+# Légende de la mosaïque (clé de couleur jetons, libellé).
+_LEGENDE = (
+    ("tuile_attente", "en attente"), ("rose_trios", "en lecture"), ("tuile_lue", "lue"),
+    ("texte_natif", "texte natif"), ("a_relire", "à relire"),
+)
 
 
 class PageTraitement(QWidget):
-    """Suit une conversion : rail, lecture en direct, anneau, mosaïque, journal, Pause/Arrêter."""
+    """Suit une conversion : en-tête, rail, lecture en direct, anneau, mosaïque, journal."""
 
     arret_demande = Signal()
     pause_demande = Signal()
     reprendre_demande = Signal()
     voir_resume = Signal()
+    mini_demande = Signal()
 
     def __init__(self, jetons: dict | None = None, parent=None):
         super().__init__(parent)
@@ -52,6 +59,7 @@ class PageTraitement(QWidget):
         self._total = 0
         self._done = 0
         self._t_premiere_page = None
+        self._t0 = None
         self._en_pause = False
         self._natures: dict[int, str] = {}
         self._pdf_vers_index: dict[int, int] = {}
@@ -68,66 +76,42 @@ class PageTraitement(QWidget):
     # ── Construction ─────────────────────────────────────────────────
     def _construire(self) -> None:
         colonne = QVBoxLayout(self)
-        colonne.setContentsMargins(32, 24, 32, 20)
+        colonne.setContentsMargins(28, 22, 28, 18)
         colonne.setSpacing(14)
-
-        entete = QHBoxLayout()
-        titre = QLabel("Conversion en cours", self)
-        titre.setObjectName("titre_ecran")
-        self.etiquette_fichier = QLabel("—", self)
-        self.etiquette_fichier.setObjectName("traitement_fichier")
-        self.etiquette_chrono = QLabel("0:00", self)
-        self.etiquette_chrono.setObjectName("traitement_progression")
-        entete.addWidget(titre)
-        entete.addSpacing(16)
-        entete.addWidget(self.etiquette_fichier, 1)
-        entete.addWidget(self.etiquette_chrono, 0, Qt.AlignmentFlag.AlignRight)
-        colonne.addLayout(entete)
-
+        colonne.addWidget(self._entete())
         self.rail = RailEtapes(self._jetons, self)
         colonne.addWidget(self.rail)
 
         centre = QHBoxLayout()
         centre.setSpacing(16)
-        self.lecture = LectureDirecte(self._jetons, self)
-        centre.addWidget(self.lecture, 3)
-        centre.addWidget(self._colonne_droite(), 0)
+        centre.addWidget(self._carte_lecture(), 3)
+        centre.addWidget(self._carte_droite(), 0)
         colonne.addLayout(centre, 1)
 
-        self.mosaique = Mosaique(self._jetons, self)
-        self.mosaique.setMinimumHeight(40)
-        colonne.addWidget(self.mosaique)
+        colonne.addWidget(self._carte_pages())
+        colonne.addWidget(self._barre_journal())
 
-        colonne.addLayout(self._barre_boutons())
-        colonne.addWidget(self._zone_journal())
-
-        # Messages d'étape : carte flottante en bas à droite, par-dessus le contenu.
         self.messages = MessagesEtape(self._jetons, self)
         self.messages.setGeometry(self.rect())
         self.messages.raise_()
 
-    def _colonne_droite(self) -> QWidget:
-        panneau = QWidget(self)
-        panneau.setFixedWidth(230)
-        col = QVBoxLayout(panneau)
-        col.setContentsMargins(0, 0, 0, 0)
-        col.setSpacing(10)
-        self.anneau = Anneau(self._jetons, panneau)
-        self.anneau.setMinimumHeight(150)
-        col.addWidget(self.anneau)
-        self.etiquette_stats = QLabel("", panneau)
-        self.etiquette_stats.setObjectName("traitement_stats")
-        self.etiquette_stats.setTextFormat(Qt.TextFormat.RichText)
-        self.etiquette_stats.setWordWrap(True)
-        col.addWidget(self.etiquette_stats)
-        self.astuces = Astuces(jetons=self._jetons, parent=panneau)
-        col.addWidget(self.astuces)
-        col.addStretch(1)
-        self._maj_stats()
-        return panneau
-
-    def _barre_boutons(self) -> QHBoxLayout:
-        rangee = QHBoxLayout()
+    def _entete(self) -> QWidget:
+        cadre = QWidget(self)
+        v = QVBoxLayout(cadre)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(8)
+        ligne = QHBoxLayout()
+        self.etiquette_fichier = QLabel("—", self)
+        self.etiquette_fichier.setObjectName("traitement_fichier")
+        self.pastille_etat = QLabel("En cours", self)
+        self.pastille_etat.setObjectName("pastille_encours")
+        ligne.addWidget(self.etiquette_fichier, 0)
+        ligne.addWidget(self.pastille_etat, 0)
+        ligne.addStretch(1)
+        self.bouton_mini = QPushButton("Mini-fenêtre", self)
+        self.bouton_mini.setObjectName("action_secondaire")
+        self.bouton_mini.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.bouton_mini.clicked.connect(self.mini_demande.emit)
         self.bouton_pause = QPushButton("Pause", self)
         self.bouton_pause.setObjectName("action_secondaire")
         self.bouton_pause.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -136,34 +120,143 @@ class PageTraitement(QWidget):
         self.bouton_arreter.setObjectName("bouton_arreter")
         self.bouton_arreter.setCursor(Qt.CursorShape.PointingHandCursor)
         self.bouton_arreter.clicked.connect(self._demander_arret)
-        self.bouton_resume = QPushButton("Voir le résumé", self)
+        for b in (self.bouton_mini, self.bouton_pause, self.bouton_arreter):
+            ligne.addWidget(b, 0)
+        v.addLayout(ligne)
+
+        self._pills = QHBoxLayout()
+        self._pills.setSpacing(8)
+        self.pill_type = self._pill("⊞ Tableau")
+        self.pill_modele = self._pill("—")
+        self.pill_sortie = self._pill("→ Excel")
+        for p in (self.pill_type, self.pill_modele, self.pill_sortie):
+            self._pills.addWidget(p, 0)
+        self._pills.addStretch(1)
+        v.addLayout(self._pills)
+        return cadre
+
+    def _pill(self, texte: str) -> QLabel:
+        p = QLabel(texte, self)
+        p.setObjectName("pill_info")
+        return p
+
+    def _carte(self, objet: str) -> QFrame:
+        cadre = QFrame(self)
+        cadre.setObjectName(objet)
+        return cadre
+
+    def _carte_lecture(self) -> QFrame:
+        carte = self._carte("carte_lecture")
+        v = QVBoxLayout(carte)
+        v.setContentsMargins(16, 14, 16, 14)
+        self.lecture = LectureDirecte(self._jetons, carte)
+        v.addWidget(self.lecture)
+        return carte
+
+    def _carte_droite(self) -> QFrame:
+        carte = self._carte("carte_droite")
+        carte.setFixedWidth(248)
+        v = QVBoxLayout(carte)
+        v.setContentsMargins(16, 16, 16, 16)
+        v.setSpacing(12)
+        self.anneau = Anneau(self._jetons, carte)
+        self.anneau.setMinimumHeight(170)
+        v.addWidget(self.anneau)
+        self.etiquette_restantes = QLabel("", carte)
+        self.etiquette_restantes.setObjectName("restantes")
+        self.etiquette_restantes.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.etiquette_temps_detail = QLabel("", carte)
+        self.etiquette_temps_detail.setObjectName("temps_detail")
+        self.etiquette_temps_detail.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        v.addWidget(self.etiquette_restantes)
+        v.addWidget(self.etiquette_temps_detail)
+
+        tuiles = QHBoxLayout()
+        tuiles.setSpacing(8)
+        self.val_tableaux, t1 = self._tuile("0", "tableaux")
+        self.val_relire, t2 = self._tuile("0", "pages à relire", "a_relire")
+        self.val_cout, t3 = self._tuile("0,00 $", "coût Claude")
+        for t in (t1, t2, t3):
+            tuiles.addWidget(t, 1)
+        v.addLayout(tuiles)
+
+        self.astuces = Astuces(jetons=self._jetons, parent=carte)
+        v.addWidget(self.astuces)
+        v.addStretch(1)
+
+        self.bouton_resume = QPushButton("Voir le résumé", carte)
         self.bouton_resume.setObjectName("bouton_lancer")
         self.bouton_resume.setCursor(Qt.CursorShape.PointingHandCursor)
         self.bouton_resume.clicked.connect(self.voir_resume.emit)
         self.bouton_resume.setVisible(False)
-        self.bouton_ouvrir_excel = QPushButton("Ouvrir l'Excel", self)
+        self.bouton_ouvrir_excel = QPushButton("Ouvrir l'Excel", carte)
         self.bouton_ouvrir_excel.setObjectName("action_secondaire")
         self.bouton_ouvrir_excel.clicked.connect(self._ouvrir_excel)
-        self.bouton_ouvrir_dossier = QPushButton("Ouvrir le dossier", self)
+        self.bouton_ouvrir_dossier = QPushButton("Ouvrir le dossier", carte)
         self.bouton_ouvrir_dossier.setObjectName("action_secondaire")
         self.bouton_ouvrir_dossier.clicked.connect(self._ouvrir_dossier)
-        for b in (self.bouton_ouvrir_excel, self.bouton_ouvrir_dossier):
+        for b in (self.bouton_resume, self.bouton_ouvrir_excel, self.bouton_ouvrir_dossier):
             b.setVisible(False)
-        rangee.addWidget(self.bouton_pause)
-        rangee.addWidget(self.bouton_arreter)
-        rangee.addStretch(1)
-        rangee.addWidget(self.bouton_ouvrir_excel)
-        rangee.addWidget(self.bouton_ouvrir_dossier)
-        rangee.addWidget(self.bouton_resume)
+            v.addWidget(b)
+        return carte
+
+    def _tuile(self, valeur: str, libelle: str, couleur_valeur: str = "texte"):
+        c = self._jetons["couleurs"]
+        tuile = QFrame(self)
+        tuile.setObjectName("tuile")
+        tv = QVBoxLayout(tuile)
+        tv.setContentsMargins(6, 8, 6, 8)
+        tv.setSpacing(1)
+        val = QLabel(valeur, tuile)
+        val.setObjectName("tuile_valeur")
+        val.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        val.setStyleSheet(f"color: {c.get(couleur_valeur, c['texte'])}; font-weight: 700;")
+        lib = QLabel(libelle, tuile)
+        lib.setObjectName("tuile_libelle")
+        lib.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lib.setWordWrap(True)
+        tv.addWidget(val)
+        tv.addWidget(lib)
+        return val, tuile
+
+    def _carte_pages(self) -> QFrame:
+        carte = self._carte("carte_pages")
+        v = QVBoxLayout(carte)
+        v.setContentsMargins(16, 12, 16, 14)
+        v.setSpacing(8)
+        entete = QHBoxLayout()
+        self.titre_pages = QLabel("Les pages", carte)
+        self.titre_pages.setObjectName("panneau_titre")
+        entete.addWidget(self.titre_pages, 0)
+        entete.addStretch(1)
+        entete.addLayout(self._legende())
+        v.addLayout(entete)
+        self.mosaique = Mosaique(self._jetons, carte)
+        self.mosaique.setMinimumHeight(130)
+        v.addWidget(self.mosaique)
+        return carte
+
+    def _legende(self) -> QHBoxLayout:
+        c = self._jetons["couleurs"]
+        rangee = QHBoxLayout()
+        rangee.setSpacing(12)
+        for cle, libelle in _LEGENDE:
+            case = QLabel(self)
+            case.setFixedSize(11, 11)
+            case.setStyleSheet(f"background-color: {c[cle]}; border-radius: 2px;")
+            txt = QLabel(libelle, self)
+            txt.setObjectName("legende_texte")
+            rangee.addWidget(case, 0)
+            rangee.addWidget(txt, 0)
         return rangee
 
-    def _zone_journal(self) -> QWidget:
+    def _barre_journal(self) -> QWidget:
         boite = QWidget(self)
         v = QVBoxLayout(boite)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(4)
         ligne = QHBoxLayout()
-        self.bouton_journal = QPushButton("▸ Journal technique", boite)
+        self.bouton_journal = QPushButton("› Journal technique", boite)
         self.bouton_journal.setObjectName("action_secondaire")
         self.bouton_journal.setCheckable(True)
         self.bouton_journal.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -181,13 +274,24 @@ class PageTraitement(QWidget):
         v.addWidget(self.journal_complet)
         return boite
 
+    # ── Infos d'en-tête (facultatives) ───────────────────────────────
+    def definir_infos(self, type_doc=None, modele=None, sortie=None) -> None:
+        if type_doc:
+            self.pill_type.setText(f"⊞ {type_doc}")
+        if modele:
+            self.pill_modele.setText(modele)
+        if sortie:
+            self.pill_sortie.setText(f"→ {sortie}")
+
     # ── Cycle de vie ─────────────────────────────────────────────────
-    def demarrer_fichier(self, nom) -> None:
+    def demarrer_fichier(self, nom, type_doc=None, modele=None, sortie=None) -> None:
         self.etiquette_fichier.setText(str(nom))
+        self.definir_infos(type_doc, modele, sortie)
         self._journal = []
         self._total = 0
         self._done = 0
         self._t_premiere_page = None
+        self._t0 = time.monotonic()
         self._en_pause = False
         self._natures.clear()
         self._pdf_vers_index.clear()
@@ -200,7 +304,11 @@ class PageTraitement(QWidget):
         self.journal_complet.clear()
         self.anneau.reinitialiser()
         self.anneau.definir_sous_libelle("")
-        self.etiquette_chrono.setText("0:00")
+        self.etiquette_restantes.setText("")
+        self.etiquette_temps_detail.setText("")
+        self.pastille_etat.setText("En cours")
+        self.pastille_etat.setObjectName("pastille_encours")
+        self._rafraichir_style(self.pastille_etat)
         self._maj_stats()
         self.bouton_resume.setVisible(False)
         self.bouton_ouvrir_excel.setVisible(False)
@@ -216,8 +324,14 @@ class PageTraitement(QWidget):
         self._dossier = dossier
         self._chrono.stop()
         self.anneau.terminer()
+        self.rail.terminer()
         self.mosaique.arreter()
         self.lecture.definir_bande_active(False)
+        self.lecture.definir_resultat("Terminé")
+        self.pastille_etat.setText("Terminé")
+        self.pastille_etat.setObjectName("pastille_termine")
+        self._rafraichir_style(self.pastille_etat)
+        self.etiquette_restantes.setText("Terminé")
         self.bouton_arreter.setVisible(False)
         self.bouton_pause.setVisible(False)
         self.bouton_resume.setVisible(True)
@@ -225,6 +339,10 @@ class PageTraitement(QWidget):
         self.bouton_ouvrir_dossier.setVisible(bool(dossier))
         self.messages.afficher("Conversion terminée")
         self._signaler_fin()
+
+    def _rafraichir_style(self, widget) -> None:
+        widget.style().unpolish(widget)
+        widget.style().polish(widget)
 
     def _signaler_fin(self) -> None:
         fenetre = self.window()
@@ -260,20 +378,22 @@ class PageTraitement(QWidget):
     def _amorcer_total(self, e) -> None:
         if e.total:
             self._total = e.total
-        # Créer les cases dès que le total est connu, même si _total a déjà été posé par ANALYSE.
         if self._total and self.mosaique.nombre_pages() == 0:
             self.mosaique.definir_pages(self._total)
+            self.titre_pages.setText(f"Les {self._total} pages")
 
     def _page_debut(self, e) -> None:
         self._amorcer_total(e)
         if self._t_premiere_page is None:
             self._t_premiere_page = time.monotonic()
+        self.lecture.definir_titre(e.page)
         idx = (e.rang or e.page or 1) - 1
         self.mosaique.definir_etat(idx, Mosaique.LECTURE, infobulle=f"page {e.page} — en lecture")
 
     def _page_lue(self, e) -> None:
         self._amorcer_total(e)
         self._done = e.rang or e.page or self._done
+        self.lecture.definir_titre(e.page)
         idx = (e.rang or e.page or 1) - 1
         if e.page:
             self._pdf_vers_index[e.page] = idx
@@ -306,6 +426,8 @@ class PageTraitement(QWidget):
             self._done = done
             self.anneau.definir_valeur(done / self._total)
             self.anneau.definir_sous_libelle(f"{done} / {self._total} pages")
+            self.rail.definir_compte("analyse", f"{self._total} p.")
+            self.rail.definir_compte("lecture", f"{done} / {self._total}")
 
     def _jalons_messages(self) -> None:
         n = len(self._borniers)
@@ -318,12 +440,9 @@ class PageTraitement(QWidget):
 
     # ── Affichage dérivé ─────────────────────────────────────────────
     def _maj_stats(self) -> None:
-        c = self._jetons["couleurs"]
-        cout = self._cout_usd()
-        self.etiquette_stats.setText(
-            f"<b>{len(self._borniers)}</b> tableaux<br>"
-            f"<span style='color:{c['a_relire']}'>{self._pages_a_relire}</span> à relire<br>"
-            f"~ {cout:.2f} $")
+        self.val_tableaux.setText(str(len(self._borniers)))
+        self.val_relire.setText(str(self._pages_a_relire))
+        self.val_cout.setText(self._cout_fr())
 
     def _cout_usd(self) -> float:
         from config import Config
@@ -332,14 +451,24 @@ class PageTraitement(QWidget):
         entree, sortie = prix.get(modele, (0.0, 0.0))
         return self._tokens_entree / 1e6 * entree + self._tokens_sortie / 1e6 * sortie
 
+    def _cout_fr(self) -> str:
+        return f"{self._cout_usd():.2f} $".replace(".", ",")
+
     def _tic(self) -> None:
-        if self._t_premiere_page is None:
-            return
-        ecoule = time.monotonic() - self._t_premiere_page
-        restant = interface_helpers.estimer_temps_restant(ecoule, self._done, self._total)
-        texte = interface_helpers.format_duree(ecoule)
-        est = interface_helpers.texte_estimation(restant, premiere_page_vue=True)
-        self.etiquette_chrono.setText(f"{texte}   {est}" if est else texte)
+        if self._t0 is not None:
+            ecoule = time.monotonic() - self._t0
+            detail = f"écoulé {interface_helpers.format_duree(ecoule)}"
+        else:
+            detail = ""
+        if self._t_premiere_page is not None and self._total:
+            depuis = time.monotonic() - self._t_premiere_page
+            restant = interface_helpers.estimer_temps_restant(depuis, self._done, self._total)
+            if restant is not None:
+                minutes = max(1, int(round(restant / 60)))
+                self.etiquette_restantes.setText(f"≈ {minutes} min restantes")
+                fin = datetime.now() + timedelta(seconds=restant)
+                detail += " · fin estimée vers " + fin.strftime("%H:%M")
+        self.etiquette_temps_detail.setText(detail)
 
     # ── Boutons ──────────────────────────────────────────────────────
     def _basculer_pause(self) -> None:
@@ -355,7 +484,6 @@ class PageTraitement(QWidget):
         return self._en_pause
 
     def _demander_arret(self) -> None:
-        # Retour immédiat : l'arrêt est coopératif (vu à la fin de la page en cours), on le dit.
         self.journal_resume.setText("Arrêt demandé — fin de la page en cours…")
         self.bouton_arreter.setEnabled(False)
         self.bouton_pause.setEnabled(False)
@@ -363,7 +491,7 @@ class PageTraitement(QWidget):
 
     def _basculer_journal(self, ouvert: bool) -> None:
         self.journal_complet.setVisible(ouvert)
-        self.bouton_journal.setText(("▾ " if ouvert else "▸ ") + "Journal technique")
+        self.bouton_journal.setText(("▾ " if ouvert else "› ") + "Journal technique")
 
     def _ouvrir_excel(self) -> None:
         if self._excel:

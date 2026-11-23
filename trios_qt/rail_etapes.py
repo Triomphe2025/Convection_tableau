@@ -1,22 +1,24 @@
-"""Rail des 4 étapes de la conversion (étape 2C-3) : analyse, lecture, contrôles, classeur.
+"""Rail des 4 étapes de la conversion (étape 2C-3, refonte 2C) : analyse, lecture, contrôles,
+Excel — en 4 segments, chacun avec son libellé, son compte (« 720 p. », « 700 / 720 ») et sa
+barre.
 
 L'étape courante vient de l'événement PHASE : les étapes précédentes passent « fait », la
-courante « en_cours », les suivantes « a_faire ». La barre se remplit à la part d'étapes faites.
-Peint en une passe ; couleurs des jetons.
+courante « en_cours », les suivantes « a_faire ». Peint en une passe ; couleurs des jetons.
 """
 from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import QWidget
 
 from trios_qt import theme
 
 _LIBELLES = {
-    "analyse": "Analyse", "lecture": "Lecture", "controles": "Contrôles", "excel": "Classeur",
+    "analyse": "Analyse du PDF", "lecture": "Lecture des pages",
+    "controles": "Contrôles", "excel": "Excel",
 }
 
 
 class RailEtapes(QWidget):
-    """Rail des 4 étapes + barre ; definir_phase(etat) / terminer() pilotent l'avancement."""
+    """Rail des 4 étapes en segments ; definir_phase / definir_compte / terminer le pilotent."""
 
     CLES = ("analyse", "lecture", "controles", "excel")
 
@@ -25,7 +27,8 @@ class RailEtapes(QWidget):
         self._jetons = jetons or theme.charger_jetons()
         self._courante: str | None = None
         self._termine = False
-        self.setMinimumHeight(52)
+        self._comptes: dict[str, str] = {}
+        self.setMinimumHeight(44)
 
     def definir_phase(self, etat: str) -> None:
         if etat not in self.CLES:
@@ -33,6 +36,14 @@ class RailEtapes(QWidget):
         self._courante = etat
         self._termine = False
         self.update()
+
+    def definir_compte(self, cle: str, texte: str) -> None:
+        if cle in self.CLES:
+            self._comptes[cle] = texte or ""
+            self.update()
+
+    def compte(self, cle: str) -> str:
+        return self._comptes.get(cle, "")
 
     def phase_courante(self) -> str | None:
         return None if self._termine else self._courante
@@ -60,58 +71,32 @@ class RailEtapes(QWidget):
     def libelle(self, cle: str) -> str:
         return _LIBELLES.get(cle, cle)
 
-    def _couleur(self, etat: str) -> QColor:
-        c = self._jetons["couleurs"]
-        return QColor({"fait": c["succes"], "en_cours": c["rose_trios"]}.get(etat, c["trait"]))
-
-    _MARGE = 24
-
-    def _geometrie(self):
+    def rectangles_segments(self):
+        """Rectangle de chaque segment (tests de disposition) ; toujours dans le widget."""
         n = len(self.CLES)
-        largeur = max(1, self.width() - 2 * self._MARGE)
-        return self._MARGE, self.height() * 0.42, largeur, largeur / (n - 1)
-
-    def rectangles_libelles(self):
-        """Pour chaque étape : (rectangle du libellé, alignement). Les extrémités sont alignées
-        sur le bord (gauche pour la 1re, droite pour la dernière) pour ne jamais dépasser."""
-        marge, y, _largeur, pas = self._geometrie()
-        yb, h = y + 10, 18.0
-        bord = 2.0
-        rectangles = []
-        dernier = len(self.CLES) - 1
-        for i in range(len(self.CLES)):
-            x = marge + i * pas
-            if i == 0:
-                rectangles.append((QRectF(bord, yb, pas, h), Qt.AlignmentFlag.AlignLeft))
-            elif i == dernier:
-                rectangles.append((QRectF(self.width() - bord - pas, yb, pas, h),
-                                   Qt.AlignmentFlag.AlignRight))
-            else:
-                rectangles.append((QRectF(x - pas / 2, yb, pas, h), Qt.AlignmentFlag.AlignHCenter))
-        return rectangles
+        largeur_seg = self.width() / n
+        return [QRectF(i * largeur_seg, 0, largeur_seg, self.height()) for i in range(n)]
 
     def paintEvent(self, _evenement):
         c = self._jetons["couleurs"]
         peintre = QPainter(self)
         peintre.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        marge, y, largeur, pas = self._geometrie()
-
-        peintre.setPen(QPen(QColor(c["trait"]), 3))
-        peintre.drawLine(int(marge), int(y), int(marge + largeur), int(y))
-        if self.fraction() > 0:
-            peintre.setPen(QPen(QColor(c["succes"]), 3))
-            peintre.drawLine(int(marge), int(y), int(marge + largeur * self.fraction()), int(y))
-
-        rectangles = self.rectangles_libelles()
+        n = len(self.CLES)
+        largeur_seg = self.width() / n
+        y_barre = self.height() - 10
         for i, cle in enumerate(self.CLES):
-            x = marge + i * pas
+            x0 = i * largeur_seg
             etat = self.etat_etape(cle)
-            rayon = 7 if etat == "en_cours" else 5
+            actif = etat in ("fait", "en_cours")
+            peintre.setPen(QColor(c["texte"] if actif else c["texte_discret"]))
+            peintre.drawText(QRectF(x0, 0, largeur_seg - 70, 22),
+                             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                             self.libelle(cle))
+            peintre.setPen(QColor(c["texte_secondaire"] if actif else c["texte_discret"]))
+            peintre.drawText(QRectF(x0, 0, largeur_seg - 10, 22),
+                             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+                             self.compte(cle))
             peintre.setPen(Qt.PenStyle.NoPen)
-            peintre.setBrush(self._couleur(etat))
-            peintre.drawEllipse(QRectF(x - rayon, y - rayon, 2 * rayon, 2 * rayon))
-            couleur_texte = c["texte"] if etat != "a_faire" else c["texte_discret"]
-            peintre.setPen(QColor(couleur_texte))
-            boite, alignement = rectangles[i]
-            peintre.drawText(boite, alignement | Qt.AlignmentFlag.AlignVCenter, self.libelle(cle))
+            peintre.setBrush(QColor(c["rose_trios"] if actif else c["trait"]))
+            peintre.drawRoundedRect(QRectF(x0, y_barre, largeur_seg - 12, 3), 1.5, 1.5)
         peintre.end()

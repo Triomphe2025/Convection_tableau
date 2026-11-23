@@ -69,13 +69,14 @@ class TestProgression:
         page.sur_evenement(ev.Evenement(type=ev.PAGE_ALERTE, page=7, page_imprimee='7',
                                         alertes=['scan dégradé']))
         assert page.mosaique.etat(0) == Mosaique.A_RELIRE
-        assert "1" in page.etiquette_stats.text()
+        assert page.val_relire.text() == "1"
 
 
 class TestLectureDirecte:
 
     def test_page_lue_charge_l_image(self, page, tmp_path):
         from PIL import Image
+        animations.definir_reduction(True)   # révélation instantanée pour vérifier le contenu
         chemin = tmp_path / "page_001.png"
         Image.new("RGB", (300, 400), (240, 240, 240)).save(chemin)
         page.sur_evenement(ev.Evenement(type=ev.PAGE_LUE, page=1, rang=1, total=1, lignes=2,
