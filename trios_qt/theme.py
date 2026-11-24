@@ -537,6 +537,24 @@ QPushButton[classe="nav"]:checked {{
     background-color: {c['fond']};
     border-radius: {int(r['bouton'])}px;
 }}
+#stat_grand {{
+    font-size: 32px;
+}}
+#stat_detail {{
+    color: {c['texte_discret']};
+    font-size: {int(t['aide'])}px;
+}}
+#attention_titre {{
+    color: {c['texte']};
+    font-weight: 600;
+}}
+#outil_titre {{
+    background-color: transparent;
+    color: {c['texte']};
+    border: none;
+    text-align: left;
+    font-weight: 600;
+}}
 """.strip()
 
 
