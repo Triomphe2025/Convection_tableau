@@ -555,6 +555,53 @@ QPushButton[classe="nav"]:checked {{
     text-align: left;
     font-weight: 600;
 }}
+#relecture_liste {{
+    background-color: transparent;
+    border: none;
+}}
+#relecture_liste::item {{
+    background-color: {c['surface']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['bouton'])}px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    color: {c['texte_secondaire']};
+}}
+#relecture_liste::item:selected {{
+    border: 2px solid {c['a_relire']};
+    color: {c['texte']};
+}}
+#relecture_barre {{
+    background-color: {c['trait']};
+    border: none;
+    border-radius: 2px;
+}}
+#relecture_barre::chunk {{
+    background-color: {c['rose_trios']};
+    border-radius: 2px;
+}}
+#champ_libelle {{
+    color: {c['texte_discret']};
+    font-size: {int(t['aide'])}px;
+}}
+#champ_relecture, #champ_douteux {{
+    background-color: {c['fond']};
+    color: {c['texte']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['bouton'])}px;
+    padding: 7px 10px;
+    font-family: "{jetons['polices']['codes']}", monospace;
+}}
+#champ_douteux {{
+    border: 1px solid {c['a_relire']};
+}}
+#relecture_explication {{
+    background-color: {c['sureleve']};
+    border: 1px solid {c['trait']};
+    border-radius: {int(r['bouton'])}px;
+    padding: 10px 12px;
+    color: {c['texte_secondaire']};
+}}
 """.strip()
 
 

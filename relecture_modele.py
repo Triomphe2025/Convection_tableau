@@ -74,6 +74,33 @@ class Relecture:
         self._chemin.write_text(json.dumps(self._data, ensure_ascii=False, indent=1),
                                 encoding="utf-8")
 
+    # ── Lecture de la ligne complète (contexte de la cellule douteuse) ──
+    def colonnes(self) -> list:
+        """Colonnes du modèle de tableau (en-têtes de la ligne), ou []."""
+        from template import TemplateManager
+        try:
+            return list(TemplateManager().get(self._data.get("modele")).columns)
+        except Exception:
+            return []
+
+    def ligne_du_point(self, point: dict, feuille: str = "Borniers"):
+        """(colonnes, valeurs) de la ligne entière du point, lue dans l'Excel ; ([], []) sinon."""
+        coord = point.get("cellule_excel")
+        cols = self.colonnes()
+        chemin = self.chemin_excel()
+        if not coord or not cols or not chemin.exists():
+            return [], []
+        from openpyxl import load_workbook
+        from openpyxl.utils.cell import coordinate_to_tuple
+        rangee = coordinate_to_tuple(coord)[0]
+        wb = load_workbook(chemin, read_only=True, data_only=True)
+        try:
+            ws = wb[feuille] if feuille in wb.sheetnames else wb.active
+            valeurs = [ws.cell(row=rangee, column=i + 1).value for i in range(len(cols))]
+        finally:
+            wb.close()
+        return cols, ["" if v is None else str(v) for v in valeurs]
+
     # ── Écriture dans l'Excel ────────────────────────────────────────
     def chemin_excel(self) -> Path:
         return Path(self._data.get("excel", ""))

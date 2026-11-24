@@ -46,7 +46,8 @@ def couple(tmp_path):
     xlsx = tmp_path / "doc.xlsx"
     _classeur(xlsx)
     points = {
-        "version": 1, "document": "DOC", "excel": str(xlsx), "points": [
+        "version": 1, "document": "DOC", "excel": str(xlsx), "modele": "Bornier standard",
+        "points": [
             _point("C3-qualite", "C3", "KGCB16", "KGBG16"),
             _point("B4-qualite", "B4", "ROUGE", "BLANC"),
             _point("D5-qualite", "D5", "X", None),
@@ -81,6 +82,17 @@ class TestEtats:
         assert r2.point("B4-qualite")["etat"] == "corrige"
         assert r2.point("D5-qualite")["etat"] == "passe"
         assert r2.a_voir() == 1
+
+
+class TestLigneComplete:
+
+    def test_ligne_du_point_lit_toute_la_ligne(self, couple):
+        r = rm.Relecture(couple[0])
+        cols, valeurs = r.ligne_du_point(r.point("C3-qualite"))
+        assert cols == ["BORNE", "COULEUR", "SIGNAL", "JARRETIERES"]
+        # C3 = SIGNAL (3e colonne) sur la ligne 3 ; seule C3 porte une valeur.
+        assert valeurs[2] == "KGCB16"
+        assert valeurs[0] == "" and valeurs[1] == ""
 
 
 class TestEcritureExcel:
