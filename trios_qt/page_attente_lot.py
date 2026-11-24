@@ -31,7 +31,7 @@ _RAIL_LIBELLES = {
 # Légende de la mosaïque du lot (clé de couleur jetons, libellé).
 _LEGENDE_LOT = (
     ("texte_natif", "texte natif (sans Claude)"), ("lot_en_cours", "dans un lot"),
-    ("rose_trios", "lue, pas encore rapatriée"), ("tuile_lue", "rapatriée"),
+    ("page_scannee", "lue, pas encore rapatriée"), ("tuile_lue", "rapatriée"),
 )
 
 
@@ -74,17 +74,19 @@ class DiagrammeLots(QWidget):
         rapatrie = self._lots[i].get("phase") == PageAttenteLot.RAPATRIE
         return QColor(c["tuile_lue"] if rapatrie else c["lot_en_cours"])
 
+    ZONE = 124   # largeur fixe d'un bloc (Ce PC / Anthropic) ; au moins 120 px
+
     def paintEvent(self, _evenement):
         c = self._jetons["couleurs"]
         peintre = QPainter(self)
         peintre.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         self._noeud(peintre, 0, "Ce PC", "prépare, puis récupère", self._pix_poste)
-        self._noeud(peintre, self.width() - 86, "Anthropic", "lit les pages du lot",
+        self._noeud(peintre, self.width() - self.ZONE, "Anthropic", "lit les pages du lot",
                     self._pix_nuage)
         if not self._lots:
             peintre.end()
             return
-        x0, x1 = 92, self.width() - 92
+        x0, x1 = self.ZONE + 6, self.width() - self.ZONE - 6
         larg_pastille = 92.0
         row_h = self.height() / len(self._lots)
         for i, lot in enumerate(self._lots):
@@ -93,42 +95,73 @@ class DiagrammeLots(QWidget):
             stylo.setStyle(Qt.PenStyle.DashLine)
             peintre.setPen(stylo)
             peintre.drawLine(int(x0), int(y), int(x1), int(y))
+            # Mo, à gauche de la piste, sous le départ.
+            peintre.setPen(QColor(c["texte_discret"]))
+            peintre.drawText(QRectF(x0, y + 11, 60, 15), Qt.AlignmentFlag.AlignLeft,
+                             f"{lot.get('taille_mo', 0):.0f} Mo")
             px = x0 + self.position_fraction(i) * (x1 - x0 - larg_pastille)
             boite = QRectF(px, y - 13, larg_pastille, 26)
-            peintre.setPen(Qt.PenStyle.NoPen)
             fond = QColor(self.couleur_lot(i))
             fond.setAlphaF(0.30)
+            contour = QPen(QColor(self.couleur_lot(i)), 1)   # contour fin visible
+            peintre.setPen(contour)
             peintre.setBrush(fond)
             peintre.drawRoundedRect(boite, 13, 13)
             peintre.setPen(QColor(c["texte"]))
             peintre.drawText(boite, Qt.AlignmentFlag.AlignCenter,
                              f"Lot {i + 1} · {lot.get('total', 0)} p.")
-            peintre.setPen(QColor(c["texte_discret"]))
-            peintre.drawText(QRectF(x0, y + 10, 70, 16), Qt.AlignmentFlag.AlignLeft,
-                             f"{lot.get('taille_mo', 0):.0f} Mo")
             rapatrie = lot.get("phase") == PageAttenteLot.RAPATRIE
-            droite = ("retour des résultats" if rapatrie
-                      else f"lu {lot.get('lues', 0)} / {lot.get('total', 0)}")
-            peintre.setPen(QColor(c["succes"] if rapatrie else c["texte_discret"]))
-            boite_d = QRectF(x1 - 150, y + 10, 150, 16)
-            peintre.drawText(boite_d, Qt.AlignmentFlag.AlignRight, droite)
+            if rapatrie:
+                peintre.setPen(QColor(c["succes"]))
+                peintre.drawText(QRectF(px + larg_pastille + 8, y - 8, 150, 16),
+                                 Qt.AlignmentFlag.AlignLeft, "retour des résultats")
+            else:
+                # « lu x / y » juste sous la pastille, aligné à droite sur elle.
+                peintre.setPen(QColor(c["texte_discret"]))
+                peintre.drawText(QRectF(px + larg_pastille - 150, y + 11, 150, 15),
+                                 Qt.AlignmentFlag.AlignRight,
+                                 f"lu {lot.get('lues', 0)} / {lot.get('total', 0)}")
         peintre.end()
 
     def _noeud(self, peintre, x, titre, sous, pixmap):
         c = self._jetons["couleurs"]
-        cx = x + 43
+        cx = x + self.ZONE / 2
         cy = self.height() / 2
-        tuile = QRectF(cx - 22, cy - 44, 44, 44)
-        peintre.setPen(Qt.PenStyle.NoPen)
+        tuile = QRectF(cx - 25, cy - 52, 50, 50)   # carré arrondi encadré, ~50 px
+        peintre.setPen(QPen(QColor(c["trait"]), 1))
         peintre.setBrush(QColor(c["sureleve"]))
-        peintre.drawRoundedRect(tuile, 10, 10)
-        peintre.drawPixmap(int(cx - 11), int(cy - 33), pixmap)
-        bx = max(0.0, min(x - 7, self.width() - 100.0))   # boîte de texte toujours à l'écran
+        peintre.drawRoundedRect(tuile, 12, 12)
+        peintre.drawPixmap(int(cx - 11), int(cy - 38), pixmap)
         peintre.setPen(QColor(c["texte"]))
-        peintre.drawText(QRectF(bx, cy + 4, 100, 18), Qt.AlignmentFlag.AlignHCenter, titre)
+        peintre.drawText(QRectF(x, cy + 4, self.ZONE, 18), Qt.AlignmentFlag.AlignHCenter, titre)
         peintre.setPen(QColor(c["texte_discret"]))
-        peintre.drawText(QRectF(bx, cy + 22, 100, 34),
+        peintre.drawText(QRectF(x, cy + 22, self.ZONE, 34),
                          Qt.AlignmentFlag.AlignHCenter | Qt.TextFlag.TextWordWrap, sous)
+
+
+class BarreDecompte(QWidget):
+    """Fine barre horizontale qui se vide jusqu'à la prochaine vérification du lot."""
+
+    def __init__(self, jetons: dict, parent=None):
+        super().__init__(parent)
+        self._jetons = jetons
+        self._fraction = 1.0
+        self.setFixedHeight(3)
+
+    def definir_fraction(self, f: float) -> None:
+        self._fraction = max(0.0, min(1.0, float(f)))
+        self.update()
+
+    def paintEvent(self, _evenement):
+        c = self._jetons["couleurs"]
+        peintre = QPainter(self)
+        peintre.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        peintre.setPen(Qt.PenStyle.NoPen)
+        peintre.setBrush(QColor(c["trait"]))
+        peintre.drawRoundedRect(QRectF(0, 0, self.width(), 3), 1.5, 1.5)
+        peintre.setBrush(QColor(c["lot_en_cours"]))
+        peintre.drawRoundedRect(QRectF(0, 0, self.width() * self._fraction, 3), 1.5, 1.5)
+        peintre.end()
 
 
 class PageAttenteLot(QWidget):
@@ -155,7 +188,7 @@ class PageAttenteLot(QWidget):
         self._lots: dict[str, dict] = {}
         self._natures: dict[int, str] = {}
         self._total = 0
-        self._pages_vues = 0
+        self._pages_rapatriees: set[int] = set()
         self._derniere_verif = None
         self._delai = 0
         self._construire()
@@ -170,7 +203,8 @@ class PageAttenteLot(QWidget):
         colonne.setContentsMargins(28, 22, 28, 18)
         colonne.setSpacing(14)
         colonne.addWidget(self._entete())
-        self.rail = RailEtapes(self._jetons, self, cles=_RAIL_CLES, libelles=_RAIL_LIBELLES)
+        self.rail = RailEtapes(self._jetons, self, cles=_RAIL_CLES, libelles=_RAIL_LIBELLES,
+                               couleur_courante=self._jetons["couleurs"]["lot_en_cours"])
         colonne.addWidget(self.rail)
 
         carte_flux = self._carte("carte_lecture")
@@ -257,6 +291,7 @@ class PageAttenteLot(QWidget):
         self.anneau = Anneau(self._jetons, carte)
         self.anneau.setFixedSize(96, 96)
         self.anneau.definir_taille_pourcentage(22)   # « 52 » tient dans l'anneau
+        self.anneau.definir_couleur(self._jetons["couleurs"]["lot_en_cours"])   # arc violet
         rangee.addWidget(self.anneau, 0)
         droite = QVBoxLayout()
         titre = QLabel("pages lues par Anthropic", carte)
@@ -271,8 +306,10 @@ class PageAttenteLot(QWidget):
         rangee.addLayout(droite, 1)
         v.addLayout(rangee)
         self.etiquette_verification = QLabel("", carte)
-        self.etiquette_verification.setObjectName("mini_relire")
+        self.etiquette_verification.setObjectName("temps_detail")   # gris normal (pas orange gras)
         v.addWidget(self.etiquette_verification)
+        self.barre_decompte = BarreDecompte(self._jetons, carte)
+        v.addWidget(self.barre_decompte)
         return carte
 
     def _carte_fermer(self) -> QFrame:
@@ -280,8 +317,17 @@ class PageAttenteLot(QWidget):
         v = QVBoxLayout(self.carte_fermer)
         v.setContentsMargins(16, 14, 16, 14)
         v.setSpacing(8)
+        from trios_qt import icones
+        rangee_titre = QHBoxLayout()
+        rangee_titre.setSpacing(7)
+        icone = QLabel(self.carte_fermer)
+        icone.setPixmap(icones.charger_icone(
+            "bouclier", self._jetons["couleurs"]["succes"], 18).pixmap(18, 18))
         titre = QLabel("Tu peux fermer l'appli", self.carte_fermer)
         titre.setObjectName("panneau_titre")
+        rangee_titre.addWidget(icone, 0)
+        rangee_titre.addWidget(titre, 0)
+        rangee_titre.addStretch(1)
         texte = QLabel("Les lots continuent chez Anthropic. À la prochaine ouverture, l'appli "
                        "récupère les résultats toute seule et finit l'Excel.", self.carte_fermer)
         texte.setObjectName("temps_detail")
@@ -289,7 +335,7 @@ class PageAttenteLot(QWidget):
         self.interrupteur_prevenir = QCheckBox("Me prévenir à la fin (notification Windows)",
                                                self.carte_fermer)
         self.interrupteur_prevenir.setObjectName("case_lot")
-        v.addWidget(titre)
+        v.addLayout(rangee_titre)
         v.addWidget(texte)
         v.addWidget(self.interrupteur_prevenir)
         return self.carte_fermer
@@ -302,15 +348,45 @@ class PageAttenteLot(QWidget):
         titre = QLabel("Pendant ce temps", self.carte_pendant)
         titre.setObjectName("panneau_titre")
         v.addWidget(titre)
-        self.bouton_relire = QPushButton("Relire un autre document", self.carte_pendant)
-        self.bouton_relire.setObjectName("action_secondaire")
-        self.bouton_relire.clicked.connect(self.relire_autre.emit)
-        self.bouton_suivant = QPushButton("Lancer le fichier suivant", self.carte_pendant)
-        self.bouton_suivant.setObjectName("action_secondaire")
-        self.bouton_suivant.clicked.connect(self.fichier_suivant.emit)
-        v.addWidget(self.bouton_relire)
-        v.addWidget(self.bouton_suivant)
+        self.ligne_relire, self.etiq_relire, self.bouton_relire = self._ligne_action(
+            "Relire", self.relire_autre.emit)
+        self.ligne_suivant, self.etiq_suivant, self.bouton_suivant = self._ligne_action(
+            "Lancer", self.fichier_suivant.emit)
+        v.addWidget(self.ligne_relire)
+        v.addWidget(self.ligne_suivant)
+        v.addStretch(1)
+        self.ligne_relire.setVisible(False)    # masquées tant qu'il n'y a rien
+        self.ligne_suivant.setVisible(False)
         return self.carte_pendant
+
+    def _ligne_action(self, lien, rappel):
+        cadre = QWidget(self.carte_pendant)
+        h = QHBoxLayout(cadre)
+        h.setContentsMargins(0, 0, 0, 0)
+        etiquette = QLabel("", cadre)
+        etiquette.setObjectName("temps_detail")
+        bouton = QPushButton(lien, cadre)
+        bouton.setObjectName("lien_action")
+        bouton.setCursor(Qt.CursorShape.PointingHandCursor)
+        bouton.clicked.connect(rappel)
+        h.addWidget(etiquette, 1)
+        h.addWidget(bouton, 0)
+        return cadre, etiquette, bouton
+
+    def definir_points_a_relire(self, n: int, document: str = "") -> None:
+        if n and n > 0:
+            nom = document or self.etiquette_fichier.text()
+            self.etiq_relire.setText(f"Relire les {n} points de {nom}")
+            self.ligne_relire.setVisible(True)
+        else:
+            self.ligne_relire.setVisible(False)
+
+    def definir_fichier_suivant(self, nom: str = "") -> None:
+        if nom:
+            self.etiq_suivant.setText("Lancer le fichier suivant de la file")
+            self.ligne_suivant.setVisible(True)
+        else:
+            self.ligne_suivant.setVisible(False)
 
     def _carte_pages(self) -> QFrame:
         carte = self._carte("carte_pages")
@@ -394,26 +470,34 @@ class PageAttenteLot(QWidget):
         self._repeindre_mosaique()
 
     def _repeindre_mosaique(self) -> None:
-        # Cases dès l'attente : natif, « dans un lot », « lue pas rapatriée », « rapatriée ».
+        # Cases par PLAGE de pages de chaque lot (pas par rang agrégé) : natif, « dans un lot »,
+        # « lue pas rapatriée » (lavande), « rapatriée » (vert). Les natives gardent leur rang.
         if self.mosaique.nombre_pages() == 0 or not self._total:
             return
-        en_cours = [d for d in self._lots.values() if d.get("phase") != self.RAPATRIE]
-        rapatries = [d for d in self._lots.values() if d.get("phase") == self.RAPATRIE]
-        rapatriees = max(sum(d.get("total", 0) for d in rapatries), self._pages_vues)
-        lues = max(rapatriees, sum(d.get("lues", 0) for d in en_cours) + rapatriees)
+        bornes = []   # (lot, début, fin) sur la suite des pages scannées, dans l'ordre de création
+        cumul = 0
+        for d in self._lots.values():
+            bornes.append((d, cumul, cumul + d.get("total", 0)))
+            cumul += d.get("total", 0)
         rang = 0
         for p in range(1, self._total + 1):
             if self._natures.get(p) in _NATURES_NATIVES:
                 self.mosaique.definir_etat(p - 1, Mosaique.NATIF)
-            else:
-                if rang < rapatriees:
-                    etat = Mosaique.LUE
-                elif rang < lues:
-                    etat = Mosaique.LECTURE
-                else:
-                    etat = Mosaique.DANS_LOT
-                self.mosaique.definir_etat(p - 1, etat)
-                rang += 1
+                continue
+            self.mosaique.definir_etat(p - 1, self._etat_scan(p, rang, bornes))
+            rang += 1
+
+    def _etat_scan(self, page: int, rang: int, bornes) -> str:
+        if page in self._pages_rapatriees:
+            return Mosaique.LUE
+        for d, debut, fin in bornes:
+            if debut <= rang < fin:
+                if d.get("phase") == self.RAPATRIE:
+                    return Mosaique.LUE
+                if rang - debut < d.get("lues", 0):
+                    return Mosaique.LUE_NON_RAPATRIEE
+                return Mosaique.DANS_LOT
+        return Mosaique.DANS_LOT
 
     def _lot(self, lot: str, taille_mo: float = 0.0) -> dict:
         if lot not in self._lots:
@@ -440,6 +524,7 @@ class PageAttenteLot(QWidget):
         self.rail.definir_compte("envoi", f"{n} / {n} lots")
         self.rail.definir_compte("lecture", f"{lues} / {total}")
         self.rail.definir_compte("recuperation", f"{rapatries} / {n} lots")
+        self.rail.definir_fraction_courante(lues / total if total else 0.0)
 
     def _lot_cree(self, e) -> None:
         comp = e.compteurs or {}
@@ -469,7 +554,8 @@ class PageAttenteLot(QWidget):
 
     def _page_lue(self, e) -> None:
         self._amorcer_pages(e.total)
-        self._pages_vues += 1
+        if e.page:
+            self._pages_rapatriees.add(e.page)
         self._repeindre_mosaique()
 
     # ── Affichage dérivé ─────────────────────────────────────────────
@@ -487,6 +573,7 @@ class PageAttenteLot(QWidget):
         prochaine = max(0, self._delai - ecoule)
         self.etiquette_verification.setText(
             f"Dernière vérification il y a {ecoule} s · prochaine dans {prochaine} s")
+        self.barre_decompte.definir_fraction(prochaine / self._delai if self._delai else 0.0)
 
     def nombre_pistes(self) -> int:
         return len(self._lots)

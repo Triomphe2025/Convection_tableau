@@ -526,6 +526,13 @@ QPushButton[classe="nav"]:checked {{
     border-radius: {int(r['bouton'])}px;
     font-size: {int(t['titre_bloc'])}px;
 }}
+#lien_action {{
+    background-color: transparent;
+    color: {c['rose_trios']};
+    border: none;
+    font-weight: 600;
+    font-size: {int(t['aide'])}px;
+}}
 """.strip()
 
 

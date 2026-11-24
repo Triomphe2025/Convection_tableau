@@ -26,6 +26,7 @@ class Anneau(QWidget):
         self._centre_grand = None   # texte central personnalisé (ex. « 52 » au lieu du %)
         self._centre_sous = ""
         self._taille_pc = None      # taille du grand texte (px) ; défaut = titre_ecran
+        self._couleur_perso = None  # couleur d'arc personnalisée (ex. violet pour l'écran lot)
 
     def definir_valeur(self, v) -> None:
         self._valeur = max(0.0, min(1.0, float(v)))
@@ -69,9 +70,16 @@ class Anneau(QWidget):
         self._valeur = 0.0
         self.update()
 
+    def definir_couleur(self, couleur) -> None:
+        """Couleur de l'arc d'avancement (par défaut rose ; violet pour l'écran lot)."""
+        self._couleur_perso = couleur
+        self.update()
+
     def couleur_progression(self) -> QColor:
         c = self._jetons["couleurs"]
-        return QColor(c["succes"] if self._termine else c["rose_trios"])
+        if self._termine:
+            return QColor(c["succes"])
+        return QColor(self._couleur_perso or c["rose_trios"])
 
     def definir_sous_libelle(self, texte: str) -> None:
         self._sous_libelle = texte or ""

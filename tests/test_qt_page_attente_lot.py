@@ -104,10 +104,47 @@ class TestMosaique:
         assert page.mosaique.etat(1) == Mosaique.DANS_LOT    # page 2 scan → dans un lot
         page.sur_evenement(ev.Evenement(type=ev.LOT_ETAT, lot="b1",
                                         compteurs={"lues": 1, "total": 3, "delai": 30}))
-        assert Mosaique.LECTURE in [page.mosaique.etat(i) for i in range(5)]
+        assert Mosaique.LUE_NON_RAPATRIEE in [page.mosaique.etat(i) for i in range(5)]
         page.sur_evenement(ev.Evenement(type=ev.LOT_RECUPERE, lot="b1",
                                         compteurs={"lues": 3, "total": 3}))
         assert Mosaique.LUE in [page.mosaique.etat(i) for i in range(5)]
+
+
+class TestMosaiqueScenario:
+    """Scénario de la maquette : 141 pages, 25 vectorielles, 5 lots, lot 0 récupéré."""
+
+    def _scenario(self, page):
+        total = 141
+        vect = set(range(1, 26))   # 25 pages vectorielles (texte natif)
+        for p in range(1, total + 1):
+            nat = 'vectoriel' if p in vect else 'scan'
+            page.sur_evenement(ev.Evenement(type=ev.ANALYSE, page=p, total=total, nature=nat))
+        reqs = [24, 24, 23, 23, 22]   # 116 pages scannées en 5 lots
+        for i, r in enumerate(reqs):
+            page.sur_evenement(ev.Evenement(type=ev.LOT_CREE, lot=f"b{i}",
+                                            compteurs={"requetes": r, "taille_mo": 40.0}))
+        return reqs
+
+    def test_pages_vectorielles_bleues(self, page):
+        # Point 1 : exactement 25 cases « natif » après ANALYSE (bleu, texte natif).
+        self._scenario(page)
+        natif = sum(1 for i in range(141) if page.mosaique.etat(i) == Mosaique.NATIF)
+        assert natif == 25
+
+    def test_etats_par_plage_de_lot(self, page, jetons):
+        # Point 2 : états par plage de pages de chaque lot ; lavande (page_scannee) pour les lues.
+        reqs = self._scenario(page)
+        page.sur_evenement(ev.Evenement(type=ev.LOT_RECUPERE, lot="b0",
+                                        compteurs={"lues": 24, "total": 24}))
+        for i, lus in ((1, 14), (2, 8), (3, 4), (4, 2)):
+            page.sur_evenement(ev.Evenement(type=ev.LOT_ETAT, lot=f"b{i}", compteurs={
+                "lues": lus, "total": reqs[i], "delai": 30}))
+        etats = [page.mosaique.etat(i) for i in range(141)]
+        assert etats.count(Mosaique.NATIF) == 25            # restent bleues
+        assert etats.count(Mosaique.LUE) == 24              # lot 0 rapatrié → vert
+        assert etats.count(Mosaique.LUE_NON_RAPATRIEE) == 14 + 8 + 4 + 2   # lavande
+        attendu = jetons["couleurs"]["page_scannee"].lower()
+        assert page.mosaique.couleur_etat(Mosaique.LUE_NON_RAPATRIEE).name().lower() == attendu
 
 
 class TestPastilles:

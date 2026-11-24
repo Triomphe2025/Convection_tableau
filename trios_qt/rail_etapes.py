@@ -22,12 +22,16 @@ class RailEtapes(QWidget):
 
     CLES = ("analyse", "lecture", "controles", "excel")
 
-    def __init__(self, jetons: dict | None = None, parent=None, cles=None, libelles=None):
+    def __init__(self, jetons: dict | None = None, parent=None, cles=None, libelles=None,
+                 couleur_courante=None):
         super().__init__(parent)
         self._jetons = jetons or theme.charger_jetons()
         # Clés et libellés personnalisables (l'écran lot a d'autres étapes que l'écran tableau).
         self._cles = tuple(cles) if cles else self.CLES
         self._libelles = libelles or _LIBELLES
+        # Couleur de l'étape en cours (rose par défaut ; violet pour l'écran lot).
+        self._couleur_courante = couleur_courante or self._jetons["couleurs"]["rose_trios"]
+        self._frac_courante = 1.0   # remplissage de la barre de l'étape en cours (prorata)
         self._courante: str | None = None
         self._termine = False
         self._comptes: dict[str, str] = {}
@@ -78,11 +82,19 @@ class RailEtapes(QWidget):
     def libelle(self, cle: str) -> str:
         return self._libelles.get(cle, cle)
 
+    def definir_fraction_courante(self, frac: float) -> None:
+        self._frac_courante = max(0.0, min(1.0, float(frac)))
+        self.update()
+
     def couleur_segment(self, cle: str) -> QColor:
-        """Barre du segment : vert (fait), rose (en cours), gris (à faire)."""
+        """Barre du segment : vert (fait), couleur courante (en cours), gris (à faire)."""
         c = self._jetons["couleurs"]
         etat = self.etat_etape(cle)
-        return QColor({"fait": c["succes"], "en_cours": c["rose_trios"]}.get(etat, c["trait"]))
+        if etat == "fait":
+            return QColor(c["succes"])
+        if etat == "en_cours":
+            return QColor(self._couleur_courante)
+        return QColor(c["trait"])
 
     def rectangles_segments(self):
         """Rectangle de chaque segment (tests de disposition) ; toujours dans le widget."""
@@ -110,6 +122,15 @@ class RailEtapes(QWidget):
                              Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
                              self.compte(cle))
             peintre.setPen(Qt.PenStyle.NoPen)
-            peintre.setBrush(self.couleur_segment(cle))
-            peintre.drawRoundedRect(QRectF(x0, y_barre, largeur_seg - 12, 3), 1.5, 1.5)
+            largeur_barre = largeur_seg - 12
+            # Étape en cours : fond gris + remplissage partiel (prorata) ; sinon barre pleine.
+            if etat == "en_cours" and self._frac_courante < 1.0:
+                peintre.setBrush(QColor(c["trait"]))
+                peintre.drawRoundedRect(QRectF(x0, y_barre, largeur_barre, 3), 1.5, 1.5)
+                peintre.setBrush(self.couleur_segment(cle))
+                peintre.drawRoundedRect(
+                    QRectF(x0, y_barre, largeur_barre * self._frac_courante, 3), 1.5, 1.5)
+            else:
+                peintre.setBrush(self.couleur_segment(cle))
+                peintre.drawRoundedRect(QRectF(x0, y_barre, largeur_barre, 3), 1.5, 1.5)
         peintre.end()

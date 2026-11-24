@@ -145,9 +145,14 @@ class MiniFenetre(QWidget):
         rangee_barre = QHBoxLayout()
         rangee_barre.setSpacing(8)
         self.barre = BarreReperes(self._jetons, self)
-        self.bouton_pause = QPushButton("⏸", self)
+        self.barre.setFixedHeight(6)   # barre fine, comme 10_mini_fenetre
+        from trios_qt import icones
+        from PySide6.QtCore import QSize
+        self.bouton_pause = QPushButton(self)
         self.bouton_pause.setObjectName("mini_icone")
-        self.bouton_pause.setFixedSize(30, 22)
+        self.bouton_pause.setIcon(icones.charger_icone("pause", c["texte"], 16))
+        self.bouton_pause.setIconSize(QSize(16, 16))
+        self.bouton_pause.setFixedSize(32, 32)   # bouton arrondi encadré
         self.bouton_pause.setCursor(Qt.CursorShape.PointingHandCursor)
         self.bouton_pause.clicked.connect(self._basculer_pause)
         rangee_barre.addWidget(self.barre, 1)
@@ -218,13 +223,9 @@ class MiniFenetre(QWidget):
 
     # ── Boutons ──────────────────────────────────────────────────────
     def _basculer_pause(self) -> None:
+        # Bouton icône : on garde l'icône pause, on ne change que l'état et le signal émis.
         self._en_pause = not self._en_pause
-        if self._en_pause:
-            self.bouton_pause.setText("Reprendre")
-            self.pause_demande.emit()
-        else:
-            self.bouton_pause.setText("Pause")
-            self.reprendre_demande.emit()
+        (self.pause_demande if self._en_pause else self.reprendre_demande).emit()
 
     def en_pause(self) -> bool:
         return self._en_pause

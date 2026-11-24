@@ -67,3 +67,19 @@ Précisions issues des phases 1 et 2B :
   lourd dans le fil de l'interface.
 - Test final avec l'exe sur un vrai scan avant de rendre la main (temps réel, captures à
   3 instants).
+
+## Retouches 3
+
+Contexte : vérification visuelle de eb03d20 contre docs/maquettes/09 (écran lot) et 10 (mini-fenêtre), scénario 141 pages dont 25 vectorielles, 5 lots, lot 0 récupéré, LOT_ETAT lues 24/14/8/4/2. Règle tests d'abord habituelle (rouge avant, rouge sur mutation, vert à la fin) pour les points marqués [test].
+
+1. [test] Mosaïque : les pages vectorielles (texte natif, sans Claude) doivent être coloriées en bleu (couleur de la légende « texte natif ») à leur rang réel, dès l'événement ANALYSE, et rester bleues jusqu'à la fin. Aujourd'hui aucune case n'est bleue. Test : après ANALYSE avec 25 pages vectorielles, exactement 25 cases ont l'état « natif ».
+2. [test] Mosaïque : l'état « lue, pas encore rapatriée » utilise la couleur lavande de la maquette (jeton violet clair de jetons.json), pas le rose. Attribue les états par plage de pages de chaque lot (pages du lot N) et non par rang agrégé : les cases du lot 0 récupéré passent au vert, les lues de chaque lot en lavande, le reste du lot en violet foncé.
+3. Diagramme : les blocs « Ce PC » et « Anthropic » ont une largeur fixe suffisante (au moins 120 px) pour que « prépare, puis récupère » et « lit les pages du lot » tiennent sur 2 lignes maximum sans chevaucher les étiquettes « xx Mo » ni « lu x / y ». L'icône est dans un carré arrondi encadré (50 px environ) comme sur la maquette.
+4. Pastilles de lot : contour fin visible comme sur la maquette ; le texte « lu x / y » est placé juste sous sa pastille, aligné à droite sur elle.
+5. Barre d'étapes : l'étape en cours « Lecture chez Anthropic » est en violet (pas rose) et remplie au prorata (52/116 ≈ 45 %).
+6. Carte « pages lues par Anthropic » : anneau violet ; « Dernière vérification il y a … · prochaine dans … » en gris normal (pas orange gras) avec une fine barre de décompte dessous qui se vide jusqu'à la prochaine vérification.
+7. Carte « Tu peux fermer l'appli » : ajoute l'icône bouclier (Lucide shield-check) devant le titre.
+8. Carte « Pendant ce temps » : remplace les deux gros boutons par deux lignes comme la maquette, texte à gauche (« Relire les N points de <document> », « Lancer le fichier suivant de la file ») et lien d'action rose à droite (« Relire », « Lancer »). Si rien à relire ou pas de fichier suivant, la ligne est masquée.
+9. Mini-fenêtre : barre de progression fine (6 px environ, comme la maquette) ; bouton pause = icône pause Lucide dans un bouton arrondi encadré de 32 px environ.
+
+Ne touche pas au moteur ni au test « mêmes cellules ». À la fin : tous les tests verts, capture offscreen de l'écran lot et de la mini-fenêtre avec le même scénario, sauvegardées dans captures/ (non commité), commit sur interface-qt, push de la branche (jamais main), et ton rapport avec la liste des points faits.

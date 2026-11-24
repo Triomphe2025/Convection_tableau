@@ -33,9 +33,9 @@ def test_ressources_embarquees_existent():
     dossier_icones = RACINE / "trios_qt" / "icones"
     icones = {p.stem for p in dossier_icones.glob("*.svg")}
     assert len(polices) == 6
-    # 6 icônes de nav + ampoule/info (cartes astuce/message) + poste/nuage (blocs de l'écran lot).
-    assert len(icones) == 10
-    assert {"ampoule", "info", "poste", "nuage"} <= icones
+    # 6 nav + ampoule/info + poste/nuage (blocs lot) + bouclier (carte fermer) + pause (mini).
+    assert len(icones) == 12
+    assert {"ampoule", "info", "poste", "nuage", "bouclier", "pause"} <= icones
     assert (RACINE / "docs" / "maquettes" / "jetons.json").is_file()
 
 
