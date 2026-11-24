@@ -48,6 +48,9 @@ class FenetrePrincipale(QWidget):
         self._fabrique_service = fabrique_service or self._fabrique_reelle
         self._controleur = None
         self._ponts = []
+        self._chemin_points_courant = None   # <nom>_points.json du dernier document converti
+        self._relecture_courante = None
+        self._excel_courant = None
         self.setObjectName("fenetre")  # cible QSS du fond général (pas tous les QWidget)
         self.setWindowTitle(TITRE_FENETRE)
         self.resize(1360, 900)
@@ -88,11 +91,22 @@ class FenetrePrincipale(QWidget):
         self.pages["attente_lot"] = self.page_attente_lot
         self._pile.addWidget(self.page_attente_lot)
 
+        from trios_qt.page_termine import PageTermine
+        self.page_termine = PageTermine(self._jetons)
+        self.page_termine.setProperty("classe", "page")
+        self.pages["termine"] = self.page_termine
+        self._pile.addWidget(self.page_termine)
+        self._monter_relecture()
+
         self.page_convertir.lancer_demande.connect(self._lancer_conversion)
         for ecran in (self.page_traitement, self.page_attente_lot):
             ecran.arret_demande.connect(self._arreter_conversion)
-            ecran.voir_resume.connect(lambda: self.aller_a("convertir"))
+            ecran.voir_resume.connect(self._voir_resume)
             ecran.mini_demande.connect(self._montrer_mini)
+        self.page_attente_lot.relire_autre.connect(self._relire_courant)
+        self.page_termine.relire_demande.connect(self._relire_courant)
+        self.page_termine.ouvrir_excel.connect(self._ouvrir_excel)
+        self.page_termine.ouvrir_dossier.connect(self._ouvrir_dossier)
         self.page_traitement.pause_demande.connect(self._pause_conversion)
         self.page_traitement.reprendre_demande.connect(self._reprendre_conversion)
 
@@ -148,6 +162,12 @@ class FenetrePrincipale(QWidget):
         if self._controleur is not None:
             self._controleur.reprendre()
 
+    def _sur_evenement_fenetre(self, e) -> None:
+        # Fin d'un document : retenir le chemin des points pour « Voir le résumé » / « Relire ».
+        import evenements as ev
+        if e.type == ev.FIN and getattr(e, "points", None):
+            self._chemin_points_courant = e.points
+
     def _montrer_mini(self) -> None:
         # Bouton « Mini-fenêtre » : ouvre la mini (toujours au premier plan) et réduit la fenêtre.
         self.mini.show()
@@ -176,6 +196,7 @@ class FenetrePrincipale(QWidget):
 
         pont = _PontEvenements()
         pont.recu.connect(on_evenement, Qt.ConnectionType.QueuedConnection)
+        pont.recu.connect(self._sur_evenement_fenetre, Qt.ConnectionType.QueuedConnection)
         # La mini-fenêtre reflète les mêmes événements que l'écran principal.
         if getattr(self, "mini", None) is not None:
             pont.recu.connect(self.mini.sur_evenement, Qt.ConnectionType.QueuedConnection)
@@ -199,6 +220,83 @@ class FenetrePrincipale(QWidget):
         disposition.setContentsMargins(0, 0, 0, 0)
         self.page_convertir = PageConvertir(parent=page)
         disposition.addWidget(self.page_convertir, 1)
+
+    def _monter_relecture(self) -> None:
+        # Remplace la page générique « relecture » de la barre latérale par l'écran réel.
+        from trios_qt.page_relecture import PageRelecture
+        page = self.pages["relecture"]
+        disposition = page.layout()
+        while disposition.count():
+            element = disposition.takeAt(0)
+            widget = element.widget()
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
+        disposition.setContentsMargins(0, 0, 0, 0)
+        self.page_relecture = PageRelecture(self._jetons)
+        disposition.addWidget(self.page_relecture, 1)
+        self.page_relecture.points_changes.connect(self.maj_compteur_relecture)
+        self.page_relecture.enregistre.connect(lambda _ok: self.maj_compteur_relecture())
+
+    # ── Branchements Terminé / Relecture (étape 5) ───────────────────────
+    def _voir_resume(self) -> None:
+        if self._chemin_points_courant:
+            self.ouvrir_termine_depuis(self._chemin_points_courant)
+        else:
+            self.aller_a("termine")
+
+    def _relire_courant(self) -> None:
+        if self._chemin_points_courant:
+            self.ouvrir_relecture(self._chemin_points_courant)
+        else:
+            self.aller_a("relecture")
+
+    def ouvrir_relecture(self, chemin_points, image_de_page=None) -> None:
+        """Charge `<nom>_points.json` dans l'écran Relecture et l'affiche."""
+        import relecture_modele as rm
+        self._chemin_points_courant = chemin_points
+        self._relecture_courante = rm.Relecture(chemin_points)
+        self._excel_courant = str(self._relecture_courante.chemin_excel())
+        self.page_relecture.definir_relecture(self._relecture_courante,
+                                              image_de_page=image_de_page)
+        self.maj_compteur_relecture()
+        self.aller_a("relecture")
+
+    def ouvrir_termine_depuis(self, chemin_points) -> None:
+        """Construit un résumé minimal depuis le points.json et affiche l'écran Terminé."""
+        import json
+        from pathlib import Path
+        env = json.loads(Path(chemin_points).read_text(encoding="utf-8"))
+        points = env.get("points", [])
+        self._excel_courant = env.get("excel") or None
+        fichier = env.get("document") or Path(env.get("excel", "")).stem
+        self.page_termine.definir_resume({"fichier": fichier}, points)
+        self.aller_a("termine")
+
+    def maj_compteur_relecture(self) -> None:
+        n = (self._relecture_courante.a_voir() if self._relecture_courante is not None
+             else self._points_a_relire)
+        pastille = getattr(self, "pastilles", {}).get("nav_relecture")
+        if pastille is not None:
+            pastille.setText(str(n))
+
+    def _ouvrir_excel(self) -> None:
+        self._ouvrir_dans_systeme(self._excel_courant)
+
+    def _ouvrir_dossier(self) -> None:
+        from pathlib import Path
+        dossier = str(Path(self._excel_courant).parent) if self._excel_courant else None
+        self._ouvrir_dans_systeme(dossier)
+
+    @staticmethod
+    def _ouvrir_dans_systeme(chemin) -> None:
+        # Ouvre le fichier / dossier avec l'application par défaut du système (code existant).
+        from pathlib import Path
+
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        if chemin and Path(chemin).exists():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(chemin)))
 
     def _construire_barre_laterale(self) -> QWidget:
         c = self._jetons["couleurs"]
