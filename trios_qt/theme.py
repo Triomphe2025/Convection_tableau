@@ -533,6 +533,10 @@ QPushButton[classe="nav"]:checked {{
     font-weight: 600;
     font-size: {int(t['aide'])}px;
 }}
+#ligne_pendant {{
+    background-color: {c['fond']};
+    border-radius: {int(r['bouton'])}px;
+}}
 """.strip()
 
 

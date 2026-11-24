@@ -64,7 +64,7 @@ class DiagrammeLots(QWidget):
         rapatrié = revenu à gauche (PC) ; envoi = en route ; chez Anthropic = à droite."""
         phase = self._lots[i].get("phase")
         if phase == PageAttenteLot.RAPATRIE:
-            return 0.0
+            return 0.62   # revenu sur sa piste « retour », vers la droite (comme la maquette)
         if phase == PageAttenteLot.ENVOI:
             return 0.4
         return 0.85   # chez Anthropic
@@ -289,8 +289,8 @@ class PageAttenteLot(QWidget):
         v.setSpacing(6)
         rangee = QHBoxLayout()
         self.anneau = Anneau(self._jetons, carte)
-        self.anneau.setFixedSize(96, 96)
-        self.anneau.definir_taille_pourcentage(22)   # « 52 » tient dans l'anneau
+        self.anneau.setFixedSize(100, 100)
+        self.anneau.definir_taille_pourcentage(26)   # nombre seul en grand (« 52 »)
         self.anneau.definir_couleur(self._jetons["couleurs"]["lot_en_cours"])   # arc violet
         rangee.addWidget(self.anneau, 0)
         droite = QVBoxLayout()
@@ -360,11 +360,11 @@ class PageAttenteLot(QWidget):
         return self.carte_pendant
 
     def _ligne_action(self, lien, rappel):
-        cadre = QWidget(self.carte_pendant)
+        cadre = QFrame(self.carte_pendant)
+        cadre.setObjectName("ligne_pendant")   # léger fond de ligne, comme la maquette
         h = QHBoxLayout(cadre)
-        h.setContentsMargins(0, 0, 0, 0)
-        etiquette = QLabel("", cadre)
-        etiquette.setObjectName("temps_detail")
+        h.setContentsMargins(10, 6, 10, 6)
+        etiquette = QLabel("", cadre)           # taille de texte normale (défaut)
         bouton = QPushButton(lien, cadre)
         bouton.setObjectName("lien_action")
         bouton.setCursor(Qt.CursorShape.PointingHandCursor)

@@ -155,10 +155,12 @@ class TestPastilles:
                                         compteurs={"requetes": 22, "taille_mo": 5.0}))
         page.sur_evenement(ev.Evenement(type=ev.LOT_ETAT, lot="b1",
                                         compteurs={"lues": 2, "total": 22, "delai": 30}))
-        assert page.diagramme.position_fraction(0) >= 0.5
+        chez = page.diagramme.position_fraction(0)
+        assert chez >= 0.8   # chez Anthropic : tout à droite
         page.sur_evenement(ev.Evenement(type=ev.LOT_RECUPERE, lot="b1",
                                         compteurs={"lues": 22, "total": 22}))
-        assert page.diagramme.position_fraction(0) <= 0.1   # rapatrié : revenu à gauche
+        rapatrie = page.diagramme.position_fraction(0)
+        assert 0.4 <= rapatrie < chez   # revenu sur sa piste « retour », distinct de « chez »
 
 
 class TestSansPause:
